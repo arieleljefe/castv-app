@@ -7,11 +7,8 @@ import fi.iki.elonen.NanoHTTPD
 import java.io.FileInputStream
 import java.io.InputStream
 
-/** Servidor HTTP embebido. URLs de la forma /video/123.mp4 o /audio/45.mp3.
- *  Soporta Content-Length, HEAD y Range (206), que los TV (VIDAA/DLNA) exigen. */
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
-    /** Lee solo [length] bytes de un archivo y cierra el descriptor al terminar. */
     private class BoundedStream(
         private val pfd: ParcelFileDescriptor,
         private val input: FileInputStream,
@@ -65,7 +62,6 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
         val total = pfd.statSize
 
-        // Range: bytes=start-end
         var start = 0L
         var end = total - 1
         var partial = false
@@ -75,7 +71,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             val s = spec.substringBefore("-")
             val e = spec.substringAfter("-", "")
             try {
-                if (s.isEmpty()) { // sufijo: últimos N bytes
+                if (s.isEmpty()) {
                     val n = e.toLong()
                     start = maxOf(0L, total - n)
                 } else {
@@ -110,7 +106,9 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         response.addHeader("Accept-Ranges", "bytes")
         if (partial) response.addHeader("Content-Range", "bytes $start-$end/$total")
-        response.addHeader("transferMode.dlna.org", "Streaming")
+        
+        // CORREGIDO: Usar "Interactive" tal como lo exige VIDAA y usa el script de Python
+        response.addHeader("transferMode.dlna.org", "Interactive")
         response.addHeader("contentFeatures.dlna.org",
             "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
         return response
