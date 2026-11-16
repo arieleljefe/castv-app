@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="2.0"
+            android:text="2.1"
             android:textColor="@color/accent"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -162,6 +162,24 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Filtro activo (carpeta / artista / álbum / lista): al tocarlo se quita -->
+    <TextView
+        android:id="@+id/tvFilter"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_chip"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:textColor="@color/accent"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
@@ -192,6 +210,18 @@
             android:footerDividersEnabled="false"
             android:headerDividersEnabled="false"
             android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:padding="32dp"
+            android:textColor="@color/vlc_muted"
+            android:textSize="15sp"
+            android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/fabShuffle"

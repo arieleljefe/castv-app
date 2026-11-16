@@ -15,55 +15,154 @@ object TvController {
     var controlPath: String = "/upnp/control/mingusavtr"
     var renderPath: String? = null
 
-    /** Busca el TV en la red local por SSDP (igual que hicimos con el script ssdp.py),
-     *  para no tener que hardcodear la IP del televisor. */
-    fun discoverTv(timeoutMs: Int = 4000): Boolean {
-        val socket = DatagramSocket()
-        socket.soTimeout = timeoutMs
-        val msg = "M-SEARCH * HTTP/1.1\r\n" +
-                "HOST: 239.255.255.250:1900\r\n" +
-                "MAN: \"ssdp:discover\"\r\n" +
-                "MX: 3\r\n" +
-                "ST: urn:schemas-upnp-org:service:AVTransport:1\r\n\r\n"
+    var tvName: String = ""
+
+    data class Tv(val name: String, val ip: String, val port: Int, val path: String)
+
+    private const val DEFAULT_CONTROL = "/upnp/control/mingusavtr"
+
+    private val locPattern: Pattern =
+        Pattern.compile("LOCATION:\\s*http://([^:/]+):(\\d+)(/\\S*)", Pattern.CASE_INSENSITIVE)
+
+    private val ssdpMsg = "M-SEARCH * HTTP/1.1\r\n" +
+            "HOST: 239.255.255.250:1900\r\n" +
+            "MAN: \"ssdp:discover\"\r\n" +
+            "MX: 3\r\n" +
+            "ST: urn:schemas-upnp-org:service:AVTransport:1\r\n\r\n"
+
+    private fun sendSsdp(socket: DatagramSocket) {
         val packet = DatagramPacket(
-            msg.toByteArray(), msg.length,
+            ssdpMsg.toByteArray(), ssdpMsg.length,
             InetSocketAddress("239.255.255.250", 1900)
         )
-        return try {
-            socket.send(packet)
+        socket.send(packet)
+    }
+
+    /** Usa un TV ya encontrado (lee su descripción UPnP para sacar las rutas de control). */
+    fun select(tv: Tv) {
+        tvIp = tv.ip
+        tvPort = tv.port
+        tvName = tv.name
+        controlPath = DEFAULT_CONTROL
+        renderPath = null
+        fetchControlPath("http://${tv.ip}:${tv.port}${tv.path}")
+    }
+
+    /** Busca el TV en la red local por SSDP (igual que hicimos con el script ssdp.py),
+     *  para no tener que hardcodear la IP del televisor.
+     *  Si hay varios aparatos, prefiere el de [preferIp] (el último que elegiste). */
+    fun discoverTv(timeoutMs: Int = 4000, preferIp: String? = null): Boolean {
+        val socket = DatagramSocket()
+        socket.soTimeout = 1000
+        var fallback: Tv? = null
+        try {
+            sendSsdp(socket)
             val buf = ByteArray(2048)
             val start = System.currentTimeMillis()
             while (System.currentTimeMillis() - start < timeoutMs) {
                 val resp = DatagramPacket(buf, buf.size)
-                socket.receive(resp)
+                try {
+                    socket.receive(resp)
+                } catch (e: java.net.SocketTimeoutException) {
+                    if (fallback != null) break
+                    continue
+                }
                 val text = String(resp.data, 0, resp.length)
-                val locMatcher = Pattern.compile("LOCATION:\\s*http://([^:/]+):(\\d+)(/\\S*)", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                if (locMatcher.find()) {
-                    tvIp = locMatcher.group(1)
-                    tvPort = locMatcher.group(2)?.toIntOrNull() ?: 38400
-                    fetchControlPath("http://${tvIp}:${tvPort}${locMatcher.group(3)}")
-                    socket.close()
+                val m = locPattern.matcher(text)
+                if (!m.find()) continue
+                val ip = m.group(1) ?: continue
+                val port = m.group(2)?.toIntOrNull() ?: 38400
+                val path = m.group(3) ?: continue
+                val tv = Tv(ip, ip, port, path)
+                if (preferIp == null || preferIp == ip) {
+                    select(tv)
                     return true
                 }
+                if (fallback == null) fallback = tv
             }
-            false
+            val fb = fallback
+            if (fb != null) {
+                select(fb)
+                return true
+            }
+            return false
         } catch (e: Exception) {
-            false
+            return false
         } finally {
             if (!socket.isClosed) socket.close()
         }
     }
 
-    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport.
-     *  Si falla, se queda con la ruta por defecto. */
-    private fun fetchControlPath(descUrl: String) {
+    /** ¿Responde el TV en su puerto? (más fiable que un SOAP, que puede dar error si no hay nada cargado). */
+    fun isReachable(timeoutMs: Int = 1500): Boolean {
+        val ip = tvIp ?: return false
+        return try {
+            java.net.Socket().use { sk ->
+                sk.connect(InetSocketAddress(ip, tvPort), timeoutMs)
+                true
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Lista todos los aparatos de la red que aceptan reproducir (TVs, bocinas, etc.). */
+    fun scanAll(timeoutMs: Int = 3500): List<Tv> {
+        val found = LinkedHashMap<String, Tv>()
+        val socket = DatagramSocket()
+        socket.soTimeout = 700
         try {
+            sendSsdp(socket)
+            val buf = ByteArray(2048)
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < timeoutMs) {
+                val resp = DatagramPacket(buf, buf.size)
+                try {
+                    socket.receive(resp)
+                } catch (e: java.net.SocketTimeoutException) {
+                    continue
+                }
+                val text = String(resp.data, 0, resp.length)
+                val m = locPattern.matcher(text)
+                if (!m.find()) continue
+                val ip = m.group(1) ?: continue
+                if (found.containsKey(ip)) continue
+                val port = m.group(2)?.toIntOrNull() ?: 38400
+                val path = m.group(3) ?: continue
+                val xml = fetchDescription("http://$ip:$port$path")
+                val name = if (xml != null) friendlyOf(xml) else null
+                found[ip] = Tv(name ?: ip, ip, port, path)
+            }
+        } catch (e: Exception) {
+        } finally {
+            if (!socket.isClosed) socket.close()
+        }
+        return ArrayList(found.values)
+    }
+
+    private fun fetchDescription(descUrl: String): String? {
+        return try {
             val conn = URL(descUrl).openConnection() as HttpURLConnection
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
             val xml = conn.inputStream.bufferedReader().readText()
             conn.disconnect()
+            xml
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun friendlyOf(xml: String): String? =
+        Regex("<friendlyName>\\s*([^<]*?)\\s*</friendlyName>", RegexOption.IGNORE_CASE)
+            .find(xml)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+
+    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport.
+     *  Si falla, se queda con la ruta por defecto. */
+    private fun fetchControlPath(descUrl: String) {
+        try {
+            val xml = fetchDescription(descUrl) ?: return
+            friendlyOf(xml)?.let { tvName = it }
             val m = Pattern.compile(
                 "<service>(?:(?!</service>).)*?AVTransport(?:(?!</service>).)*?<controlURL>\\s*([^<\\s]+)\\s*</controlURL>",
                 Pattern.DOTALL

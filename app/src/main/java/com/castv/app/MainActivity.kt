@@ -17,6 +17,11 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.content.res.ColorStateList
 import android.net.Uri
+import android.media.PlaybackParams
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Equalizer
+import android.view.KeyEvent
+import android.widget.AbsListView
 import android.widget.PopupMenu
 import android.os.PowerManager
 import android.os.Build
@@ -82,11 +87,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nowThumbBox: FrameLayout
     private lateinit var nowIcon: ImageView
     private lateinit var nowThumb: ImageView
+    private lateinit var tvFilter: TextView
+    private lateinit var tvEmpty: TextView
+    private lateinit var btnPlay: ImageButton
+    private lateinit var fab: View
+    private lateinit var footerView: View
+    private var footerAttached = true
+    private var fabShown = true
 
     private enum class Sort(val label: String) {
         NAME_ASC("↕ A-Z"), NAME_DESC("↕ Z-A"), NEWEST("↕ Recientes"),
-        LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos")
+        LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos"),
+        MOST_PLAYED("↕ Más reproducidas"), RECENT_PLAYED("↕ Reproducidas hace poco")
     }
+
+    private enum class Repeat { OFF, ALL, ONE }
 
     private enum class ViewMode(val label: String) {
         ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar")
@@ -157,7 +172,24 @@ class MainActivity : AppCompatActivity() {
     private var playIndex = -1
     @Volatile private var playingItem: MediaItem? = null
     private var showingMusic = false
-    private var autoNext = false
+    private var repeatMode = Repeat.OFF
+    private var selectedArtist: String? = null
+    private var selectedAlbum: String? = null
+    private var selectedPlaylist: String? = null
+    @Volatile private var sleepAtMs = 0L
+    @Volatile private var sleepAfterTrack = false
+    private var speed = 1.0f
+    private var speedTouched = false
+    private val speedValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+    private val speedLabels = arrayOf("0.5x", "0.75x", "1x (normal)", "1.25x", "1.5x", "1.75x", "2x")
+    private var equalizer: Equalizer? = null
+    private var bassBoost: BassBoost? = null
+    private var eqPreset = -1
+    private var bassOn = false
+    private var eqNames: List<String> = emptyList()
+    @Volatile private var tvFails = 0
+    @Volatile private var tvOnline = false
+    private val nameKeyCache = HashMap<Long, String>()
     private var userSeeking = false
     private var volTouching = false
     private var muted = false
@@ -206,6 +238,8 @@ class MainActivity : AppCompatActivity() {
         val inflater = LayoutInflater.from(this)
         val footer = inflater.inflate(R.layout.footer_credits, listFiles, false)
         listFiles.addFooterView(footer, null, false)
+        footerView = footer
+        footerAttached = true
 
         tvStatus = findViewById(R.id.tvStatus)
         tvNowPlaying = findViewById(R.id.tvNowPlaying)
@@ -235,11 +269,19 @@ class MainActivity : AppCompatActivity() {
         btnQuick = findViewById(R.id.btnQuick)
         btnExpand = findViewById(R.id.btnExpand)
         playerExpanded = findViewById(R.id.playerExpanded)
+        tvFilter = findViewById(R.id.tvFilter)
+        tvEmpty = findViewById(R.id.tvEmpty)
+        btnPlay = findViewById(R.id.btnPlay)
+        fab = findViewById(R.id.fabShuffle)
 
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
 
         outPhone = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("outPhone", false)
+        repeatMode = Repeat.values().getOrElse(
+            getSharedPreferences("castv", MODE_PRIVATE).getInt("repeat", 0)) { Repeat.OFF }
+        eqPreset = getSharedPreferences("castv", MODE_PRIVATE).getInt("eqPreset", -1)
+        bassOn = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("bassOn", false)
         updateOutputButton()
         btnOutput.setOnClickListener {
             outPhone = !outPhone
@@ -264,7 +306,14 @@ class MainActivity : AppCompatActivity() {
         tabAll.setOnClickListener { viewMode = ViewMode.ALL; applyFilters() }
         tabFavs.setOnClickListener { viewMode = ViewMode.FAVS; applyFilters() }
         tabResume.setOnClickListener { viewMode = ViewMode.RESUME; applyFilters() }
-        findViewById<View>(R.id.fabShuffle).setOnClickListener { shuffleAndPlay() }
+        fab.setOnClickListener { shuffleAndPlay() }
+        tvFilter.setOnClickListener { clearFilters() }
+        listFiles.setOnScrollListener(object : AbsListView.OnScrollListener {
+            override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) {
+                setFabShown(scrollState == AbsListView.OnScrollListener.SCROLL_STATE_IDLE)
+            }
+            override fun onScroll(view: AbsListView?, firstVisibleItem: Int, visibleItemCount: Int, totalItemCount: Int) {}
+        })
         btnSearch.setOnClickListener { toggleSearch() }
         btnMenu.setOnClickListener { showMainMenu() }
         btnQuick.setOnClickListener { if (playingItem == null) step(+1) else togglePlayPause() }
@@ -294,18 +343,8 @@ class MainActivity : AppCompatActivity() {
         btnClearSearch.setOnClickListener { etSearch.setText("") }
 
         btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
-        findViewById<View>(R.id.btnPause).setOnClickListener {
-            if (localActive) {
-                withLocal { it.pause() }
-                saveProgress()
-            } else thread { TvController.pause() }
-        }
-        findViewById<View>(R.id.btnPlay).setOnClickListener {
-            manualStop = false
-            if (localActive) {
-                pausedByFocus = false
-                withLocal { it.start() }
-            } else thread { TvController.play() }
+        btnPlay.setOnClickListener {
+            if (playingItem == null) step(+1) else togglePlayPause()
         }
         findViewById<View>(R.id.btnStop).setOnClickListener {
             manualStop = true
@@ -321,7 +360,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnPrev).setOnClickListener { step(-1) }
         findViewById<View>(R.id.btnNext).setOnClickListener { step(+1) }
         findViewById<View>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
-        btnAuto.setOnClickListener { toggleAuto() }
+        btnAuto.setOnClickListener { cycleRepeat() }
 
         findViewById<Button>(R.id.btnBack10).setOnClickListener {
             val t = maxOf(0, lastPos - 10)
@@ -390,7 +429,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        btnAuto.alpha = 0.5f
+        updateRepeatButton()
         updateTabs()
         updateQueueBadge()
         checkPermissionsAndStart()
@@ -411,8 +450,29 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
     override fun onBackPressed() {
-        // Con música sonando en el teléfono, "atrás" minimiza en vez de cerrar y cortar la música
-        if (localActive) moveTaskToBack(true) else super.onBackPressed()
+        // Primero se cierra lo que esté abierto; con música en el teléfono, "atrás" minimiza
+        // en vez de cerrar y cortar la música
+        when {
+            searchBar.visibility == View.VISIBLE -> toggleSearch()
+            playerExpanded.visibility == View.VISIBLE -> setPlayerExpanded(false)
+            hasActiveFilter() -> clearFilters()
+            localActive -> moveTaskToBack(true)
+            else -> super.onBackPressed()
+        }
+    }
+
+    /** Con algo sonando en el TV, los botones de volumen del teléfono suben/bajan el volumen del TV. */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) &&
+            !localActive && TvController.tvIp != null && playingItem != null) {
+            val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 5 else -5
+            val v = (volSeek.progress + delta).coerceIn(0, 100)
+            volSeek.progress = v
+            setStatus("🔊 Volumen del TV: $v")
+            thread { TvController.setVolume(v) }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun openUrl(url: String) {
@@ -449,29 +509,36 @@ class MainActivity : AppCompatActivity() {
         } else {
             startService(intent)
         }
-        showMovies()
+        if (getSharedPreferences("castv", MODE_PRIVATE).getBoolean("lastMusic", false)) showMusic()
+        else showMovies()
         monitoring = true
         thread { monitorLoop() }
     }
 
     private fun showMovies() {
         showingMusic = false
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("lastMusic", false).apply()
+        nameKeyCache.clear()
         allItems = MediaScanner.scanVideos(this)
         computeDups()
         selectedFolder = null
+        selectedArtist = null
+        selectedAlbum = null
         applyFilters()
         updateTabs()
-        if (allItems.isEmpty()) setStatus("No hay videos encontrados.")
     }
 
     private fun showMusic() {
         showingMusic = true
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("lastMusic", true).apply()
+        nameKeyCache.clear()
         allItems = MediaScanner.scanMusic(this)
         computeDups()
         selectedFolder = null
+        selectedArtist = null
+        selectedAlbum = null
         applyFilters()
         updateTabs()
-        if (allItems.isEmpty()) setStatus("No hay música encontrada.")
     }
 
     // ------------------------------------------- Buscar, ordenar, carpetas
@@ -481,13 +548,26 @@ class MainActivity : AppCompatActivity() {
     private fun norm(s: String): String =
         Normalizer.normalize(s, Normalizer.Form.NFD).replace(diacritics, "").lowercase()
 
-    /** Mismo nombre y misma duración = copia del mismo archivo. Se conserva la más antigua. */
+    private fun nameKey(m: MediaItem): String = nameKeyCache.getOrPut(m.id) { norm(m.name) }
+
+    /** Mismo título (sin extensión ni etiquetas tipo "(MP3_160K)") y duración casi igual
+     *  (±2 s) = copia del mismo archivo. Se conserva la más antigua. */
     private fun computeDups() {
         val d = HashSet<Long>()
-        for (g in allItems.groupBy { norm(it.name) + "|" + it.durationSec }.values) {
+        for (g in allItems.groupBy { norm(prettyTitle(it.name)) }.values) {
             if (g.size < 2) continue
-            val keep = g.minWithOrNull(compareBy<MediaItem>({ it.dateAdded }, { it.id }))!!
-            for (m in g) if (m.id != keep.id) d.add(m.id)
+            val sorted = g.sortedBy { it.durationSec }
+            var start = 0
+            while (start < sorted.size) {
+                var end = start + 1
+                while (end < sorted.size && sorted[end].durationSec - sorted[end - 1].durationSec <= 2) end++
+                if (end - start >= 2) {
+                    val cluster = sorted.subList(start, end)
+                    val keep = cluster.minWithOrNull(compareBy<MediaItem>({ it.dateAdded }, { it.id }))!!
+                    for (m in cluster) if (m.id != keep.id) d.add(m.id)
+                }
+                start = end
+            }
         }
         dupIds = d
     }
@@ -516,6 +596,9 @@ class MainActivity : AppCompatActivity() {
     private fun applyFilters() {
         var list = allItems
         selectedFolder?.let { f -> list = list.filter { it.folder == f } }
+        selectedArtist?.let { ar -> list = list.filter { it.artist == ar } }
+        selectedAlbum?.let { al -> list = list.filter { it.album == al } }
+        selectedPlaylist?.let { pl -> list = list.filter { Store.inList(pl, it) } }
         if (Store.hideDups) list = list.filter { it.id !in dupIds }
         when (viewMode) {
             ViewMode.FAVS -> list = list.filter { Store.isFav(it) }
@@ -523,25 +606,138 @@ class MainActivity : AppCompatActivity() {
             ViewMode.ALL -> {}
         }
         if (query.isNotEmpty()) {
-            val q = norm(query)
-            list = list.filter { norm(it.name).contains(q) }
+            val toks = norm(query).split(' ').filter { it.isNotEmpty() }
+            list = list.filter { m ->
+                val h = norm(m.name + " " + m.artist + " " + m.album)
+                toks.all { t -> h.contains(t) }
+            }
         }
         currentList = when (sortMode) {
-            Sort.NAME_ASC -> list.sortedWith { a, b -> naturalCompare(norm(a.name), norm(b.name)) }
-            Sort.NAME_DESC -> list.sortedWith { a, b -> naturalCompare(norm(b.name), norm(a.name)) }
+            Sort.NAME_ASC -> list.sortedWith { a, b -> naturalCompare(nameKey(a), nameKey(b)) }
+            Sort.NAME_DESC -> list.sortedWith { a, b -> naturalCompare(nameKey(b), nameKey(a)) }
             Sort.NEWEST -> list.sortedByDescending { it.dateAdded }
             Sort.LONGEST -> list.sortedByDescending { it.durationSec }
             Sort.SHORTEST -> list.sortedBy { it.durationSec }
+            Sort.MOST_PLAYED -> list.sortedWith(
+                compareByDescending<MediaItem> { Store.playCount(it) }.thenBy { nameKey(it) })
+            Sort.RECENT_PLAYED -> list.sortedByDescending { Store.lastPlayed(it) }
         }
         refreshList()
         updateTabs()
-        if (allItems.isNotEmpty() && currentList.isEmpty()) {
-            setStatus(when (viewMode) {
-                ViewMode.FAVS -> "Aún no hay favoritos: toca ⋮ en un archivo y elige ☆."
-                ViewMode.RESUME -> "Nada por continuar todavía."
-                ViewMode.ALL -> "Sin resultados."
-            })
+        updateFilterChip()
+        updateEmptyState()
+    }
+
+    private fun hasMediaPermission(): Boolean {
+        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            (if (showingMusic) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_MEDIA_VIDEO)
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+        return ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Mensaje en el centro de la lista cuando no hay nada que mostrar (ya no ensucia la línea de estado). */
+    private fun updateEmptyState() {
+        if (currentList.isNotEmpty()) {
+            tvEmpty.visibility = View.GONE
+            if (!footerAttached) {
+                listFiles.addFooterView(footerView, null, false)
+                footerAttached = true
+            }
+            return
         }
+        val msg = when {
+            !hasMediaPermission() -> "Falta el permiso para leer tus archivos.\nActívalo en Ajustes › Apps › CASTV › Permisos."
+            allItems.isEmpty() -> if (showingMusic) "No se encontró música en el teléfono." else "No se encontraron videos en el teléfono."
+            viewMode == ViewMode.FAVS -> "Aún no hay favoritos.\nToca ⋮ en un archivo y elige ☆."
+            viewMode == ViewMode.RESUME -> "Nada por continuar todavía."
+            query.isNotEmpty() -> "Sin resultados para «$query»."
+            selectedPlaylist != null -> "Esta lista no tiene " + (if (showingMusic) "audios" else "videos") +
+                    ".\nToca ⋮ en un archivo y elige 📃 Añadir a lista."
+            else -> "Sin resultados."
+        }
+        tvEmpty.text = msg
+        tvEmpty.visibility = View.VISIBLE
+        if (footerAttached) {
+            listFiles.removeFooterView(footerView)
+            footerAttached = false
+        }
+    }
+
+    private fun hasActiveFilter(): Boolean =
+        selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null
+
+    private fun clearFilters() {
+        selectedFolder = null
+        selectedArtist = null
+        selectedAlbum = null
+        selectedPlaylist = null
+        applyFilters()
+    }
+
+    /** Etiqueta con los filtros activos; al tocarla se quitan todos. */
+    private fun updateFilterChip() {
+        val parts = ArrayList<String>()
+        selectedFolder?.let { parts.add("📁 " + it.substringAfterLast('/')) }
+        selectedArtist?.let { parts.add("🎤 $it") }
+        selectedAlbum?.let { parts.add("💿 $it") }
+        selectedPlaylist?.let { parts.add("📃 $it") }
+        if (parts.isEmpty()) {
+            tvFilter.visibility = View.GONE
+        } else {
+            tvFilter.text = parts.joinToString("  ·  ") + "   ✕"
+            tvFilter.visibility = View.VISIBLE
+        }
+    }
+
+    private fun setFabShown(show: Boolean) {
+        if (fabShown == show) return
+        fabShown = show
+        if (show) {
+            fab.visibility = View.VISIBLE
+            fab.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start()
+        } else {
+            fab.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setDuration(150)
+                .withEndAction { if (!fabShown) fab.visibility = View.INVISIBLE }
+                .start()
+        }
+    }
+
+    private fun pickArtist() {
+        val counts = allItems.filter { it.artist.isNotBlank() }.groupingBy { it.artist }.eachCount()
+        if (counts.isEmpty()) {
+            toast("Tus archivos no traen el dato del artista")
+            return
+        }
+        val names = counts.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }
+        val labels = ArrayList<String>()
+        labels.add("🎤 Todos los artistas")
+        names.forEach { labels.add("🎤 $it (${counts[it]})") }
+        AlertDialog.Builder(this)
+            .setTitle("Artista")
+            .setItems(labels.toTypedArray()) { _, which ->
+                selectedArtist = if (which == 0) null else names[which - 1]
+                applyFilters()
+            }
+            .show()
+    }
+
+    private fun pickAlbum() {
+        val counts = allItems.filter { it.album.isNotBlank() }.groupingBy { it.album }.eachCount()
+        if (counts.isEmpty()) {
+            toast("Tus archivos no traen el dato del álbum")
+            return
+        }
+        val names = counts.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }
+        val labels = ArrayList<String>()
+        labels.add("💿 Todos los álbumes")
+        names.forEach { labels.add("💿 $it (${counts[it]})") }
+        AlertDialog.Builder(this)
+            .setTitle("Álbum")
+            .setItems(labels.toTypedArray()) { _, which ->
+                selectedAlbum = if (which == 0) null else names[which - 1]
+                applyFilters()
+            }
+            .show()
     }
 
     private fun pickFolder() {
@@ -629,7 +825,16 @@ class MainActivity : AppCompatActivity() {
             else -> "Ocultar duplicados (${dupIds.size})"
         })
         pm.menu.add(0, 3, 2, if (outPhone) "Música en: Teléfono" else "Música en: TV")
-        pm.menu.add(0, 4, 3, "Mis redes y contacto")
+        pm.menu.add(0, 4, 3, "Mis listas")
+        if (showingMusic) {
+            pm.menu.add(0, 5, 4, "Filtrar por artista")
+            pm.menu.add(0, 6, 5, "Filtrar por álbum")
+        }
+        pm.menu.add(0, 7, 6, sleepLabel())
+        pm.menu.add(0, 8, 7, "Velocidad: " + speedShort() + " (teléfono)")
+        pm.menu.add(0, 9, 8, "Ecualizador (teléfono)")
+        pm.menu.add(0, 10, 9, "Elegir TV")
+        pm.menu.add(0, 11, 10, "Mis redes y contacto")
         pm.setOnMenuItemClickListener { mi ->
             when (mi.itemId) {
                 1 -> pickSort()
@@ -638,7 +843,14 @@ class MainActivity : AppCompatActivity() {
                     applyFilters()
                 }
                 3 -> btnOutput.performClick()
-                4 -> showSocials()
+                4 -> showPlaylists()
+                5 -> pickArtist()
+                6 -> pickAlbum()
+                7 -> pickSleepTimer()
+                8 -> pickSpeed()
+                9 -> showEqualizer()
+                10 -> pickTv()
+                11 -> showSocials()
             }
             true
         }
@@ -677,6 +889,7 @@ class MainActivity : AppCompatActivity() {
         lastQuickPlaying = playing
         runOnUiThread {
             btnQuick.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play_w)
+            btnPlay.setImageResource(if (playing) R.drawable.ic_pause_dark else R.drawable.ic_play)
         }
     }
 
@@ -684,11 +897,36 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = msg
     }
 
-    private fun toggleAuto() {
-        autoNext = !autoNext
-        btnAuto.setBackgroundResource(if (autoNext) R.drawable.ctrl_on else R.drawable.ctrl_off)
-        btnAuto.alpha = if (autoNext) 1f else 0.5f
-        setStatus(if (autoNext) "🔁 Auto-avance activado" else "🔁 Auto-avance desactivado")
+    private fun cycleRepeat() {
+        repeatMode = when (repeatMode) {
+            Repeat.OFF -> Repeat.ALL
+            Repeat.ALL -> Repeat.ONE
+            Repeat.ONE -> Repeat.OFF
+        }
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("repeat", repeatMode.ordinal).apply()
+        updateRepeatButton()
+        setStatus(when (repeatMode) {
+            Repeat.OFF -> "🔁 Repetición apagada: al terminar se detiene (la cola sigue)"
+            Repeat.ALL -> "🔁 Auto-avance: sigue con la lista"
+            Repeat.ONE -> "🔂 Repitiendo esta pista"
+        })
+    }
+
+    private fun updateRepeatButton() {
+        btnAuto.setImageResource(if (repeatMode == Repeat.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat)
+        btnAuto.setBackgroundResource(if (repeatMode == Repeat.OFF) R.drawable.ctrl_off else R.drawable.ctrl_on)
+        btnAuto.alpha = if (repeatMode == Repeat.OFF) 0.5f else 1f
+    }
+
+    /** Qué hacer cuando termina una pista (siempre en el hilo principal). */
+    private fun advanceAfterEnd() {
+        if (consumeSleepAfterTrack()) return
+        val cur = playingItem
+        if (repeatMode == Repeat.ONE && cur != null) {
+            startPlayback(cur)
+            return
+        }
+        if (repeatMode == Repeat.ALL || queue.isNotEmpty()) step(+1)
     }
 
     private fun fmt(totalSec: Int): String {
@@ -750,6 +988,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startPlayback(item: MediaItem, resumeAt: Int = 0) {
         playingItem = item
+        Store.registerPlay(item)
         pendingResume = resumeAt
         resumeTries = 0
         manualStop = false
@@ -771,7 +1010,11 @@ class MainActivity : AppCompatActivity() {
 
         thread {
             val phoneIp = getLocalIpAddress()
-            if (phoneIp == null || TvController.tvIp == null) {
+            if (TvController.tvIp == null) {
+                runOnUiThread { setStatus("⚠️ TV no encontrado todavía. Espera unos segundos o usa ⋮ › Elegir TV.") }
+                return@thread
+            }
+            if (phoneIp == null) {
                 runOnUiThread { setStatus("⚠️ No se pudo determinar la red.") }
                 return@thread
             }
@@ -779,7 +1022,7 @@ class MainActivity : AppCompatActivity() {
             val ext = MediaScanner.extFor(item.name, item.isMusic)
             val mime = MediaScanner.mimeFor(item.name, item.isMusic)
             val mediaUrl = "http://$phoneIp:8000/$kind/${item.id}.$ext"
-            val ok = TvController.setUriAndPlay(mediaUrl, item.name, mime, item.isMusic)
+            val ok = TvController.setUriAndPlay(mediaUrl, prettyTitle(item.name), mime, item.isMusic)
             playStartedAt = SystemClock.elapsedRealtime()
             runOnUiThread {
                 setStatus(
@@ -828,10 +1071,18 @@ class MainActivity : AppCompatActivity() {
                     pollLocal(tick)
                 } else if (TvController.tvIp == null) {
                     if (tick % 5 == 0) {
-                        val found = TvController.discoverTv()
+                        val pref = getSharedPreferences("castv", MODE_PRIVATE).getString("tvIp", null)
+                        val found = TvController.discoverTv(preferIp = pref)
+                        if (found) {
+                            tvFails = 0
+                            tvOnline = true
+                        }
+                        val label = if (TvController.tvName.isNotEmpty()) TvController.tvName
+                                    else (TvController.tvIp ?: "")
                         runOnUiThread {
+                            if (found) updateOutputButton()
                             setStatus(
-                                if (found) "✅ TV encontrado: ${TvController.tvIp}"
+                                if (found) "✅ TV encontrado: $label"
                                 else "⚠️ No se encontró el TV. Reintentando..."
                             )
                         }
@@ -839,6 +1090,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     poll(tick)
                 }
+                checkSleep()
             } catch (e: Exception) { }
             tick++
             try { Thread.sleep(1000) } catch (e: InterruptedException) { return }
@@ -847,7 +1099,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun poll(tick: Int) {
         val info = TvController.getPositionInfo()
+        if (info == null) {
+            // Sin respuesta: ¿está apagado el TV / cambió de IP? Tras varios intentos se vuelve a buscar.
+            if (TvController.isReachable()) {
+                tvFails = 0
+            } else {
+                tvFails++
+                if (tvOnline && tvFails >= 3) {
+                    tvOnline = false
+                    runOnUiThread { updateOutputButton() }
+                }
+                if (tvFails >= 8) {
+                    tvFails = 0
+                    TvController.tvIp = null
+                    runOnUiThread { setStatus("⚠️ Se perdió la conexión con el TV. Buscándolo de nuevo...") }
+                    return
+                }
+            }
+        }
         if (info != null) {
+            tvFails = 0
+            if (!tvOnline) {
+                tvOnline = true
+                runOnUiThread { updateOutputButton() }
+            }
             val (pos, rawDur) = info
             val dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: 0)
             lastPos = pos
@@ -897,7 +1172,7 @@ class MainActivity : AppCompatActivity() {
                 playingItem?.let { Store.clearResume(it) }   // terminó: ya no hay nada que continuar
                 runOnUiThread {
                     adapter.notifyDataSetChanged()
-                    if (autoNext || queue.isNotEmpty()) step(+1)
+                    advanceAfterEnd()
                 }
             }
         }
@@ -914,14 +1189,18 @@ class MainActivity : AppCompatActivity() {
             if (localIsPlaying()) {
                 withLocal { it.pause() }
                 saveProgress()
+                updateQuickIcon(false)
             } else {
                 pausedByFocus = false
                 withLocal { it.start() }
+                applySpeed()
+                updateQuickIcon(true)
             }
         } else {
             val playingNow = tvPlaying
             manualStop = false
             thread { if (playingNow) TvController.pause() else TvController.play() }
+            updateQuickIcon(!playingNow)
         }
         lastNotifKey = ""   // fuerza refrescar el botón en el próximo ciclo
     }
@@ -1029,8 +1308,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateOutputButton() {
         btnOutput.setImageResource(if (outPhone) R.drawable.ic_phone else R.drawable.ic_tv)
+        // cian = teléfono · blanco = TV conectado · ámbar = buscando / sin conexión con el TV
         btnOutput.imageTintList = ColorStateList.valueOf(
-            if (outPhone) 0xFF22D3EE.toInt() else 0xFFFFFFFF.toInt())
+            when {
+                outPhone -> 0xFF22D3EE.toInt()
+                tvOnline -> 0xFFFFFFFF.toInt()
+                else -> 0xFFFFB74D.toInt()
+            })
     }
 
     private fun withLocal(block: (MediaPlayer) -> Unit) {
@@ -1072,6 +1356,8 @@ class MainActivity : AppCompatActivity() {
                     if (resumeAt > 0) p.seekTo(resumeAt * 1000)
                     applyLocalVolume()
                     p.start()
+                    attachEffects(p)
+                    applySpeed()
                     wasPlaying = true
                     setStatus(if (resumeAt > 0) "⏩ Retomando en ${fmt(resumeAt)} (teléfono)"
                               else "✅ Reproduciendo en el teléfono")
@@ -1105,6 +1391,7 @@ class MainActivity : AppCompatActivity() {
         localActive = false
         localPrepared = false
         pausedByFocus = false
+        releaseEffects()
         if (mp != null) {
             try { mp.release() } catch (e: Exception) { }
             audioManager.abandonAudioFocus(focusListener)
@@ -1115,7 +1402,7 @@ class MainActivity : AppCompatActivity() {
         playingItem?.let { Store.clearResume(it) }
         wasPlaying = false
         adapter.notifyDataSetChanged()
-        if (autoNext || queue.isNotEmpty()) step(+1)
+        advanceAfterEnd()
     }
 
     private fun pollLocal(tick: Int) {
@@ -1227,7 +1514,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (saved >= 10) {
             AlertDialog.Builder(this)
-                .setTitle(item.name)
+                .setTitle(prettyTitle(item.name))
                 .setItems(arrayOf("⏩ Continuar desde ${fmt(saved)}", "↺ Desde el inicio")) { _, which ->
                     go(if (which == 0) saved else 0)
                 }
@@ -1243,7 +1530,7 @@ class MainActivity : AppCompatActivity() {
         val actions = ArrayList<() -> Unit>()
         labels.add("➕ Añadir a la cola")
         actions.add {
-            queue.add(item); updateQueueBadge(); toast("➕ En cola: ${item.name}")
+            queue.add(item); updateQueueBadge(); toast("➕ En cola: ${prettyTitle(item.name)}")
         }
         labels.add("⏭ Reproducir a continuación")
         actions.add {
@@ -1251,12 +1538,18 @@ class MainActivity : AppCompatActivity() {
         }
         labels.add(if (Store.isFav(item)) "★ Quitar de favoritos" else "☆ Añadir a favoritos")
         actions.add { toggleFav(item) }
+        labels.add("📃 Añadir a lista…")
+        actions.add { addToListDialog(item) }
+        selectedPlaylist?.let { pl ->
+            labels.add("➖ Quitar de «$pl»")
+            actions.add { Store.removeFromList(pl, item); applyFilters() }
+        }
         if (Store.resumeAt(item) >= 10) {
             labels.add("↺ Olvidar el punto guardado")
             actions.add { Store.clearResume(item); applyFilters() }
         }
         AlertDialog.Builder(this)
-            .setTitle(item.name)
+            .setTitle(prettyTitle(item.name))
             .setItems(labels.toTypedArray()) { _, which -> actions[which]() }
             .show()
     }
@@ -1321,6 +1614,286 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ------------------------------------------- Temporizador de apagado
+
+    private fun pauseAll() {
+        if (localActive) {
+            withLocal { it.pause() }
+            saveProgress()
+            updateQuickIcon(false)
+        } else {
+            thread { TvController.pause() }
+        }
+        lastNotifKey = ""
+    }
+
+    private fun checkSleep() {
+        val t = sleepAtMs
+        if (t > 0 && SystemClock.elapsedRealtime() >= t) {
+            sleepAtMs = 0L
+            runOnUiThread {
+                pauseAll()
+                toast("😴 Temporizador: reproducción en pausa")
+            }
+        }
+    }
+
+    /** true si había que parar al terminar la pista (y ya no se sigue con la siguiente). */
+    private fun consumeSleepAfterTrack(): Boolean {
+        if (!sleepAfterTrack) return false
+        sleepAfterTrack = false
+        runOnUiThread { toast("😴 Temporizador: terminó la pista") }
+        return true
+    }
+
+    private fun sleepLabel(): String {
+        if (sleepAfterTrack) return "Temporizador: al terminar la pista"
+        val t = sleepAtMs
+        if (t > 0) {
+            val min = ((t - SystemClock.elapsedRealtime()) / 60000L).toInt() + 1
+            return "Temporizador: $min min"
+        }
+        return "Temporizador de apagado"
+    }
+
+    private fun pickSleepTimer() {
+        val labels = arrayListOf("15 minutos", "30 minutos", "45 minutos", "1 hora", "1 hora 30 min", "Al terminar la pista")
+        val mins = intArrayOf(15, 30, 45, 60, 90)
+        if (sleepAtMs > 0 || sleepAfterTrack) labels.add("✕ Cancelar temporizador")
+        AlertDialog.Builder(this)
+            .setTitle("😴 Temporizador de apagado")
+            .setItems(labels.toTypedArray()) { _, which ->
+                when {
+                    which < mins.size -> {
+                        sleepAfterTrack = false
+                        sleepAtMs = SystemClock.elapsedRealtime() + mins[which] * 60000L
+                        toast("😴 Se pausará en " + labels[which])
+                    }
+                    which == mins.size -> {
+                        sleepAtMs = 0L
+                        sleepAfterTrack = true
+                        toast("😴 Se pausará al terminar esta pista")
+                    }
+                    else -> {
+                        sleepAtMs = 0L
+                        sleepAfterTrack = false
+                        toast("Temporizador cancelado")
+                    }
+                }
+            }
+            .show()
+    }
+
+    // ------------------------------------------- Velocidad y ecualizador (teléfono)
+
+    private fun speedShort(): String {
+        val i = speedValues.indexOf(speed)
+        return if (i >= 0) speedLabels[i].substringBefore(' ') else "${speed}x"
+    }
+
+    /** Solo se toca el reproductor cuando ya está sonando (en pausa algunos teléfonos lo arrancan solo). */
+    private fun applySpeed() {
+        if (!speedTouched) return
+        withLocal { mp ->
+            if (mp.isPlaying) mp.playbackParams = PlaybackParams().setSpeed(speed)
+        }
+    }
+
+    private fun pickSpeed() {
+        if (!outPhone && !localActive) {
+            toast("La velocidad solo funciona con la música en el teléfono")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Velocidad de reproducción")
+            .setSingleChoiceItems(speedLabels, speedValues.indexOf(speed)) { d, which ->
+                speed = speedValues[which]
+                speedTouched = true
+                applySpeed()
+                d.dismiss()
+            }
+            .show()
+    }
+
+    private fun releaseEffects() {
+        try { equalizer?.release() } catch (e: Exception) { }
+        try { bassBoost?.release() } catch (e: Exception) { }
+        equalizer = null
+        bassBoost = null
+    }
+
+    private fun attachEffects(mp: MediaPlayer) {
+        releaseEffects()
+        try {
+            val eq = Equalizer(0, mp.audioSessionId)
+            val n = eq.numberOfPresets.toInt()
+            eqNames = (0 until n).map { i -> eq.getPresetName(i.toShort()) }
+            if (eqPreset in 0 until n) {
+                eq.usePreset(eqPreset.toShort())
+                eq.setEnabled(true)
+            } else {
+                eq.setEnabled(false)
+            }
+            equalizer = eq
+        } catch (e: Exception) {
+            equalizer = null
+        }
+        try {
+            val bb = BassBoost(0, mp.audioSessionId)
+            if (bassOn && bb.strengthSupported) {
+                bb.setStrength(800.toShort())
+                bb.setEnabled(true)
+            } else {
+                bb.setEnabled(false)
+            }
+            bassBoost = bb
+        } catch (e: Exception) {
+            bassBoost = null
+        }
+    }
+
+    private fun showEqualizer() {
+        if (eqNames.isEmpty()) {
+            toast("Pon una pista en el teléfono y vuelve a abrir el ecualizador")
+            return
+        }
+        val labels = ArrayList<String>()
+        labels.add("Sin ecualizador")
+        labels.addAll(eqNames)
+        labels.add(if (bassOn) "🔊 Graves reforzados: SÍ (toca para quitar)" else "🔊 Reforzar graves")
+        AlertDialog.Builder(this)
+            .setTitle("🎚 Ecualizador")
+            .setSingleChoiceItems(labels.toTypedArray(), eqPreset + 1) { d, which ->
+                if (which == labels.size - 1) {
+                    bassOn = !bassOn
+                } else {
+                    eqPreset = which - 1
+                }
+                getSharedPreferences("castv", MODE_PRIVATE).edit()
+                    .putInt("eqPreset", eqPreset).putBoolean("bassOn", bassOn).apply()
+                if (localActive && localPrepared) localPlayer?.let { attachEffects(it) }
+                d.dismiss()
+            }
+            .show()
+    }
+
+    // ------------------------------------------- Listas de reproducción
+
+    private fun promptNewList(onCreated: (String) -> Unit) {
+        val et = EditText(this)
+        et.hint = "Nombre de la lista"
+        et.setSingleLine(true)
+        AlertDialog.Builder(this)
+            .setTitle("Nueva lista")
+            .setView(et)
+            .setPositiveButton("Crear") { _, _ ->
+                val n = et.text.toString().trim()
+                if (n.isEmpty()) {
+                    toast("Escribe un nombre")
+                } else if (!Store.createList(n)) {
+                    toast("Ya existe una lista con ese nombre")
+                } else {
+                    onCreated(n)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun showPlaylists() {
+        val names = Store.listNames()
+        val labels = ArrayList<String>()
+        for (n in names) labels.add("📃 $n (${Store.listSize(n)})")
+        labels.add("➕ Nueva lista…")
+        AlertDialog.Builder(this)
+            .setTitle("Mis listas")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == names.size) {
+                    promptNewList { n -> toast("Lista «$n» creada. Añade pistas con ⋮ › Añadir a lista") }
+                } else {
+                    openPlaylistMenu(names[which])
+                }
+            }
+            .show()
+    }
+
+    private fun openPlaylistMenu(name: String) {
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setItems(arrayOf("📂 Abrir", "🗑 Eliminar lista")) { _, which ->
+                if (which == 0) {
+                    selectedPlaylist = name
+                    viewMode = ViewMode.ALL
+                    applyFilters()
+                } else {
+                    Store.deleteList(name)
+                    if (selectedPlaylist == name) {
+                        selectedPlaylist = null
+                        applyFilters()
+                    }
+                    toast("Lista eliminada")
+                }
+            }
+            .show()
+    }
+
+    private fun addToListDialog(item: MediaItem) {
+        val names = Store.listNames()
+        val labels = ArrayList<String>()
+        for (n in names) labels.add((if (Store.inList(n, item)) "✓ " else "") + n)
+        labels.add("➕ Nueva lista…")
+        AlertDialog.Builder(this)
+            .setTitle("Añadir a lista")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == names.size) {
+                    promptNewList { n ->
+                        Store.addToList(n, item)
+                        toast("➕ Añadida a «$n»")
+                    }
+                } else {
+                    val n = names[which]
+                    if (Store.addToList(n, item)) toast("➕ Añadida a «$n»") else toast("Ya estaba en «$n»")
+                }
+            }
+            .show()
+    }
+
+    // ------------------------------------------- Elegir TV
+
+    private fun pickTv() {
+        setStatus("🔎 Buscando aparatos en la red...")
+        thread {
+            val tvs = TvController.scanAll()
+            runOnUiThread {
+                if (tvs.isEmpty()) {
+                    setStatus("⚠️ No se encontró ningún TV en esta red. ¿Está encendido y en el mismo Wi-Fi?")
+                } else {
+                    val labels = tvs.map { t ->
+                        (if (t.ip == TvController.tvIp) "✓ " else "") + t.name + "  (" + t.ip + ")"
+                    }
+                    setStatus("Elige el aparato donde quieres reproducir")
+                    AlertDialog.Builder(this)
+                        .setTitle("Elegir TV")
+                        .setItems(labels.toTypedArray()) { _, which ->
+                            val tv = tvs[which]
+                            getSharedPreferences("castv", MODE_PRIVATE).edit().putString("tvIp", tv.ip).apply()
+                            setStatus("🔌 Conectando con ${tv.name}...")
+                            thread {
+                                TvController.select(tv)
+                                tvFails = 0
+                                tvOnline = true
+                                runOnUiThread {
+                                    updateOutputButton()
+                                    setStatus("✅ TV: " + TvController.tvName.ifEmpty { tv.ip })
+                                }
+                            }
+                        }
+                        .show()
+                }
+            }
+        }
+    }
+
     // ---------------------------------------------------------- Adaptador
 
     private inner class FileAdapter : BaseAdapter() {
@@ -1365,6 +1938,10 @@ class MainActivity : AppCompatActivity() {
                 if (saved >= 10 && item.durationSec > 0) parts.add("⏩ ${fmt(saved)} / ${fmt(item.durationSec)}")
                 else if (item.durationSec > 0) parts.add(fmt(item.durationSec))
                 if (item.id in dupIds) parts.add("duplicado")
+                if (sortMode == Sort.MOST_PLAYED) {
+                    val c = Store.playCount(item)
+                    if (c > 0) parts.add("▶ ${c}×")
+                }
                 action.text = (if (isFav) "★ " else "") + parts.joinToString("  ·  ")
                 action.setTextColor(if (saved >= 10) 0xFF22D3EE.toInt() else 0xFF8B98A5.toInt())
             }

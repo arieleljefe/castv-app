@@ -11,7 +11,8 @@ data class MediaItem(
     val dateAdded: Long = 0,   // segundos desde epoch
     val folder: String = "",   // ruta relativa, p. ej. "Download/Series"
     val albumId: Long = 0,     // solo audio (carátulas en Android < 10)
-    val artist: String = ""    // solo audio
+    val artist: String = "",   // solo audio
+    val album: String = ""     // solo audio
 )
 
 object MediaScanner {
@@ -36,6 +37,7 @@ object MediaScanner {
         cols.add(if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
         if (music) cols.add(MediaStore.Audio.Media.ALBUM_ID)
         if (music) cols.add(MediaStore.Audio.Media.ARTIST)
+        if (music) cols.add(MediaStore.Audio.Media.ALBUM)
 
         val selection = if (music) "${MediaStore.Audio.Media.IS_MUSIC} != 0" else null
 
@@ -51,6 +53,7 @@ object MediaScanner {
                 if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
             val albumCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID) else -1
             val artistCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ARTIST) else -1
+            val albumNameCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ALBUM) else -1
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 val name = c.getString(nameCol) ?: continue
@@ -62,7 +65,8 @@ object MediaScanner {
                         dateAdded = c.getLong(addCol),
                         folder = folderOf(raw, useRel),
                         albumId = if (albumCol >= 0) c.getLong(albumCol) else 0,
-                        artist = if (artistCol >= 0) cleanArtist(c.getString(artistCol)) else ""
+                        artist = if (artistCol >= 0) cleanArtist(c.getString(artistCol)) else "",
+                        album = if (albumNameCol >= 0) cleanArtist(c.getString(albumNameCol)) else ""
                     )
                 )
             }
