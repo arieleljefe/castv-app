@@ -7,4 +7,5 @@
     <color name="vlc_surface2">#2A2A2A</color>
     <color name="vlc_text">#FFFFFF</color>
     <color name="vlc_muted">#9E9E9E</color>
+    <color name="ic_launcher_bg">#121212</color>
 </resources>
