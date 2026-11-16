@@ -10,7 +10,14 @@ import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.BaseAdapter
+import android.widget.EditText
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.ListView
 import android.widget.SeekBar
@@ -19,6 +26,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.net.Inet4Address
+import java.text.Normalizer
 import java.net.NetworkInterface
 import kotlin.concurrent.thread
 
@@ -37,6 +45,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnMute: Button
     private lateinit var volSeek: SeekBar
 
+    private lateinit var etSearch: EditText
+    private lateinit var btnClearSearch: TextView
+    private lateinit var btnSort: Button
+    private lateinit var btnFolder: Button
+
+    private enum class Sort(val label: String) {
+        NAME_ASC("↕ A-Z"), NAME_DESC("↕ Z-A"), NEWEST("↕ Recientes"),
+        LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos")
+    }
+
+    private var allItems: List<MediaItem> = emptyList()    // todo lo escaneado de la pestaña
+    private var sortMode = Sort.NAME_ASC
+    private var selectedFolder: String? = null             // null = todas las carpetas
+    private var query = ""
     private var currentList: List<MediaItem> = emptyList() // lo que se ve en pantalla
     private var playlist: List<MediaItem> = emptyList()    // lista con la que se avanza
     private var playIndex = -1
@@ -85,11 +107,47 @@ class MainActivity : AppCompatActivity() {
         btnAuto = findViewById(R.id.btnAuto)
         btnMute = findViewById(R.id.btnMute)
         volSeek = findViewById(R.id.volSeek)
+        etSearch = header.findViewById(R.id.etSearch)
+        btnClearSearch = header.findViewById(R.id.btnClearSearch)
+        btnSort = header.findViewById(R.id.btnSort)
+        btnFolder = header.findViewById(R.id.btnFolder)
+
+        sortMode = Sort.values().getOrElse(
+            getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
+        btnSort.text = sortMode.label
 
         adapter = FileAdapter()
         listFiles.adapter = adapter
 
         btnMovies.setOnClickListener { showMovies() }
+
+        etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                query = s?.toString()?.trim() ?: ""
+                btnClearSearch.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
+                applyFilters()
+            }
+        })
+        etSearch.setOnEditorActionListener { v, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(v.windowToken, 0)
+                v.clearFocus()
+                true
+            } else false
+        }
+        btnClearSearch.setOnClickListener { etSearch.setText("") }
+
+        btnSort.setOnClickListener {
+            val all = Sort.values()
+            sortMode = all[(sortMode.ordinal + 1) % all.size]
+            getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("sort", sortMode.ordinal).apply()
+            btnSort.text = sortMode.label
+            applyFilters()
+        }
+        btnFolder.setOnClickListener { pickFolder() }
         btnMusic.setOnClickListener { showMusic() }
         findViewById<Button>(R.id.btnPause).setOnClickListener { thread { TvController.pause() } }
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
@@ -202,18 +260,83 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMovies() {
         showingMusic = false
-        currentList = MediaScanner.scanVideos(this)
-        refreshList()
+        allItems = MediaScanner.scanVideos(this)
+        selectedFolder = null
+        applyFilters()
         updateTabs()
-        if (currentList.isEmpty()) setStatus("No hay videos encontrados.")
+        if (allItems.isEmpty()) setStatus("No hay videos encontrados.")
     }
 
     private fun showMusic() {
         showingMusic = true
-        currentList = MediaScanner.scanMusic(this)
-        refreshList()
+        allItems = MediaScanner.scanMusic(this)
+        selectedFolder = null
+        applyFilters()
         updateTabs()
-        if (currentList.isEmpty()) setStatus("No hay música encontrada.")
+        if (allItems.isEmpty()) setStatus("No hay música encontrada.")
+    }
+
+    // ------------------------------------------- Buscar, ordenar, carpetas
+
+    private fun norm(s: String): String =
+        Normalizer.normalize(s, Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "").lowercase()
+
+    /** Compara "Cap 2" antes que "Cap 10" (números por valor, no letra a letra). */
+    private fun naturalCompare(a: String, b: String): Int {
+        var i = 0; var j = 0
+        while (i < a.length && j < b.length) {
+            if (a[i].isDigit() && b[j].isDigit()) {
+                var ei = i; while (ei < a.length && a[ei].isDigit()) ei++
+                var ej = j; while (ej < b.length && b[ej].isDigit()) ej++
+                val na = a.substring(i, ei).trimStart('0')
+                val nb = b.substring(j, ej).trimStart('0')
+                if (na.length != nb.length) return na.length - nb.length
+                val c = na.compareTo(nb)
+                if (c != 0) return c
+                i = ei; j = ej
+            } else {
+                if (a[i] != b[j]) return a[i].compareTo(b[j])
+                i++; j++
+            }
+        }
+        return (a.length - i) - (b.length - j)
+    }
+
+    private fun applyFilters() {
+        var list = allItems
+        selectedFolder?.let { f -> list = list.filter { it.folder == f } }
+        if (query.isNotEmpty()) {
+            val q = norm(query)
+            list = list.filter { norm(it.name).contains(q) }
+        }
+        currentList = when (sortMode) {
+            Sort.NAME_ASC -> list.sortedWith { a, b -> naturalCompare(norm(a.name), norm(b.name)) }
+            Sort.NAME_DESC -> list.sortedWith { a, b -> naturalCompare(norm(b.name), norm(a.name)) }
+            Sort.NEWEST -> list.sortedByDescending { it.dateAdded }
+            Sort.LONGEST -> list.sortedByDescending { it.durationSec }
+            Sort.SHORTEST -> list.sortedBy { it.durationSec }
+        }
+        refreshList()
+        btnFolder.text = "📁 " + (selectedFolder?.substringAfterLast('/') ?: "Todas") +
+                " (${currentList.size})"
+        if (allItems.isNotEmpty() && currentList.isEmpty()) setStatus("Sin resultados.")
+    }
+
+    private fun pickFolder() {
+        if (allItems.isEmpty()) return
+        val counts = allItems.groupingBy { it.folder }.eachCount()
+        val folders = counts.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }
+        val labels = ArrayList<String>()
+        labels.add("📁 Todas (${allItems.size})")
+        folders.forEach { labels.add("📁 $it (${counts[it]})") }
+        AlertDialog.Builder(this)
+            .setTitle("Carpeta")
+            .setItems(labels.toTypedArray()) { _, which ->
+                selectedFolder = if (which == 0) null else folders[which - 1]
+                applyFilters()
+            }
+            .show()
     }
 
     private fun refreshList() {
@@ -425,14 +548,34 @@ class MainActivity : AppCompatActivity() {
             val item = items[position]
             val isPlaying = item.id == playingId && item.isMusic == playingMusic
             v.findViewById<TextView>(R.id.itemName).text = item.name
-            v.findViewById<TextView>(R.id.itemIcon).text = if (item.isMusic) "🎵" else "🎬"
+            val icon = v.findViewById<TextView>(R.id.itemIcon)
+            val thumb = v.findViewById<ImageView>(R.id.itemThumb)
+            icon.text = if (item.isMusic) "🎵" else "🎬"
+            val tkey = Thumbs.key(item)
+            thumb.tag = tkey
+            val cached = Thumbs.cached(item)
+            if (cached != null) {
+                thumb.setImageBitmap(cached)
+                thumb.visibility = View.VISIBLE
+            } else {
+                thumb.setImageDrawable(null)
+                thumb.visibility = View.GONE
+                if (!Thumbs.isKnownMissing(item)) {
+                    Thumbs.load(this@MainActivity, item) { bmp ->
+                        if (bmp != null && thumb.tag == tkey) {
+                            thumb.setImageBitmap(bmp)
+                            thumb.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            }
             val action = v.findViewById<TextView>(R.id.itemAction)
             if (isPlaying) {
                 action.text = "▶ Reproduciendo en el TV"
                 action.setTextColor(0xFFFF8800.toInt())
                 action.visibility = View.VISIBLE
             } else if (item.durationSec > 0) {
-                action.text = fmt(item.durationSec)
+                action.text = fmt(item.durationSec) + "  ·  " + item.folder.substringAfterLast('/')
                 action.setTextColor(0xFF9E9E9E.toInt())
                 action.visibility = View.VISIBLE
             } else {

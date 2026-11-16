@@ -10,14 +10,28 @@
     android:paddingEnd="16dp"
     android:paddingBottom="10dp">
 
-    <TextView
-        android:id="@+id/itemIcon"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:background="@drawable/bg_icon_circle"
-        android:gravity="center"
-        android:text="🎬"
-        android:textSize="20sp" />
+    <FrameLayout
+        android:layout_width="72dp"
+        android:layout_height="54dp"
+        android:background="@drawable/bg_thumb"
+        android:clipToOutline="true">
+
+        <TextView
+            android:id="@+id/itemIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="🎬"
+            android:textSize="22sp" />
+
+        <ImageView
+            android:id="@+id/itemThumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"

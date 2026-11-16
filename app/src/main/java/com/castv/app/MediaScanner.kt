@@ -1,54 +1,77 @@
 package com.castv.app
 
 import android.content.Context
+import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 
 data class MediaItem(
     val id: Long, val name: String, val uriString: String, val isMusic: Boolean,
-    val durationSec: Int = 0
+    val durationSec: Int = 0,
+    val dateAdded: Long = 0,   // segundos desde epoch
+    val folder: String = "",   // ruta relativa, p. ej. "Download/Series"
+    val albumId: Long = 0      // solo audio (carátulas en Android < 10)
 )
 
 object MediaScanner {
 
-    fun scanVideos(context: Context): List<MediaItem> {
+    fun scanVideos(context: Context): List<MediaItem> = scan(context, false)
+
+    fun scanMusic(context: Context): List<MediaItem> = scan(context, true)
+
+    @Suppress("DEPRECATION")
+    private fun scan(context: Context, music: Boolean): List<MediaItem> {
         val items = mutableListOf<MediaItem>()
-        val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.DURATION)
+        val base: Uri = if (music) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                        else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val useRel = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+
+        val cols = mutableListOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.DURATION,
+            MediaStore.MediaColumns.DATE_ADDED
+        )
+        cols.add(if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
+        if (music) cols.add(MediaStore.Audio.Media.ALBUM_ID)
+
+        val selection = if (music) "${MediaStore.Audio.Media.IS_MUSIC} != 0" else null
+
         context.contentResolver.query(
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projection, null, null,
-            "${MediaStore.Video.Media.DISPLAY_NAME} ASC"
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-            val durCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val name = cursor.getString(nameCol)
-                val uri = "${MediaStore.Video.Media.EXTERNAL_CONTENT_URI}/$id"
-                items.add(MediaItem(id, name, uri, false, (cursor.getLong(durCol) / 1000).toInt()))
+            base, cols.toTypedArray(), selection, null,
+            "${MediaStore.MediaColumns.DISPLAY_NAME} ASC"
+        )?.use { c ->
+            val idCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val nameCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val durCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
+            val addCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+            val pathCol = c.getColumnIndexOrThrow(
+                if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
+            val albumCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID) else -1
+            while (c.moveToNext()) {
+                val id = c.getLong(idCol)
+                val name = c.getString(nameCol) ?: continue
+                val raw = c.getString(pathCol) ?: ""
+                items.add(
+                    MediaItem(
+                        id = id, name = name, uriString = "$base/$id", isMusic = music,
+                        durationSec = (c.getLong(durCol) / 1000).toInt(),
+                        dateAdded = c.getLong(addCol),
+                        folder = folderOf(raw, useRel),
+                        albumId = if (albumCol >= 0) c.getLong(albumCol) else 0
+                    )
+                )
             }
         }
         return items
     }
 
-    fun scanMusic(context: Context): List<MediaItem> {
-        val items = mutableListOf<MediaItem>()
-        val projection = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.DURATION)
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        context.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, selection, null,
-            "${MediaStore.Audio.Media.DISPLAY_NAME} ASC"
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
-            val durCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val name = cursor.getString(nameCol)
-                val uri = "${MediaStore.Audio.Media.EXTERNAL_CONTENT_URI}/$id"
-                items.add(MediaItem(id, name, uri, true, (cursor.getLong(durCol) / 1000).toInt()))
-            }
-        }
-        return items
+    /** Normaliza la ruta a algo como "Download/Series" (sin barras sobrantes ni nombre de archivo). */
+    private fun folderOf(raw: String, relative: Boolean): String {
+        var dir = if (relative) raw else raw.substringBeforeLast('/', "")
+        dir = dir.replace("/storage/emulated/0/", "").replace("/sdcard/", "")
+        dir = dir.trim('/')
+        return if (dir.isEmpty()) "(raíz)" else dir
     }
 
     /** MIME correcto según la extensión (no todo lo "audio" es mpeg ni todo el vídeo mp4). */
