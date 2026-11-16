@@ -15,7 +15,9 @@ import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.content.res.ColorStateList
 import android.net.Uri
+import android.widget.PopupMenu
 import android.os.PowerManager
 import android.os.Build
 import android.os.Bundle
@@ -55,23 +57,30 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvElapsed: TextView
     private lateinit var tvDuration: TextView
     private lateinit var seekBar: SeekBar
-    private lateinit var btnMovies: Button
-    private lateinit var btnMusic: Button
     private lateinit var btnAuto: ImageButton
     private lateinit var btnMute: ImageButton
     private lateinit var volSeek: SeekBar
 
     private lateinit var etSearch: EditText
     private lateinit var btnClearSearch: TextView
-    private lateinit var btnSort: Button
-    private lateinit var btnFolder: Button
-    private lateinit var btnView: Button
-    private lateinit var btnDups: Button
-    private lateinit var btnQueue: Button
+    private lateinit var btnSearch: ImageButton
+    private lateinit var btnMenu: ImageButton
+    private lateinit var searchBar: View
+    private lateinit var tabAll: TextView
+    private lateinit var tabFavs: TextView
+    private lateinit var tabResume: TextView
+    private lateinit var navVideo: TextView
+    private lateinit var navAudio: TextView
+    private lateinit var navFolders: TextView
+    private lateinit var navQueue: TextView
+    private lateinit var btnQuick: ImageButton
+    private lateinit var btnExpand: ImageButton
+    private lateinit var playerExpanded: View
+    private var lastQuickPlaying: Boolean? = null
     private lateinit var btnNowFav: Button
-    private lateinit var btnOutput: Button
+    private lateinit var btnOutput: ImageButton
     private lateinit var nowThumbBox: FrameLayout
-    private lateinit var nowIcon: TextView
+    private lateinit var nowIcon: ImageView
     private lateinit var nowThumb: ImageView
 
     private enum class Sort(val label: String) {
@@ -114,6 +123,9 @@ class MainActivity : AppCompatActivity() {
         const val ACT_TOGGLE = "com.castv.app.ACT_TOGGLE"
         const val ACT_NEXT = "com.castv.app.ACT_NEXT"
         const val CHANNEL_ID = "castv_channel"
+        const val FB_URL = "https://www.facebook.com/share/19x6GMsWUM/"
+        const val IG_URL = "https://www.instagram.com/arieldejesusbuen"
+        const val TT_URL = "https://www.tiktok.com/@arieldejesusbueno0"
     }
     @Volatile private var tvPlaying = false
     private var lastNotifKey = ""
@@ -192,37 +204,40 @@ class MainActivity : AppCompatActivity() {
 
         listFiles = findViewById(R.id.listFiles)
         val inflater = LayoutInflater.from(this)
-        val header = inflater.inflate(R.layout.header_player, listFiles, false)
         val footer = inflater.inflate(R.layout.footer_credits, listFiles, false)
-        listFiles.addHeaderView(header, null, false)
         listFiles.addFooterView(footer, null, false)
 
-        tvStatus = header.findViewById(R.id.tvStatus)
+        tvStatus = findViewById(R.id.tvStatus)
         tvNowPlaying = findViewById(R.id.tvNowPlaying)
         tvElapsed = findViewById(R.id.tvElapsed)
         tvDuration = findViewById(R.id.tvDuration)
         seekBar = findViewById(R.id.seekBar)
-        btnMovies = header.findViewById(R.id.btnMovies)
-        btnMusic = header.findViewById(R.id.btnMusic)
         btnAuto = findViewById(R.id.btnAuto)
         btnMute = findViewById(R.id.btnMute)
         volSeek = findViewById(R.id.volSeek)
-        etSearch = header.findViewById(R.id.etSearch)
-        btnClearSearch = header.findViewById(R.id.btnClearSearch)
-        btnSort = header.findViewById(R.id.btnSort)
-        btnFolder = header.findViewById(R.id.btnFolder)
-        btnView = header.findViewById(R.id.btnView)
-        btnDups = header.findViewById(R.id.btnDups)
-        btnQueue = findViewById(R.id.btnQueue)
+        etSearch = findViewById(R.id.etSearch)
+        btnClearSearch = findViewById(R.id.btnClearSearch)
         btnNowFav = findViewById(R.id.btnNowFav)
-        btnOutput = header.findViewById(R.id.btnOutput)
+        btnOutput = findViewById(R.id.btnOutput)
         nowThumbBox = findViewById(R.id.nowThumbBox)
         nowIcon = findViewById(R.id.nowIcon)
         nowThumb = findViewById(R.id.nowThumb)
+        btnSearch = findViewById(R.id.btnSearch)
+        btnMenu = findViewById(R.id.btnMenu)
+        searchBar = findViewById(R.id.searchBar)
+        tabAll = findViewById(R.id.tabAll)
+        tabFavs = findViewById(R.id.tabFavs)
+        tabResume = findViewById(R.id.tabResume)
+        navVideo = findViewById(R.id.navVideo)
+        navAudio = findViewById(R.id.navAudio)
+        navFolders = findViewById(R.id.navFolders)
+        navQueue = findViewById(R.id.navQueue)
+        btnQuick = findViewById(R.id.btnQuick)
+        btnExpand = findViewById(R.id.btnExpand)
+        playerExpanded = findViewById(R.id.playerExpanded)
 
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
-        btnSort.text = sortMode.label
 
         outPhone = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("outPhone", false)
         updateOutputButton()
@@ -242,7 +257,22 @@ class MainActivity : AppCompatActivity() {
         adapter = FileAdapter()
         listFiles.adapter = adapter
 
-        btnMovies.setOnClickListener { showMovies() }
+        navVideo.setOnClickListener { showMovies() }
+        navAudio.setOnClickListener { showMusic() }
+        navFolders.setOnClickListener { pickFolder() }
+        navQueue.setOnClickListener { showQueue() }
+        tabAll.setOnClickListener { viewMode = ViewMode.ALL; applyFilters() }
+        tabFavs.setOnClickListener { viewMode = ViewMode.FAVS; applyFilters() }
+        tabResume.setOnClickListener { viewMode = ViewMode.RESUME; applyFilters() }
+        findViewById<View>(R.id.fabShuffle).setOnClickListener { shuffleAndPlay() }
+        btnSearch.setOnClickListener { toggleSearch() }
+        btnMenu.setOnClickListener { showMainMenu() }
+        btnQuick.setOnClickListener { if (playingItem == null) step(+1) else togglePlayPause() }
+        val toggleExpand = View.OnClickListener { setPlayerExpanded(playerExpanded.visibility != View.VISIBLE) }
+        btnExpand.setOnClickListener(toggleExpand)
+        tvNowPlaying.setOnClickListener(toggleExpand)
+        nowThumbBox.setOnClickListener(toggleExpand)
+        setPlayerExpanded(false)
 
         etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -263,26 +293,7 @@ class MainActivity : AppCompatActivity() {
         }
         btnClearSearch.setOnClickListener { etSearch.setText("") }
 
-        btnSort.setOnClickListener {
-            val all = Sort.values()
-            sortMode = all[(sortMode.ordinal + 1) % all.size]
-            getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("sort", sortMode.ordinal).apply()
-            btnSort.text = sortMode.label
-            applyFilters()
-        }
-        btnFolder.setOnClickListener { pickFolder() }
-        btnView.setOnClickListener {
-            val all = ViewMode.values()
-            viewMode = all[(viewMode.ordinal + 1) % all.size]
-            applyFilters()
-        }
-        btnDups.setOnClickListener {
-            Store.hideDups = !Store.hideDups
-            applyFilters()
-        }
-        btnQueue.setOnClickListener { showQueue() }
         btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
-        btnMusic.setOnClickListener { showMusic() }
         findViewById<View>(R.id.btnPause).setOnClickListener {
             if (localActive) {
                 withLocal { it.pause() }
@@ -344,9 +355,6 @@ class MainActivity : AppCompatActivity() {
         val fbUrl = "https://www.facebook.com/share/19x6GMsWUM/"
         val igUrl = "https://www.instagram.com/arieldejesusbuen"
         val ttUrl = "https://www.tiktok.com/@arieldejesusbueno0"
-        header.findViewById<View>(R.id.hFb).setOnClickListener { openUrl(fbUrl) }
-        header.findViewById<View>(R.id.hIg).setOnClickListener { openUrl(igUrl) }
-        header.findViewById<View>(R.id.hTt).setOnClickListener { openUrl(ttUrl) }
         footer.findViewById<View>(R.id.fFb).setOnClickListener { openUrl(fbUrl) }
         footer.findViewById<View>(R.id.fIg).setOnClickListener { openUrl(igUrl) }
         footer.findViewById<View>(R.id.fTt).setOnClickListener { openUrl(ttUrl) }
@@ -526,22 +534,10 @@ class MainActivity : AppCompatActivity() {
             Sort.SHORTEST -> list.sortedBy { it.durationSec }
         }
         refreshList()
-        btnFolder.text = "📁 " + (selectedFolder?.substringAfterLast('/') ?: "Todas") +
-                " (${currentList.size})"
-        btnView.text = viewMode.label
-        val on = 0xFF22D3EE.toInt()
-        val off = 0xFFFFFFFF.toInt()
-        btnView.setTextColor(if (viewMode != ViewMode.ALL) on else off)
-        btnFolder.setTextColor(if (selectedFolder != null) on else off)
-        btnSort.setTextColor(off)
-        btnDups.text = when {
-            dupIds.isEmpty() -> "⧉ Sin duplicados"
-            Store.hideDups -> "⧉ Duplicados ocultos (${dupIds.size})"
-            else -> "⧉ Duplicados visibles (${dupIds.size})"
-        }
+        updateTabs()
         if (allItems.isNotEmpty() && currentList.isEmpty()) {
             setStatus(when (viewMode) {
-                ViewMode.FAVS -> "Aún no hay favoritos: toca la ☆ de un archivo."
+                ViewMode.FAVS -> "Aún no hay favoritos: toca ⋮ en un archivo y elige ☆."
                 ViewMode.RESUME -> "Nada por continuar todavía."
                 ViewMode.ALL -> "Sin resultados."
             })
@@ -570,13 +566,118 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTabs() {
-        styleTab(btnMovies, !showingMusic)
-        styleTab(btnMusic, showingMusic)
+        val on = 0xFF22D3EE.toInt()
+        val off = 0xFF8B98A5.toInt()
+        fun nav(t: TextView, active: Boolean) {
+            val c = if (active) on else off
+            t.setTextColor(c)
+            t.compoundDrawableTintList = ColorStateList.valueOf(c)
+        }
+        nav(navVideo, !showingMusic)
+        nav(navAudio, showingMusic)
+        nav(navFolders, selectedFolder != null)
+        navFolders.text = selectedFolder?.substringAfterLast('/') ?: "Carpetas"
+        fun tab(t: TextView, active: Boolean) {
+            t.setBackgroundResource(if (active) R.drawable.tab_active else R.drawable.tab_off)
+            t.setTextColor(if (active) on else off)
+        }
+        tabAll.text = if (showingMusic) "PISTAS" else "VIDEOS"
+        tab(tabAll, viewMode == ViewMode.ALL)
+        tab(tabFavs, viewMode == ViewMode.FAVS)
+        tab(tabResume, viewMode == ViewMode.RESUME)
     }
 
-    private fun styleTab(b: Button, active: Boolean) {
-        b.setBackgroundResource(if (active) R.drawable.tab_active else R.drawable.tab_off)
-        b.setTextColor(if (active) 0xFF22D3EE.toInt() else 0xFF8B98A5.toInt())
+    private fun toggleSearch() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        if (searchBar.visibility == View.VISIBLE) {
+            etSearch.setText("")
+            searchBar.visibility = View.GONE
+            imm.hideSoftInputFromWindow(etSearch.windowToken, 0)
+        } else {
+            searchBar.visibility = View.VISIBLE
+            etSearch.requestFocus()
+            imm.showSoftInput(etSearch, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    private fun setPlayerExpanded(expanded: Boolean) {
+        playerExpanded.visibility = if (expanded) View.VISIBLE else View.GONE
+        btnExpand.rotation = if (expanded) 180f else 0f
+    }
+
+    private fun pickSort() {
+        val all = Sort.values()
+        AlertDialog.Builder(this)
+            .setTitle("Ordenar por")
+            .setSingleChoiceItems(
+                all.map { it.label.removePrefix("↕ ") }.toTypedArray(), sortMode.ordinal
+            ) { d, which ->
+                sortMode = all[which]
+                getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("sort", sortMode.ordinal).apply()
+                applyFilters()
+                d.dismiss()
+            }
+            .show()
+    }
+
+    private fun showMainMenu() {
+        val pm = PopupMenu(this, btnMenu)
+        pm.menu.add(0, 1, 0, "Ordenar: " + sortMode.label.removePrefix("↕ "))
+        pm.menu.add(0, 2, 1, when {
+            dupIds.isEmpty() -> "Duplicados: ninguno"
+            Store.hideDups -> "Mostrar duplicados (${dupIds.size})"
+            else -> "Ocultar duplicados (${dupIds.size})"
+        })
+        pm.menu.add(0, 3, 2, if (outPhone) "Música en: Teléfono" else "Música en: TV")
+        pm.menu.add(0, 4, 3, "Mis redes y contacto")
+        pm.setOnMenuItemClickListener { mi ->
+            when (mi.itemId) {
+                1 -> pickSort()
+                2 -> if (dupIds.isNotEmpty()) {
+                    Store.hideDups = !Store.hideDups
+                    applyFilters()
+                }
+                3 -> btnOutput.performClick()
+                4 -> showSocials()
+            }
+            true
+        }
+        pm.show()
+    }
+
+    private fun openWhatsapp() {
+        val url = "https://wa.me/18094480441?text=" +
+                Uri.encode("Hola Ariel, vi tu app CASTV 2.0 y está excelente!")
+        openUrl(url)
+    }
+
+    private fun showSocials() {
+        val items = arrayOf("Facebook", "Instagram", "TikTok", "WhatsApp: +1 (809) 448-0441")
+        AlertDialog.Builder(this)
+            .setTitle("Creado por Ariel De Jesus Bueno")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> openUrl(FB_URL)
+                    1 -> openUrl(IG_URL)
+                    2 -> openUrl(TT_URL)
+                    3 -> openWhatsapp()
+                }
+            }
+            .show()
+    }
+
+    /** Letra de sección estilo VLC ("#" para números y símbolos). */
+    private fun sectionLetter(name: String): String {
+        val c = norm(name).firstOrNull { !it.isWhitespace() } ?: return "#"
+        return if (c in 'a'..'z') c.uppercaseChar().toString() else "#"
+    }
+
+    private fun updateQuickIcon(playing: Boolean) {
+        if (lastQuickPlaying == playing) return
+        lastQuickPlaying = playing
+        runOnUiThread {
+            btnQuick.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play_w)
+        }
     }
 
     private fun setStatus(msg: String) {
@@ -654,7 +755,7 @@ class MainActivity : AppCompatActivity() {
         manualStop = false
         wasPlaying = false
         playStartedAt = SystemClock.elapsedRealtime()
-        tvNowPlaying.text = item.name
+        tvNowPlaying.text = prettyTitle(item.name)
         bindNowPlaying(item)
         resetProgress()
         adapter.playingId = item.id
@@ -857,6 +958,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshNotification() {
         val item = playingItem ?: return
         val playing = currentlyPlaying()
+        updateQuickIcon(playing)
         updateSessionState(playing)
         val cover = Thumbs.cached(item)
         val dur = if (lastDur > 0) lastDur else item.durationSec
@@ -926,8 +1028,9 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------- Reproducción en el teléfono
 
     private fun updateOutputButton() {
-        btnOutput.text = if (outPhone) "Música en: Teléfono" else "Música en: TV"
-        btnOutput.setTextColor(if (outPhone) 0xFF22D3EE.toInt() else 0xFFFFFFFF.toInt())
+        btnOutput.setImageResource(if (outPhone) R.drawable.ic_phone else R.drawable.ic_tv)
+        btnOutput.imageTintList = ColorStateList.valueOf(
+            if (outPhone) 0xFF22D3EE.toInt() else 0xFFFFFFFF.toInt())
     }
 
     private fun withLocal(block: (MediaPlayer) -> Unit) {
@@ -1075,7 +1178,7 @@ class MainActivity : AppCompatActivity() {
     /** Carátula + estrella del mini reproductor de abajo. */
     private fun bindNowPlaying(item: MediaItem) {
         nowThumbBox.visibility = View.VISIBLE
-        nowIcon.text = if (item.isMusic) "🎵" else "🎬"
+        nowIcon.setImageResource(if (item.isMusic) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
         bindThumb(item, nowThumb)
         updateNowFav()
     }
@@ -1093,8 +1196,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateQueueBadge() {
-        btnQueue.text = if (queue.isEmpty()) "☰" else "☰ ${queue.size}"
-        btnQueue.setTextColor(if (queue.isEmpty()) 0xFF8B98A5.toInt() else 0xFF22D3EE.toInt())
+        navQueue.text = if (queue.isEmpty()) "Cola" else "Cola (${queue.size})"
+        val c = if (queue.isEmpty()) 0xFF8B98A5.toInt() else 0xFF22D3EE.toInt()
+        navQueue.setTextColor(c)
+        navQueue.compoundDrawableTintList = ColorStateList.valueOf(c)
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
@@ -1170,7 +1275,7 @@ class MainActivity : AppCompatActivity() {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val v = convertView ?: LayoutInflater.from(parent.context)
                     .inflate(R.layout.item_queue, parent, false)
-                v.findViewById<TextView>(R.id.qTitle).text = "${position + 1}. ${queue[position].name}"
+                v.findViewById<TextView>(R.id.qTitle).text = "${position + 1}. ${prettyTitle(queue[position].name)}"
                 val up = v.findViewById<TextView>(R.id.qUp)
                 val down = v.findViewById<TextView>(R.id.qDown)
                 val rm = v.findViewById<TextView>(R.id.qRemove)
@@ -1233,33 +1338,39 @@ class MainActivity : AppCompatActivity() {
                 .inflate(R.layout.item_file, parent, false)
             val item = items[position]
             val isPlaying = item.id == playingId && item.isMusic == playingMusic
-            v.findViewById<TextView>(R.id.itemName).text = item.name
-            val icon = v.findViewById<TextView>(R.id.itemIcon)
+            v.findViewById<TextView>(R.id.itemName).text = prettyTitle(item.name)
+            val section = v.findViewById<TextView>(R.id.itemSection)
+            val byName = sortMode == Sort.NAME_ASC || sortMode == Sort.NAME_DESC
+            val letter = sectionLetter(item.name)
+            if (byName && (position == 0 || sectionLetter(items[position - 1].name) != letter)) {
+                section.text = letter
+                section.visibility = View.VISIBLE
+            } else {
+                section.visibility = View.GONE
+            }
+            val icon = v.findViewById<ImageView>(R.id.itemIcon)
             val thumb = v.findViewById<ImageView>(R.id.itemThumb)
-            icon.text = if (item.isMusic) "🎵" else "🎬"
+            icon.setImageResource(if (item.isMusic) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
             bindThumb(item, thumb)
-            val fav = v.findViewById<TextView>(R.id.itemFav)
+            v.findViewById<View>(R.id.itemMore).setOnClickListener { showItemMenu(item) }
             val isFav = Store.isFav(item)
-            fav.text = if (isFav) "★" else "☆"
-            fav.setTextColor(if (isFav) 0xFFFFC107.toInt() else 0xFF8B98A5.toInt())
-            fav.setOnClickListener { toggleFav(item) }
             val action = v.findViewById<TextView>(R.id.itemAction)
             if (isPlaying) {
                 action.text = if (playingLocal) "▶ Reproduciendo en el teléfono" else "▶ Reproduciendo en el TV"
                 action.setTextColor(0xFF22D3EE.toInt())
-                action.visibility = View.VISIBLE
             } else {
                 val saved = Store.resumeAt(item)
                 val parts = ArrayList<String>()
+                parts.add(if (item.artist.isNotBlank()) item.artist else item.folder.substringAfterLast('/'))
                 if (saved >= 10 && item.durationSec > 0) parts.add("⏩ ${fmt(saved)} / ${fmt(item.durationSec)}")
                 else if (item.durationSec > 0) parts.add(fmt(item.durationSec))
-                parts.add(item.folder.substringAfterLast('/'))
                 if (item.id in dupIds) parts.add("duplicado")
-                action.text = parts.joinToString("  ·  ")
+                action.text = (if (isFav) "★ " else "") + parts.joinToString("  ·  ")
                 action.setTextColor(if (saved >= 10) 0xFF22D3EE.toInt() else 0xFF8B98A5.toInt())
-                action.visibility = View.VISIBLE
             }
-            v.setBackgroundResource(if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
+            action.visibility = View.VISIBLE
+            v.findViewById<View>(R.id.itemRow).setBackgroundResource(
+                if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
             return v
         }
     }

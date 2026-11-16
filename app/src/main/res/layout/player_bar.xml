@@ -25,13 +25,15 @@
             android:clipToOutline="true"
             android:visibility="gone">
 
-            <TextView
+            <ImageView
                 android:id="@+id/nowIcon"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="🎬"
-                android:textSize="18sp" />
+                android:contentDescription="@null"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_nav_audio"
+                android:tint="@color/vlc_muted" />
 
             <ImageView
                 android:id="@+id/nowThumb"
@@ -65,19 +67,25 @@
             android:textColor="@color/vlc_muted"
             android:textSize="22sp" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnQueue"
-            android:layout_width="wrap_content"
+        <ImageButton
+            android:id="@+id/btnQuick"
+            android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:minWidth="44dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:text="☰"
-            android:textAllCaps="false"
-            android:textColor="@color/vlc_muted"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:contentDescription="Reproducir o pausar"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_play_w" />
+
+        <ImageButton
+            android:id="@+id/btnExpand"
+            android:layout_width="36dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Mostrar controles"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_expand" />
     </LinearLayout>
 
     <SeekBar
@@ -92,6 +100,13 @@
         android:progressBackgroundTint="#555555"
         android:progressTint="@color/accent"
         android:thumbTint="@color/accent" />
+
+    <LinearLayout
+        android:id="@+id/playerExpanded"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -250,5 +265,6 @@
             android:padding="11dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_repeat" />
+    </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -10,7 +10,8 @@ data class MediaItem(
     val durationSec: Int = 0,
     val dateAdded: Long = 0,   // segundos desde epoch
     val folder: String = "",   // ruta relativa, p. ej. "Download/Series"
-    val albumId: Long = 0      // solo audio (carátulas en Android < 10)
+    val albumId: Long = 0,     // solo audio (carátulas en Android < 10)
+    val artist: String = ""    // solo audio
 )
 
 object MediaScanner {
@@ -34,6 +35,7 @@ object MediaScanner {
         )
         cols.add(if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
         if (music) cols.add(MediaStore.Audio.Media.ALBUM_ID)
+        if (music) cols.add(MediaStore.Audio.Media.ARTIST)
 
         val selection = if (music) "${MediaStore.Audio.Media.IS_MUSIC} != 0" else null
 
@@ -48,6 +50,7 @@ object MediaScanner {
             val pathCol = c.getColumnIndexOrThrow(
                 if (useRel) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA)
             val albumCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID) else -1
+            val artistCol = if (music) c.getColumnIndex(MediaStore.Audio.Media.ARTIST) else -1
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 val name = c.getString(nameCol) ?: continue
@@ -58,13 +61,17 @@ object MediaScanner {
                         durationSec = (c.getLong(durCol) / 1000).toInt(),
                         dateAdded = c.getLong(addCol),
                         folder = folderOf(raw, useRel),
-                        albumId = if (albumCol >= 0) c.getLong(albumCol) else 0
+                        albumId = if (albumCol >= 0) c.getLong(albumCol) else 0,
+                        artist = if (artistCol >= 0) cleanArtist(c.getString(artistCol)) else ""
                     )
                 )
             }
         }
         return items
     }
+
+    private fun cleanArtist(a: String?): String =
+        if (a == null || a == "<unknown>") "" else a.trim()
 
     /** Normaliza la ruta a algo como "Download/Series" (sin barras sobrantes ni nombre de archivo). */
     private fun folderOf(raw: String, relative: Boolean): String {
