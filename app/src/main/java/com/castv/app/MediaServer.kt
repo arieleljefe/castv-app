@@ -40,6 +40,12 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
     }
 
     override fun serve(session: IHTTPSession): Response {
+        if (session.uri == "/log") {
+            if (session.parameters.containsKey("clear")) DebugLog.clear()
+            return newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", DebugLog.dump())
+        }
+        DebugLog.add("TV pide ${session.method} ${session.uri} range=${session.headers["range"] ?: "-"} " +
+                "de ${session.headers["remote-addr"] ?: "?"} ua=${session.headers["user-agent"] ?: "-"}")
         try {
             val parts = session.uri.trim('/').split("/")
             if (parts.size == 2) {
@@ -55,8 +61,10 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 }
             }
         } catch (e: Exception) {
+            DebugLog.add("ERROR sirviendo ${session.uri}: ${e.javaClass.simpleName}: ${e.message}")
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
         }
+        DebugLog.add("404 ${session.uri}")
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
     }
 
@@ -94,6 +102,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             }
         }
         val length = end - start + 1
+        DebugLog.add("  -> ${if (partial) "206" else "200"} $mime bytes $start-$end de $total")
 
         val response: Response
         if (session.method == Method.HEAD) {

@@ -214,9 +214,16 @@ $innerXml
             os.flush()
             os.close()
             val code = conn.responseCode
+            if (code == 200) {
+                DebugLog.add("SOAP $action -> 200 OK")
+            } else {
+                val err = try { conn.errorStream?.bufferedReader()?.readText() } catch (e: Exception) { null }
+                DebugLog.add("SOAP $action -> HTTP $code ${err?.replace(Regex("\\s+"), " ")?.take(400) ?: ""}")
+            }
             conn.disconnect()
             code == 200
         } catch (e: Exception) {
+            DebugLog.add("SOAP $action EXCEPCION ${e.javaClass.simpleName}: ${e.message}")
             false
         }
     }
@@ -292,6 +299,7 @@ $innerXml
     }
 
     fun setUriAndPlay(mediaUrl: String, title: String, mime: String, isMusic: Boolean): Boolean {
+        DebugLog.add("ENVIANDO al TV $tvIp:$tvPort -> $mediaUrl ($mime)")
         val upnpClass = if (isMusic) "object.item.audioItem.musicTrack" else "object.item.videoItem"
         val protocolInfo = "http-get:*:$mime:DLNA.ORG_OP=01;DLNA.ORG_CI=0;" +
                 "DLNA.ORG_FLAGS=01700000000000000000000000000000"
