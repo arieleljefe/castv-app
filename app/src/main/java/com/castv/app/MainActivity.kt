@@ -2,6 +2,9 @@ package com.castv.app
 
 import android.Manifest
 import android.app.NotificationManager
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -115,6 +118,7 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var tvPlaying = false
     private var lastNotifKey = ""
     private var notifReceiverRegistered = false
+    private var mediaSession: MediaSessionCompat? = null
 
     private val notifReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -175,6 +179,16 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(notifReceiver, nf)
         notifReceiverRegistered = true
+        mediaSession = MediaSessionCompat(this, "CASTV").apply {
+            setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlay() { if (!currentlyPlaying()) togglePlayPause() }
+                override fun onPause() { if (currentlyPlaying()) togglePlayPause() }
+                override fun onStop() { if (currentlyPlaying()) togglePlayPause() }
+                override fun onSkipToNext() { step(+1) }
+                override fun onSkipToPrevious() { step(-1) }
+                override fun onSeekTo(pos: Long) { seekToSec((pos / 1000).toInt()) }
+            })
+        }
 
         listFiles = findViewById(R.id.listFiles)
         val inflater = LayoutInflater.from(this)
@@ -381,6 +395,8 @@ class MainActivity : AppCompatActivity() {
             try { unregisterReceiver(notifReceiver) } catch (e: Exception) { }
             notifReceiverRegistered = false
         }
+        try { mediaSession?.isActive = false; mediaSession?.release() } catch (e: Exception) { }
+        mediaSession = null
         postDefaultNotification()
         super.onDestroy()
     }
@@ -809,12 +825,56 @@ class MainActivity : AppCompatActivity() {
         lastNotifKey = ""   // fuerza refrescar el botón en el próximo ciclo
     }
 
+    private fun currentlyPlaying(): Boolean = if (localActive) localIsPlaying() else tvPlaying
+
+    private fun seekToSec(t: Int) {
+        if (localActive) withLocal { it.seekTo(t * 1000) } else thread { TvController.seek(t) }
+    }
+
+    /** Nombre sin extensión ni etiquetas tipo "(MP3_160K)". */
+    private fun prettyTitle(name: String): String {
+        var t = name.substringBeforeLast('.', name)
+        t = t.replace(Regex("\\(?MP3_\\d+K\\)?", RegexOption.IGNORE_CASE), "")
+        return t.trim().trimEnd('_', '-', ' ').ifEmpty { name }
+    }
+
+    private fun updateSessionState(playing: Boolean) {
+        val st = if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+        val actions = PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_SEEK_TO
+        try {
+            mediaSession?.setPlaybackState(
+                PlaybackStateCompat.Builder()
+                    .setActions(actions)
+                    .setState(st, lastPos * 1000L, if (playing) 1f else 0f)
+                    .build()
+            )
+        } catch (e: Exception) { }
+    }
+
     private fun refreshNotification() {
         val item = playingItem ?: return
-        val playing = if (localActive) localIsPlaying() else tvPlaying
-        val key = "${item.id}|${item.isMusic}|$playing|$localActive"
+        val playing = currentlyPlaying()
+        updateSessionState(playing)
+        val cover = Thumbs.cached(item)
+        val dur = if (lastDur > 0) lastDur else item.durationSec
+        val key = "${item.id}|${item.isMusic}|$playing|$localActive|${cover != null}|${dur > 0}"
         if (key == lastNotifKey) return
         lastNotifKey = key
+
+        val title = prettyTitle(item.name)
+        val where = if (localActive) "teléfono" else "TV"
+        try {
+            val md = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "CASTV · $where")
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, dur * 1000L)
+            if (cover != null) md.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, cover)
+            mediaSession?.setMetadata(md.build())
+            mediaSession?.isActive = true
+        } catch (e: Exception) { }
 
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         fun act(action: String, req: Int) =
@@ -825,10 +885,10 @@ class MainActivity : AppCompatActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             flags
         )
-        val where = if (localActive) "teléfono" else "TV"
         val n = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(item.name)
+            .setContentTitle(title)
+            .setLargeIcon(cover)
             .setContentText(if (playing) "Sonando en el $where" else "En pausa · $where")
             .setContentIntent(open)
             .setOngoing(true)
@@ -841,7 +901,9 @@ class MainActivity : AppCompatActivity() {
             )
             .addAction(android.R.drawable.ic_media_next, "Siguiente", act(ACT_NEXT, 3))
             .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    .setShowActionsInCompactView(0, 1, 2)
             )
             .build()
         try {
