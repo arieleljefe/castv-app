@@ -14,7 +14,7 @@ object TvController {
     var tvPort: Int = 38400
     var controlPath: String = "/upnp/control/mingusavtr"
 
-    /** Busca el TV en la red local por SSDP,
+    /** Busca el TV en la red local por SSDP (igual que hicimos con el script ssdp.py),
      *  para no tener que hardcodear la IP del televisor. */
     fun discoverTv(timeoutMs: Int = 4000): Boolean {
         val socket = DatagramSocket()
@@ -54,7 +54,8 @@ object TvController {
         }
     }
 
-    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport. */
+    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport.
+     *  Si falla, se queda con la ruta por defecto. */
     private fun fetchControlPath(descUrl: String) {
         try {
             val conn = URL(descUrl).openConnection() as HttpURLConnection
@@ -110,54 +111,94 @@ $innerXml
         }
     }
 
-    fun getTransportState(): String {
-        val ip = tvIp ?: return "UNKNOWN"
-        return try {
-            val url = URL("http://$ip:$tvPort$controlPath")
-            val envelope = """<?xml version="1.0" encoding="utf-8"?>
+    /** Hace una llamada SOAP y devuelve el cuerpo de la respuesta (o null si falla). */
+    private fun soapCall(action: String, innerXml: String): String? {
+        val ip = tvIp ?: return null
+        val envelope = """<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-<s:Body><u:GetTransportInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:GetTransportInfo></s:Body>
+<s:Body><u:$action xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">$innerXml</u:$action></s:Body>
 </s:Envelope>"""
-            val conn = url.openConnection() as HttpURLConnection
+        return try {
+            val conn = URL("http://$ip:$tvPort$controlPath").openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
             conn.setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
-            conn.setRequestProperty("SOAPAction", "\"urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo\"")
-            conn.outputStream.use { it.write(envelope.toByteArray()) }
-            val body = conn.inputStream.bufferedReader().readText()
-            conn.disconnect()
-            when {
-                body.contains("PLAYING") -> "PLAYING"
-                body.contains("STOPPED") -> "STOPPED"
-                body.contains("PAUSED_PLAYBACK") -> "PAUSED"
-                else -> "UNKNOWN"
+            conn.setRequestProperty("SOAPAction", "\"urn:schemas-upnp-org:service:AVTransport:1#$action\"")
+            conn.outputStream.use { it.write(envelope.toByteArray(Charsets.UTF_8)) }
+            if (conn.responseCode != 200) {
+                conn.disconnect()
+                null
+            } else {
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                body
             }
         } catch (e: Exception) {
-            "UNKNOWN"
+            null
         }
+    }
+
+    private fun tag(body: String, name: String): String? =
+        Regex("<$name>([^<]*)</$name>", RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)
+
+    /** PLAYING, PAUSED, STOPPED (incluye NO_MEDIA_PRESENT) o UNKNOWN. */
+    fun getTransportState(): String {
+        val body = soapCall("GetTransportInfo", "<InstanceID>0</InstanceID>") ?: return "UNKNOWN"
+        return when (tag(body, "CurrentTransportState")?.uppercase()) {
+            "PLAYING" -> "PLAYING"
+            "PAUSED_PLAYBACK" -> "PAUSED"
+            "STOPPED", "NO_MEDIA_PRESENT" -> "STOPPED"
+            else -> "UNKNOWN"
+        }
+    }
+
+    private fun parseTime(t: String?): Int {
+        if (t == null) return -1
+        val parts = t.trim().substringBefore('.').split(":")
+        if (parts.size != 3) return -1
+        val h = parts[0].toIntOrNull() ?: return -1
+        val m = parts[1].toIntOrNull() ?: return -1
+        val sec = parts[2].toIntOrNull() ?: return -1
+        return h * 3600 + m * 60 + sec
+    }
+
+    /** Devuelve (posición, duración) en segundos, o null si el TV no responde. */
+    fun getPositionInfo(): Pair<Int, Int>? {
+        val body = soapCall("GetPositionInfo", "<InstanceID>0</InstanceID>") ?: return null
+        val pos = parseTime(tag(body, "RelTime"))
+        val dur = parseTime(tag(body, "TrackDuration"))
+        return Pair(maxOf(pos, 0), maxOf(dur, 0))
+    }
+
+    /** Salta a un segundo concreto de la pista (si el TV lo soporta). */
+    fun seek(seconds: Int): Boolean {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        val s = seconds % 60
+        val target = String.format("%d:%02d:%02d", h, m, s)
+        return sendSoap("Seek", "<InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>$target</Target>")
     }
 
     fun setUriAndPlay(mediaUrl: String, title: String, mime: String, isMusic: Boolean): Boolean {
         val upnpClass = if (isMusic) "object.item.audioItem.musicTrack" else "object.item.videoItem"
         val protocolInfo = "http-get:*:$mime:DLNA.ORG_OP=01;DLNA.ORG_CI=0;" +
                 "DLNA.ORG_FLAGS=01700000000000000000000000000000"
-        
-        // CORREGIDO: restricted="0" para que VIDAA permita la reproducción directa
+        // DIDL bien formado y escapado UNA sola vez al meterlo en el SOAP
         val didl = "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" " +
                 "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" " +
                 "xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">" +
-                "<item id=\"1\" parentID=\"0\" restricted=\"0\">" +
+                "<item id=\"1\" parentID=\"0\" restricted=\"1\">" +
                 "<dc:title>${xmlEscape(title)}</dc:title>" +
                 "<upnp:class>$upnpClass</upnp:class>" +
                 "<res protocolInfo=\"${xmlEscape(protocolInfo)}\">${xmlEscape(mediaUrl)}</res>" +
                 "</item></DIDL-Lite>"
-        
         val inner = "<InstanceID>0</InstanceID>" +
                 "<CurrentURI>${xmlEscape(mediaUrl)}</CurrentURI>" +
                 "<CurrentURIMetaData>${xmlEscape(didl)}</CurrentURIMetaData>"
 
+        // Stop previo: evita que el TV se quede con la URI/caché anterior
         sendSoap("Stop", "<InstanceID>0</InstanceID>")
         Thread.sleep(400)
         val ok1 = sendSoap("SetAVTransportURI", inner)
