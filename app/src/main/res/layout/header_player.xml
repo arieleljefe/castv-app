@@ -125,7 +125,7 @@
         android:paddingStart="12dp"
         android:paddingTop="8dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="10dp">
+        android:paddingBottom="0dp">
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnSort"
@@ -150,6 +150,43 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="📁 Todas"
+            android:textAllCaps="false"
+            android:textColor="@color/vlc_text"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnView"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip"
+            android:maxLines="1"
+            android:text="Ver: Todos"
+            android:textAllCaps="false"
+            android:textColor="@color/vlc_text"
+            android:textSize="12sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnDups"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="⧉ Duplicados"
             android:textAllCaps="false"
             android:textColor="@color/vlc_text"
             android:textSize="12sp" />

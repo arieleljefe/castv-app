@@ -22,6 +22,8 @@ import android.widget.Button
 import android.widget.ListView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -49,12 +51,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClearSearch: TextView
     private lateinit var btnSort: Button
     private lateinit var btnFolder: Button
+    private lateinit var btnView: Button
+    private lateinit var btnDups: Button
+    private lateinit var btnQueue: Button
+    private lateinit var btnNowFav: Button
+    private lateinit var nowThumbBox: FrameLayout
+    private lateinit var nowIcon: TextView
+    private lateinit var nowThumb: ImageView
 
     private enum class Sort(val label: String) {
         NAME_ASC("↕ A-Z"), NAME_DESC("↕ Z-A"), NEWEST("↕ Recientes"),
         LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos")
     }
 
+    private enum class ViewMode(val label: String) {
+        ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar")
+    }
+
+    private var viewMode = ViewMode.ALL
+    private var dupIds: Set<Long> = emptySet()               // copias repetidas (se conserva la más antigua)
+    private val queue = ArrayList<MediaItem>()               // cola: suena antes de seguir con la lista
+    private var playingFromQueue = false
+    @Volatile private var pendingResume = 0                  // segundo al que saltar cuando el TV ya reproduce
+    @Volatile private var resumeTries = 0
     private var allItems: List<MediaItem> = emptyList()    // todo lo escaneado de la pestaña
     private var sortMode = Sort.NAME_ASC
     private var selectedFolder: String? = null             // null = todas las carpetas
@@ -62,7 +81,7 @@ class MainActivity : AppCompatActivity() {
     private var currentList: List<MediaItem> = emptyList() // lo que se ve en pantalla
     private var playlist: List<MediaItem> = emptyList()    // lista con la que se avanza
     private var playIndex = -1
-    private var playingItem: MediaItem? = null
+    @Volatile private var playingItem: MediaItem? = null
     private var showingMusic = false
     private var autoNext = false
     private var userSeeking = false
@@ -89,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        Store.init(this)
 
         listFiles = findViewById(R.id.listFiles)
         val inflater = LayoutInflater.from(this)
@@ -111,6 +131,13 @@ class MainActivity : AppCompatActivity() {
         btnClearSearch = header.findViewById(R.id.btnClearSearch)
         btnSort = header.findViewById(R.id.btnSort)
         btnFolder = header.findViewById(R.id.btnFolder)
+        btnView = header.findViewById(R.id.btnView)
+        btnDups = header.findViewById(R.id.btnDups)
+        btnQueue = findViewById(R.id.btnQueue)
+        btnNowFav = findViewById(R.id.btnNowFav)
+        nowThumbBox = findViewById(R.id.nowThumbBox)
+        nowIcon = findViewById(R.id.nowIcon)
+        nowThumb = findViewById(R.id.nowThumb)
 
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
@@ -148,6 +175,17 @@ class MainActivity : AppCompatActivity() {
             applyFilters()
         }
         btnFolder.setOnClickListener { pickFolder() }
+        btnView.setOnClickListener {
+            val all = ViewMode.values()
+            viewMode = all[(viewMode.ordinal + 1) % all.size]
+            applyFilters()
+        }
+        btnDups.setOnClickListener {
+            Store.hideDups = !Store.hideDups
+            applyFilters()
+        }
+        btnQueue.setOnClickListener { showQueue() }
+        btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
         btnMusic.setOnClickListener { showMusic() }
         findViewById<Button>(R.id.btnPause).setOnClickListener { thread { TvController.pause() } }
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
@@ -156,8 +194,10 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnStop).setOnClickListener {
             manualStop = true
+            saveProgress()
             thread { TvController.stop() }
             resetProgress()
+            adapter.notifyDataSetChanged()
         }
         findViewById<Button>(R.id.btnPrev).setOnClickListener { step(-1) }
         findViewById<Button>(R.id.btnNext).setOnClickListener { step(+1) }
@@ -210,15 +250,17 @@ class MainActivity : AppCompatActivity() {
 
         listFiles.setOnItemClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
-            if (idx in currentList.indices) {
-                playlist = ArrayList(currentList)
-                playIndex = idx
-                startPlayback(playlist[idx])
-            }
+            if (idx in currentList.indices) playFromList(idx)
+        }
+        listFiles.setOnItemLongClickListener { _, _, position, _ ->
+            val idx = position - listFiles.headerViewsCount
+            if (idx in currentList.indices) showItemMenu(currentList[idx])
+            true
         }
 
         btnAuto.alpha = 0.5f
         updateTabs()
+        updateQueueBadge()
         checkPermissionsAndStart()
     }
 
@@ -261,6 +303,7 @@ class MainActivity : AppCompatActivity() {
     private fun showMovies() {
         showingMusic = false
         allItems = MediaScanner.scanVideos(this)
+        computeDups()
         selectedFolder = null
         applyFilters()
         updateTabs()
@@ -270,6 +313,7 @@ class MainActivity : AppCompatActivity() {
     private fun showMusic() {
         showingMusic = true
         allItems = MediaScanner.scanMusic(this)
+        computeDups()
         selectedFolder = null
         applyFilters()
         updateTabs()
@@ -278,9 +322,21 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------- Buscar, ordenar, carpetas
 
+    private val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
+
     private fun norm(s: String): String =
-        Normalizer.normalize(s, Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "").lowercase()
+        Normalizer.normalize(s, Normalizer.Form.NFD).replace(diacritics, "").lowercase()
+
+    /** Mismo nombre y misma duración = copia del mismo archivo. Se conserva la más antigua. */
+    private fun computeDups() {
+        val d = HashSet<Long>()
+        for (g in allItems.groupBy { norm(it.name) + "|" + it.durationSec }.values) {
+            if (g.size < 2) continue
+            val keep = g.minWithOrNull(compareBy<MediaItem>({ it.dateAdded }, { it.id }))!!
+            for (m in g) if (m.id != keep.id) d.add(m.id)
+        }
+        dupIds = d
+    }
 
     /** Compara "Cap 2" antes que "Cap 10" (números por valor, no letra a letra). */
     private fun naturalCompare(a: String, b: String): Int {
@@ -306,6 +362,12 @@ class MainActivity : AppCompatActivity() {
     private fun applyFilters() {
         var list = allItems
         selectedFolder?.let { f -> list = list.filter { it.folder == f } }
+        if (Store.hideDups) list = list.filter { it.id !in dupIds }
+        when (viewMode) {
+            ViewMode.FAVS -> list = list.filter { Store.isFav(it) }
+            ViewMode.RESUME -> list = list.filter { Store.resumeAt(it) >= 10 }
+            ViewMode.ALL -> {}
+        }
         if (query.isNotEmpty()) {
             val q = norm(query)
             list = list.filter { norm(it.name).contains(q) }
@@ -320,7 +382,19 @@ class MainActivity : AppCompatActivity() {
         refreshList()
         btnFolder.text = "📁 " + (selectedFolder?.substringAfterLast('/') ?: "Todas") +
                 " (${currentList.size})"
-        if (allItems.isNotEmpty() && currentList.isEmpty()) setStatus("Sin resultados.")
+        btnView.text = viewMode.label
+        btnDups.text = when {
+            dupIds.isEmpty() -> "⧉ Sin duplicados"
+            Store.hideDups -> "⧉ Duplicados ocultos (${dupIds.size})"
+            else -> "⧉ Duplicados visibles (${dupIds.size})"
+        }
+        if (allItems.isNotEmpty() && currentList.isEmpty()) {
+            setStatus(when (viewMode) {
+                ViewMode.FAVS -> "Aún no hay favoritos: toca la ☆ de un archivo."
+                ViewMode.RESUME -> "Nada por continuar todavía."
+                ViewMode.ALL -> "Sin resultados."
+            })
+        }
     }
 
     private fun pickFolder() {
@@ -383,6 +457,20 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------- Reproducción
 
     private fun step(delta: Int) {
+        if (delta > 0 && queue.isNotEmpty()) {
+            val next = queue.removeAt(0)
+            updateQueueBadge()
+            playingFromQueue = true
+            startPlayback(next)
+            return
+        }
+        if (delta < 0 && playingFromQueue && playIndex in playlist.indices) {
+            // "Anterior" desde la cola: vuelve a lo que sonaba antes de entrar en ella
+            playingFromQueue = false
+            startPlayback(playlist[playIndex])
+            return
+        }
+        playingFromQueue = false
         if (playlist.isEmpty()) {
             playlist = ArrayList(currentList)
             playIndex = -1
@@ -403,16 +491,20 @@ class MainActivity : AppCompatActivity() {
         currentList = currentList.shuffled()
         playlist = ArrayList(currentList)
         playIndex = 0
+        playingFromQueue = false
         refreshList()
         startPlayback(playlist[0])
     }
 
-    private fun startPlayback(item: MediaItem) {
+    private fun startPlayback(item: MediaItem, resumeAt: Int = 0) {
         playingItem = item
+        pendingResume = resumeAt
+        resumeTries = 0
         manualStop = false
         wasPlaying = false
         playStartedAt = SystemClock.elapsedRealtime()
         tvNowPlaying.text = item.name
+        bindNowPlaying(item)
         resetProgress()
         adapter.playingId = item.id
         adapter.playingMusic = item.isMusic
@@ -432,7 +524,11 @@ class MainActivity : AppCompatActivity() {
             val ok = TvController.setUriAndPlay(mediaUrl, item.name, mime, item.isMusic)
             playStartedAt = SystemClock.elapsedRealtime()
             runOnUiThread {
-                setStatus(if (ok) "✅ Reproduciendo en el TV" else "❌ Error al enviar al TV")
+                setStatus(
+                    if (!ok) "❌ Error al enviar al TV"
+                    else if (resumeAt > 0) "⏩ Retomando en ${fmt(resumeAt)}"
+                    else "✅ Reproduciendo en el TV"
+                )
             }
         }
     }
@@ -519,16 +615,197 @@ class MainActivity : AppCompatActivity() {
 
         if (tick % 2 != 0) return
         val state = TvController.getTransportState()
+
+        // Retomar donde se dejó: en cuanto el TV ya está reproduciendo, salta al segundo guardado
+        val resume = pendingResume
+        if (resume > 0 && state == "PLAYING" &&
+            SystemClock.elapsedRealtime() - playStartedAt > 1500) {
+            val ok = TvController.seek(resume)
+            if (ok || ++resumeTries >= 3) pendingResume = 0
+        }
+
         if (SystemClock.elapsedRealtime() - playStartedAt < 4000) return
 
         if (state == "PLAYING") {
             wasPlaying = true
+            if (tick % 6 == 0) saveProgress()
         } else if (state == "STOPPED" && wasPlaying) {
             wasPlaying = false
-            if (autoNext && !manualStop) {
-                runOnUiThread { step(+1) }
+            if (!manualStop) {
+                playingItem?.let { Store.clearResume(it) }   // terminó: ya no hay nada que continuar
+                runOnUiThread {
+                    adapter.notifyDataSetChanged()
+                    if (autoNext || queue.isNotEmpty()) step(+1)
+                }
             }
         }
+    }
+
+    // ------------------------------------- Favoritos, continuar, cola
+
+    private fun bindThumb(item: MediaItem, thumb: ImageView) {
+        val tkey = Thumbs.key(item)
+        thumb.tag = tkey
+        val cached = Thumbs.cached(item)
+        if (cached != null) {
+            thumb.setImageBitmap(cached)
+            thumb.visibility = View.VISIBLE
+        } else {
+            thumb.setImageDrawable(null)
+            thumb.visibility = View.GONE
+            if (!Thumbs.isKnownMissing(item)) {
+                Thumbs.load(this, item) { bmp ->
+                    if (bmp != null && thumb.tag == tkey) {
+                        thumb.setImageBitmap(bmp)
+                        thumb.visibility = View.VISIBLE
+                    }
+                }
+            }
+        }
+    }
+
+    /** Carátula + estrella del mini reproductor de abajo. */
+    private fun bindNowPlaying(item: MediaItem) {
+        nowThumbBox.visibility = View.VISIBLE
+        nowIcon.text = if (item.isMusic) "🎵" else "🎬"
+        bindThumb(item, nowThumb)
+        updateNowFav()
+    }
+
+    private fun updateNowFav() {
+        val fav = playingItem?.let { Store.isFav(it) } ?: false
+        btnNowFav.text = if (fav) "★" else "☆"
+        btnNowFav.setTextColor(if (fav) 0xFFFFC107.toInt() else 0xFF9E9E9E.toInt())
+    }
+
+    private fun toggleFav(item: MediaItem) {
+        Store.toggleFav(item)
+        updateNowFav()
+        if (viewMode == ViewMode.FAVS) applyFilters() else adapter.notifyDataSetChanged()
+    }
+
+    private fun updateQueueBadge() {
+        btnQueue.text = if (queue.isEmpty()) "☰" else "☰ ${queue.size}"
+        btnQueue.setTextColor(if (queue.isEmpty()) 0xFF9E9E9E.toInt() else 0xFFFF8800.toInt())
+    }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    /** Guarda el punto de reproducción de videos largos / mezclas de audio. */
+    private fun saveProgress() {
+        val item = playingItem ?: return
+        if (!wasPlaying) return
+        val pos = lastPos
+        val dur = lastDur
+        val long = if (item.isMusic) dur >= 1200 else dur >= 300
+        if (!long || pendingResume > 0) return
+        if (pos >= 10 && pos < dur - 30) Store.saveResume(item, pos)
+        else if (pos >= dur - 30) Store.clearResume(item)
+    }
+
+    private fun playFromList(idx: Int) {
+        val item = currentList[idx]
+        val saved = Store.resumeAt(item)
+        fun go(startAt: Int) {
+            playlist = ArrayList(currentList)
+            playIndex = idx
+            playingFromQueue = false
+            startPlayback(item, startAt)
+        }
+        if (saved >= 10) {
+            AlertDialog.Builder(this)
+                .setTitle(item.name)
+                .setItems(arrayOf("⏩ Continuar desde ${fmt(saved)}", "↺ Desde el inicio")) { _, which ->
+                    go(if (which == 0) saved else 0)
+                }
+                .show()
+        } else {
+            go(0)
+        }
+    }
+
+    /** Pulsación larga en una fila. */
+    private fun showItemMenu(item: MediaItem) {
+        val labels = ArrayList<String>()
+        val actions = ArrayList<() -> Unit>()
+        labels.add("➕ Añadir a la cola")
+        actions.add {
+            queue.add(item); updateQueueBadge(); toast("➕ En cola: ${item.name}")
+        }
+        labels.add("⏭ Reproducir a continuación")
+        actions.add {
+            queue.add(0, item); updateQueueBadge(); toast("⏭ Sonará después de este")
+        }
+        labels.add(if (Store.isFav(item)) "★ Quitar de favoritos" else "☆ Añadir a favoritos")
+        actions.add { toggleFav(item) }
+        if (Store.resumeAt(item) >= 10) {
+            labels.add("↺ Olvidar el punto guardado")
+            actions.add { Store.clearResume(item); applyFilters() }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(item.name)
+            .setItems(labels.toTypedArray()) { _, which -> actions[which]() }
+            .show()
+    }
+
+    /** Cola de reproducción: tocar = reproducir ya, ▲▼ = reordenar, ✕ = quitar. */
+    private fun showQueue() {
+        if (queue.isEmpty()) {
+            toast("La cola está vacía. Mantén pulsado un archivo para añadirlo.")
+            return
+        }
+        val lv = ListView(this)
+        val qAdapter = object : BaseAdapter() {
+            override fun getCount() = queue.size
+            override fun getItem(position: Int) = queue[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val v = convertView ?: LayoutInflater.from(parent.context)
+                    .inflate(R.layout.item_queue, parent, false)
+                v.findViewById<TextView>(R.id.qTitle).text = "${position + 1}. ${queue[position].name}"
+                val up = v.findViewById<TextView>(R.id.qUp)
+                val down = v.findViewById<TextView>(R.id.qDown)
+                val rm = v.findViewById<TextView>(R.id.qRemove)
+                up.alpha = if (position == 0) 0.3f else 1f
+                down.alpha = if (position == queue.size - 1) 0.3f else 1f
+                up.setOnClickListener {
+                    if (position > 0) {
+                        val it2 = queue.removeAt(position); queue.add(position - 1, it2)
+                        notifyDataSetChanged()
+                    }
+                }
+                down.setOnClickListener {
+                    if (position < queue.size - 1) {
+                        val it2 = queue.removeAt(position); queue.add(position + 1, it2)
+                        notifyDataSetChanged()
+                    }
+                }
+                rm.setOnClickListener {
+                    queue.removeAt(position)
+                    updateQueueBadge()
+                    notifyDataSetChanged()
+                }
+                return v
+            }
+        }
+        lv.adapter = qAdapter
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Cola de reproducción")
+            .setView(lv)
+            .setPositiveButton("Cerrar", null)
+            .setNeutralButton("Vaciar") { _, _ -> queue.clear(); updateQueueBadge() }
+            .create()
+        lv.setOnItemClickListener { _, _, position, _ ->
+            if (position in queue.indices) {
+                val item = queue.removeAt(position)
+                updateQueueBadge()
+                playingFromQueue = true
+                startPlayback(item)
+                dialog.dismiss()
+            }
+        }
+        dialog.setOnDismissListener { updateQueueBadge() }
+        dialog.show()
     }
 
     // ---------------------------------------------------------- Adaptador
@@ -551,35 +828,27 @@ class MainActivity : AppCompatActivity() {
             val icon = v.findViewById<TextView>(R.id.itemIcon)
             val thumb = v.findViewById<ImageView>(R.id.itemThumb)
             icon.text = if (item.isMusic) "🎵" else "🎬"
-            val tkey = Thumbs.key(item)
-            thumb.tag = tkey
-            val cached = Thumbs.cached(item)
-            if (cached != null) {
-                thumb.setImageBitmap(cached)
-                thumb.visibility = View.VISIBLE
-            } else {
-                thumb.setImageDrawable(null)
-                thumb.visibility = View.GONE
-                if (!Thumbs.isKnownMissing(item)) {
-                    Thumbs.load(this@MainActivity, item) { bmp ->
-                        if (bmp != null && thumb.tag == tkey) {
-                            thumb.setImageBitmap(bmp)
-                            thumb.visibility = View.VISIBLE
-                        }
-                    }
-                }
-            }
+            bindThumb(item, thumb)
+            val fav = v.findViewById<TextView>(R.id.itemFav)
+            val isFav = Store.isFav(item)
+            fav.text = if (isFav) "★" else "☆"
+            fav.setTextColor(if (isFav) 0xFFFFC107.toInt() else 0xFF9E9E9E.toInt())
+            fav.setOnClickListener { toggleFav(item) }
             val action = v.findViewById<TextView>(R.id.itemAction)
             if (isPlaying) {
                 action.text = "▶ Reproduciendo en el TV"
                 action.setTextColor(0xFFFF8800.toInt())
                 action.visibility = View.VISIBLE
-            } else if (item.durationSec > 0) {
-                action.text = fmt(item.durationSec) + "  ·  " + item.folder.substringAfterLast('/')
-                action.setTextColor(0xFF9E9E9E.toInt())
-                action.visibility = View.VISIBLE
             } else {
-                action.visibility = View.GONE
+                val saved = Store.resumeAt(item)
+                val parts = ArrayList<String>()
+                if (saved >= 10 && item.durationSec > 0) parts.add("⏩ ${fmt(saved)} / ${fmt(item.durationSec)}")
+                else if (item.durationSec > 0) parts.add(fmt(item.durationSec))
+                parts.add(item.folder.substringAfterLast('/'))
+                if (item.id in dupIds) parts.add("duplicado")
+                action.text = parts.joinToString("  ·  ")
+                action.setTextColor(if (saved >= 10) 0xFFFF8800.toInt() else 0xFF9E9E9E.toInt())
+                action.visibility = View.VISIBLE
             }
             v.setBackgroundResource(if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
             return v

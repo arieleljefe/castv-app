@@ -10,16 +10,75 @@
     android:paddingEnd="16dp"
     android:paddingBottom="6dp">
 
-    <TextView
-        android:id="@+id/tvNowPlaying"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="Ningún archivo seleccionado"
-        android:textColor="@color/vlc_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/nowThumbBox"
+            android:layout_width="56dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/bg_thumb"
+            android:clipToOutline="true"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/nowIcon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="🎬"
+                android:textSize="18sp" />
+
+            <ImageView
+                android:id="@+id/nowThumb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvNowPlaying"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Ningún archivo seleccionado"
+            android:textColor="@color/vlc_text"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnNowFav"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            android:text="☆"
+            android:textColor="@color/vlc_muted"
+            android:textSize="22sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnQueue"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:minWidth="44dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="☰"
+            android:textAllCaps="false"
+            android:textColor="@color/vlc_muted"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <SeekBar
         android:id="@+id/seekBar"
