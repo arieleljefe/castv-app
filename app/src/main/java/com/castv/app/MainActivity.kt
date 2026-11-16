@@ -3,7 +3,11 @@ package com.castv.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
 import android.net.Uri
+import android.os.PowerManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -55,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDups: Button
     private lateinit var btnQueue: Button
     private lateinit var btnNowFav: Button
+    private lateinit var btnOutput: Button
     private lateinit var nowThumbBox: FrameLayout
     private lateinit var nowIcon: TextView
     private lateinit var nowThumb: ImageView
@@ -66,6 +71,31 @@ class MainActivity : AppCompatActivity() {
 
     private enum class ViewMode(val label: String) {
         ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar")
+    }
+
+    // Salida de la música: false = TV, true = el propio teléfono (los videos siempre van al TV)
+    private var outPhone = false
+    private var localPlayer: MediaPlayer? = null
+    @Volatile private var localActive = false
+    @Volatile private var localPrepared = false
+    private var pausedByFocus = false
+    private lateinit var audioManager: AudioManager
+
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (localActive && localPrepared && localPlayer?.isPlaying == true) {
+                    pausedByFocus = true
+                    try { localPlayer?.pause() } catch (e: Exception) { }
+                }
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                if (pausedByFocus && localActive) {
+                    pausedByFocus = false
+                    try { localPlayer?.start() } catch (e: Exception) { }
+                }
+            }
+        }
     }
 
     private var viewMode = ViewMode.ALL
@@ -109,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         Store.init(this)
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
         listFiles = findViewById(R.id.listFiles)
         val inflater = LayoutInflater.from(this)
@@ -135,6 +166,7 @@ class MainActivity : AppCompatActivity() {
         btnDups = header.findViewById(R.id.btnDups)
         btnQueue = findViewById(R.id.btnQueue)
         btnNowFav = findViewById(R.id.btnNowFav)
+        btnOutput = header.findViewById(R.id.btnOutput)
         nowThumbBox = findViewById(R.id.nowThumbBox)
         nowIcon = findViewById(R.id.nowIcon)
         nowThumb = findViewById(R.id.nowThumb)
@@ -142,6 +174,21 @@ class MainActivity : AppCompatActivity() {
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
         btnSort.text = sortMode.label
+
+        outPhone = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("outPhone", false)
+        updateOutputButton()
+        btnOutput.setOnClickListener {
+            outPhone = !outPhone
+            getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("outPhone", outPhone).apply()
+            updateOutputButton()
+            if (!outPhone && localActive) {
+                stopLocal()
+                adapter.playingLocal = false
+                adapter.notifyDataSetChanged()
+            }
+            setStatus(if (outPhone) "📱 La música sonará en el teléfono (los videos siguen yendo al TV)"
+                      else "📺 La música sonará en el TV")
+        }
 
         adapter = FileAdapter()
         listFiles.adapter = adapter
@@ -187,16 +234,28 @@ class MainActivity : AppCompatActivity() {
         btnQueue.setOnClickListener { showQueue() }
         btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
         btnMusic.setOnClickListener { showMusic() }
-        findViewById<Button>(R.id.btnPause).setOnClickListener { thread { TvController.pause() } }
+        findViewById<Button>(R.id.btnPause).setOnClickListener {
+            if (localActive) {
+                withLocal { it.pause() }
+                saveProgress()
+            } else thread { TvController.pause() }
+        }
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
             manualStop = false
-            thread { TvController.play() }
+            if (localActive) {
+                pausedByFocus = false
+                withLocal { it.start() }
+            } else thread { TvController.play() }
         }
         findViewById<Button>(R.id.btnStop).setOnClickListener {
             manualStop = true
             saveProgress()
-            thread { TvController.stop() }
-            resetProgress()
+            if (localActive) {
+                withLocal { it.pause(); it.seekTo(0) }
+            } else {
+                thread { TvController.stop() }
+                resetProgress()
+            }
             adapter.notifyDataSetChanged()
         }
         findViewById<Button>(R.id.btnPrev).setOnClickListener { step(-1) }
@@ -206,17 +265,19 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnBack10).setOnClickListener {
             val t = maxOf(0, lastPos - 10)
-            thread { TvController.seek(t) }
+            if (localActive) withLocal { it.seekTo(t * 1000) }
+            else thread { TvController.seek(t) }
         }
         findViewById<Button>(R.id.btnFwd10).setOnClickListener {
             val t = if (lastDur > 0) minOf(lastDur, lastPos + 10) else lastPos + 10
-            thread { TvController.seek(t) }
+            if (localActive) withLocal { it.seekTo(t * 1000) }
+            else thread { TvController.seek(t) }
         }
         btnMute.setOnClickListener {
             muted = !muted
             btnMute.text = if (muted) "🔇" else "🔊"
             val m = muted
-            thread { TvController.setMute(m) }
+            if (localActive) applyLocalVolume() else thread { TvController.setMute(m) }
         }
         volSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {}
@@ -224,9 +285,22 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(sb: SeekBar) {
                 val v = sb.progress
                 volTouching = false
-                thread { TvController.setVolume(v) }
+                if (localActive) {
+                    val mx = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (v * mx + 50) / 100, 0)
+                } else thread { TvController.setVolume(v) }
             }
         })
+
+        val fbUrl = "https://www.facebook.com/share/19x6GMsWUM/"
+        val igUrl = "https://www.instagram.com/arieldejesusbuen"
+        val ttUrl = "https://www.tiktok.com/@arieldejesusbueno0"
+        header.findViewById<View>(R.id.hFb).setOnClickListener { openUrl(fbUrl) }
+        header.findViewById<View>(R.id.hIg).setOnClickListener { openUrl(igUrl) }
+        header.findViewById<View>(R.id.hTt).setOnClickListener { openUrl(ttUrl) }
+        footer.findViewById<View>(R.id.fFb).setOnClickListener { openUrl(fbUrl) }
+        footer.findViewById<View>(R.id.fIg).setOnClickListener { openUrl(igUrl) }
+        footer.findViewById<View>(R.id.fTt).setOnClickListener { openUrl(ttUrl) }
 
         footer.findViewById<TextView>(R.id.tvWhatsapp).setOnClickListener {
             val url = "https://wa.me/18094480441?text=" +
@@ -244,7 +318,8 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(sb: SeekBar) {
                 val target = sb.progress
                 userSeeking = false
-                thread { TvController.seek(target) }
+                if (localActive) withLocal { it.seekTo(target * 1000) }
+                else thread { TvController.seek(target) }
             }
         })
 
@@ -266,7 +341,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         monitoring = false
+        stopLocal()
         super.onDestroy()
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override fun onBackPressed() {
+        // Con música sonando en el teléfono, "atrás" minimiza en vez de cerrar y cortar la música
+        if (localActive) moveTaskToBack(true) else super.onBackPressed()
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            toast("No se pudo abrir el enlace")
+        }
     }
 
     private fun checkPermissionsAndStart() {
@@ -508,7 +598,13 @@ class MainActivity : AppCompatActivity() {
         resetProgress()
         adapter.playingId = item.id
         adapter.playingMusic = item.isMusic
+        adapter.playingLocal = item.isMusic && outPhone
         adapter.notifyDataSetChanged()
+        if (item.isMusic && outPhone) {
+            startLocal(item, resumeAt)
+            return
+        }
+        stopLocal()
         setStatus("🚀 Enviando al TV...")
 
         thread {
@@ -566,7 +662,9 @@ class MainActivity : AppCompatActivity() {
         var tick = 0
         while (monitoring) {
             try {
-                if (TvController.tvIp == null) {
+                if (localActive) {
+                    pollLocal(tick)
+                } else if (TvController.tvIp == null) {
                     if (tick % 5 == 0) {
                         val found = TvController.discoverTv()
                         runOnUiThread {
@@ -638,6 +736,131 @@ class MainActivity : AppCompatActivity() {
                     if (autoNext || queue.isNotEmpty()) step(+1)
                 }
             }
+        }
+    }
+
+    // ------------------------------------- Reproducción en el teléfono
+
+    private fun updateOutputButton() {
+        btnOutput.text = if (outPhone) "🔊 Música en: 📱 Teléfono" else "🔊 Música en: 📺 TV"
+        btnOutput.setTextColor(if (outPhone) 0xFFFF8800.toInt() else 0xFFFFFFFF.toInt())
+    }
+
+    private fun withLocal(block: (MediaPlayer) -> Unit) {
+        val mp = localPlayer
+        if (!localActive || mp == null || !localPrepared) return
+        try { block(mp) } catch (e: Exception) { }
+    }
+
+    private fun applyLocalVolume() {
+        val v = if (muted) 0f else 1f
+        try { localPlayer?.setVolume(v, v) } catch (e: Exception) { }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun startLocal(item: MediaItem, resumeAt: Int) {
+        stopLocal()
+        // Si el TV estaba reproduciendo algo, se detiene: ahora suena en el teléfono
+        thread { try { if (TvController.tvIp != null) TvController.stop() } catch (e: Exception) { } }
+        audioManager.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        pausedByFocus = false
+        pendingResume = 0   // el salto se hace aquí mismo, no hace falta esperar al TV
+
+        val mp = MediaPlayer()
+        localPlayer = mp
+        localPrepared = false
+        localActive = true
+        try {
+            mp.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            mp.setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
+            mp.setDataSource(this, Uri.parse(item.uriString))
+            mp.setOnPreparedListener { p ->
+                if (localPlayer === p) {
+                    localPrepared = true
+                    if (resumeAt > 0) p.seekTo(resumeAt * 1000)
+                    applyLocalVolume()
+                    p.start()
+                    wasPlaying = true
+                    setStatus(if (resumeAt > 0) "⏩ Retomando en ${fmt(resumeAt)} (teléfono)"
+                              else "✅ Reproduciendo en el teléfono")
+                }
+            }
+            mp.setOnCompletionListener { p ->
+                if (localPlayer === p) onLocalCompleted()
+            }
+            mp.setOnErrorListener { p, _, _ ->
+                if (localPlayer === p) {
+                    stopLocal()
+                    adapter.playingLocal = false
+                    adapter.notifyDataSetChanged()
+                    setStatus("❌ No se pudo reproducir en el teléfono")
+                }
+                true
+            }
+            mp.prepareAsync()
+        } catch (e: Exception) {
+            stopLocal()
+            adapter.playingLocal = false
+            adapter.notifyDataSetChanged()
+            setStatus("❌ No se pudo reproducir en el teléfono")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun stopLocal() {
+        val mp = localPlayer
+        localPlayer = null
+        localActive = false
+        localPrepared = false
+        pausedByFocus = false
+        if (mp != null) {
+            try { mp.release() } catch (e: Exception) { }
+            audioManager.abandonAudioFocus(focusListener)
+        }
+    }
+
+    private fun onLocalCompleted() {
+        playingItem?.let { Store.clearResume(it) }
+        wasPlaying = false
+        adapter.notifyDataSetChanged()
+        if (autoNext || queue.isNotEmpty()) step(+1)
+    }
+
+    private fun pollLocal(tick: Int) {
+        val mp = localPlayer ?: return
+        if (!localPrepared) return
+        val pos = mp.currentPosition / 1000
+        val rawDur = mp.duration / 1000
+        val dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: 0)
+        lastPos = pos
+        lastDur = dur
+        runOnUiThread {
+            if (!userSeeking && playingItem != null) {
+                if (dur > 0) {
+                    seekBar.isEnabled = true
+                    seekBar.max = dur
+                    seekBar.progress = minOf(pos, dur)
+                    tvDuration.text = fmt(dur)
+                } else {
+                    seekBar.isEnabled = false
+                    tvDuration.text = "--:--"
+                }
+                tvElapsed.text = fmt(pos)
+            }
+        }
+        if (tick % 4 == 1 && !volTouching) {
+            val mx = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            if (mx > 0) runOnUiThread { if (!volTouching) volSeek.progress = cur * 100 / mx }
+        }
+        if (mp.isPlaying) {
+            wasPlaying = true
+            if (tick % 6 == 0) saveProgress()
         }
     }
 
@@ -814,6 +1037,7 @@ class MainActivity : AppCompatActivity() {
         var items: List<MediaItem> = emptyList()
         var playingId: Long = -1
         var playingMusic: Boolean = false
+        var playingLocal: Boolean = false
 
         override fun getCount() = items.size
         override fun getItem(position: Int) = items[position]
@@ -836,7 +1060,7 @@ class MainActivity : AppCompatActivity() {
             fav.setOnClickListener { toggleFav(item) }
             val action = v.findViewById<TextView>(R.id.itemAction)
             if (isPlaying) {
-                action.text = "▶ Reproduciendo en el TV"
+                action.text = if (playingLocal) "▶ Reproduciendo en el teléfono" else "▶ Reproduciendo en el TV"
                 action.setTextColor(0xFFFF8800.toInt())
                 action.visibility = View.VISIBLE
             } else {

@@ -39,6 +39,51 @@
             android:textColor="@color/vlc_orange"
             android:textSize="14sp"
             android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/hFb"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="0dp"
+            android:background="@drawable/bg_chip"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="FB"
+            android:textColor="#1877F2"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/hIg"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="IG"
+            android:textColor="#E1306C"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/hTt"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="TT"
+            android:textColor="#25F4EE"
+            android:textSize="11sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <TextView
@@ -79,6 +124,20 @@
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btnOutput"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/bg_chip"
+        android:maxLines="1"
+        android:text="🔊 Música en: 📺 TV"
+        android:textAllCaps="false"
+        android:textColor="@color/vlc_text"
+        android:textSize="12sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
