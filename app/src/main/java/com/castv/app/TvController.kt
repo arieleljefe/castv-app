@@ -13,6 +13,7 @@ object TvController {
     var tvIp: String? = null
     var tvPort: Int = 38400
     var controlPath: String = "/upnp/control/mingusavtr"
+    var renderPath: String? = null
 
     /** Busca el TV en la red local por SSDP (igual que hicimos con el script ssdp.py),
      *  para no tener que hardcodear la IP del televisor. */
@@ -72,6 +73,16 @@ object TvController {
                 if (path.startsWith("http://")) path = path.substringAfter("://").substringAfter("/").let { "/$it" }
                 if (!path.startsWith("/")) path = "/$path"
                 controlPath = path
+            }
+            val r = Pattern.compile(
+                "<service>(?:(?!</service>).)*?RenderingControl(?:(?!</service>).)*?<controlURL>\\s*([^<\\s]+)\\s*</controlURL>",
+                Pattern.DOTALL
+            ).matcher(xml)
+            if (r.find()) {
+                var rp = r.group(1) ?: return
+                if (rp.startsWith("http://")) rp = rp.substringAfter("://").substringAfter("/").let { "/$it" }
+                if (!rp.startsWith("/")) rp = "/$rp"
+                renderPath = rp
             }
         } catch (e: Exception) { }
     }
@@ -210,4 +221,46 @@ $innerXml
     fun pause() = sendSoap("Pause", "<InstanceID>0</InstanceID>")
     fun play() = sendSoap("Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
     fun stop() = sendSoap("Stop", "<InstanceID>0</InstanceID>")
+
+    // ------------------------------------------------ Volumen (RenderingControl)
+
+    private fun rcCall(action: String, inner: String): String? {
+        val ip = tvIp ?: return null
+        val path = renderPath ?: return null
+        val envelope = """<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<s:Body><u:$action xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">$inner</u:$action></s:Body>
+</s:Envelope>"""
+        return try {
+            val conn = URL("http://$ip:$tvPort$path").openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
+            conn.setRequestProperty("SOAPAction", "\"urn:schemas-upnp-org:service:RenderingControl:1#$action\"")
+            conn.outputStream.use { it.write(envelope.toByteArray(Charsets.UTF_8)) }
+            if (conn.responseCode != 200) {
+                conn.disconnect()
+                null
+            } else {
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                body
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun getVolume(): Int? {
+        val body = rcCall("GetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel>") ?: return null
+        return tag(body, "CurrentVolume")?.trim()?.toIntOrNull()
+    }
+
+    fun setVolume(v: Int): Boolean =
+        rcCall("SetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>") != null
+
+    fun setMute(mute: Boolean): Boolean =
+        rcCall("SetMute", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${if (mute) 1 else 0}</DesiredMute>") != null
 }

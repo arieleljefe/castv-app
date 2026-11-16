@@ -3,24 +3,28 @@ package com.castv.app
 import android.content.Context
 import android.provider.MediaStore
 
-data class MediaItem(val id: Long, val name: String, val uriString: String, val isMusic: Boolean)
+data class MediaItem(
+    val id: Long, val name: String, val uriString: String, val isMusic: Boolean,
+    val durationSec: Int = 0
+)
 
 object MediaScanner {
 
     fun scanVideos(context: Context): List<MediaItem> {
         val items = mutableListOf<MediaItem>()
-        val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME)
+        val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.DURATION)
         context.contentResolver.query(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projection, null, null,
             "${MediaStore.Video.Media.DISPLAY_NAME} ASC"
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+            val durCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val name = cursor.getString(nameCol)
                 val uri = "${MediaStore.Video.Media.EXTERNAL_CONTENT_URI}/$id"
-                items.add(MediaItem(id, name, uri, false))
+                items.add(MediaItem(id, name, uri, false, (cursor.getLong(durCol) / 1000).toInt()))
             }
         }
         return items
@@ -28,7 +32,7 @@ object MediaScanner {
 
     fun scanMusic(context: Context): List<MediaItem> {
         val items = mutableListOf<MediaItem>()
-        val projection = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME)
+        val projection = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.DURATION)
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, selection, null,
@@ -36,11 +40,12 @@ object MediaScanner {
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+            val durCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val name = cursor.getString(nameCol)
                 val uri = "${MediaStore.Audio.Media.EXTERNAL_CONTENT_URI}/$id"
-                items.add(MediaItem(id, name, uri, true))
+                items.add(MediaItem(id, name, uri, true, (cursor.getLong(durCol) / 1000).toInt()))
             }
         }
         return items

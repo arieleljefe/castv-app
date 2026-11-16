@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnMovies: Button
     private lateinit var btnMusic: Button
     private lateinit var btnAuto: Button
+    private lateinit var btnMute: Button
+    private lateinit var volSeek: SeekBar
 
     private var currentList: List<MediaItem> = emptyList() // lo que se ve en pantalla
     private var playlist: List<MediaItem> = emptyList()    // lista con la que se avanza
@@ -42,6 +44,10 @@ class MainActivity : AppCompatActivity() {
     private var showingMusic = false
     private var autoNext = false
     private var userSeeking = false
+    private var volTouching = false
+    private var muted = false
+    @Volatile private var lastPos = 0
+    @Volatile private var lastDur = 0
 
     @Volatile private var manualStop = false
     @Volatile private var wasPlaying = false
@@ -77,6 +83,8 @@ class MainActivity : AppCompatActivity() {
         btnMovies = header.findViewById(R.id.btnMovies)
         btnMusic = header.findViewById(R.id.btnMusic)
         btnAuto = findViewById(R.id.btnAuto)
+        btnMute = findViewById(R.id.btnMute)
+        volSeek = findViewById(R.id.volSeek)
 
         adapter = FileAdapter()
         listFiles.adapter = adapter
@@ -97,6 +105,30 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnNext).setOnClickListener { step(+1) }
         findViewById<Button>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
         btnAuto.setOnClickListener { toggleAuto() }
+
+        findViewById<Button>(R.id.btnBack10).setOnClickListener {
+            val t = maxOf(0, lastPos - 10)
+            thread { TvController.seek(t) }
+        }
+        findViewById<Button>(R.id.btnFwd10).setOnClickListener {
+            val t = if (lastDur > 0) minOf(lastDur, lastPos + 10) else lastPos + 10
+            thread { TvController.seek(t) }
+        }
+        btnMute.setOnClickListener {
+            muted = !muted
+            btnMute.text = if (muted) "🔇" else "🔊"
+            val m = muted
+            thread { TvController.setMute(m) }
+        }
+        volSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {}
+            override fun onStartTrackingTouch(sb: SeekBar) { volTouching = true }
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                val v = sb.progress
+                volTouching = false
+                thread { TvController.setVolume(v) }
+            }
+        })
 
         footer.findViewById<TextView>(R.id.tvWhatsapp).setOnClickListener {
             val url = "https://wa.me/18094480441?text=" +
@@ -337,7 +369,10 @@ class MainActivity : AppCompatActivity() {
     private fun poll(tick: Int) {
         val info = TvController.getPositionInfo()
         if (info != null) {
-            val (pos, dur) = info
+            val (pos, rawDur) = info
+            val dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: 0)
+            lastPos = pos
+            lastDur = dur
             runOnUiThread {
                 if (!userSeeking && playingItem != null) {
                     if (dur > 0) {
@@ -352,6 +387,11 @@ class MainActivity : AppCompatActivity() {
                     tvElapsed.text = fmt(pos)
                 }
             }
+        }
+
+        if (tick % 4 == 1 && !volTouching) {
+            val v = TvController.getVolume()
+            if (v != null) runOnUiThread { if (!volTouching) volSeek.progress = v }
         }
 
         if (tick % 2 != 0) return
@@ -387,8 +427,17 @@ class MainActivity : AppCompatActivity() {
             v.findViewById<TextView>(R.id.itemName).text = item.name
             v.findViewById<TextView>(R.id.itemIcon).text = if (item.isMusic) "🎵" else "🎬"
             val action = v.findViewById<TextView>(R.id.itemAction)
-            action.text = if (isPlaying) "▶ Reproduciendo en el TV" else ""
-            action.visibility = if (isPlaying) View.VISIBLE else View.GONE
+            if (isPlaying) {
+                action.text = "▶ Reproduciendo en el TV"
+                action.setTextColor(0xFFFF8800.toInt())
+                action.visibility = View.VISIBLE
+            } else if (item.durationSec > 0) {
+                action.text = fmt(item.durationSec)
+                action.setTextColor(0xFF9E9E9E.toInt())
+                action.visibility = View.VISIBLE
+            } else {
+                action.visibility = View.GONE
+            }
             v.setBackgroundResource(if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
             return v
         }
