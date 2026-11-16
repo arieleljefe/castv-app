@@ -170,6 +170,7 @@ class MainActivity : AppCompatActivity() {
     private var currentList: List<MediaItem> = emptyList() // lo que se ve en pantalla
     private var playlist: List<MediaItem> = emptyList()    // lista con la que se avanza
     private var playIndex = -1
+    private var unsupportedSkips = 0
     @Volatile private var playingItem: MediaItem? = null
     private var showingMusic = false
     private var repeatMode = Repeat.OFF
@@ -1005,6 +1006,20 @@ class MainActivity : AppCompatActivity() {
             startLocal(item, resumeAt)
             return
         }
+        // El TV solo lee mp3 y mp4: los demás formatos (.opus, .m4a, .mkv...) se saltan
+        val tvExt = MediaScanner.extFor(item.name, item.isMusic)
+        if (tvExt != "mp3" && tvExt != "mp4" && tvExt != "m4v") {
+            if (unsupportedSkips < 10) {
+                unsupportedSkips++
+                step(1)
+                setStatus("⚠️ El TV solo lee mp3 y mp4. Se saltó .$tvExt")
+            } else {
+                unsupportedSkips = 0
+                setStatus("⚠️ El TV solo lee mp3 y mp4 (.$tvExt)")
+            }
+            return
+        }
+        unsupportedSkips = 0
         stopLocal()
         setStatus("🚀 Enviando al TV...")
 
