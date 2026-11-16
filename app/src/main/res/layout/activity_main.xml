@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ListView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/listFiles"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0f172a"
-    android:clipToPadding="false"
-    android:divider="@android:color/transparent"
-    android:dividerHeight="8dp"
-    android:footerDividersEnabled="false"
-    android:headerDividersEnabled="false"
-    android:paddingStart="16dp"
-    android:paddingTop="16dp"
-    android:paddingEnd="16dp"
-    android:paddingBottom="16dp"
-    android:scrollbars="none" />
+    android:background="@color/vlc_bg"
+    android:orientation="vertical">
+
+    <ListView
+        android:id="@+id/listFiles"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/vlc_bg"
+        android:divider="#262626"
+        android:dividerHeight="1dp"
+        android:footerDividersEnabled="false"
+        android:headerDividersEnabled="false"
+        android:scrollbars="none" />
+
+    <include layout="@layout/player_bar" />
+</LinearLayout>

@@ -70,32 +70,32 @@ class MainActivity : AppCompatActivity() {
         listFiles.addFooterView(footer, null, false)
 
         tvStatus = header.findViewById(R.id.tvStatus)
-        tvNowPlaying = header.findViewById(R.id.tvNowPlaying)
-        tvElapsed = header.findViewById(R.id.tvElapsed)
-        tvDuration = header.findViewById(R.id.tvDuration)
-        seekBar = header.findViewById(R.id.seekBar)
+        tvNowPlaying = findViewById(R.id.tvNowPlaying)
+        tvElapsed = findViewById(R.id.tvElapsed)
+        tvDuration = findViewById(R.id.tvDuration)
+        seekBar = findViewById(R.id.seekBar)
         btnMovies = header.findViewById(R.id.btnMovies)
         btnMusic = header.findViewById(R.id.btnMusic)
-        btnAuto = header.findViewById(R.id.btnAuto)
+        btnAuto = findViewById(R.id.btnAuto)
 
         adapter = FileAdapter()
         listFiles.adapter = adapter
 
         btnMovies.setOnClickListener { showMovies() }
         btnMusic.setOnClickListener { showMusic() }
-        header.findViewById<Button>(R.id.btnPause).setOnClickListener { thread { TvController.pause() } }
-        header.findViewById<Button>(R.id.btnPlay).setOnClickListener {
+        findViewById<Button>(R.id.btnPause).setOnClickListener { thread { TvController.pause() } }
+        findViewById<Button>(R.id.btnPlay).setOnClickListener {
             manualStop = false
             thread { TvController.play() }
         }
-        header.findViewById<Button>(R.id.btnStop).setOnClickListener {
+        findViewById<Button>(R.id.btnStop).setOnClickListener {
             manualStop = true
             thread { TvController.stop() }
             resetProgress()
         }
-        header.findViewById<Button>(R.id.btnPrev).setOnClickListener { step(-1) }
-        header.findViewById<Button>(R.id.btnNext).setOnClickListener { step(+1) }
-        header.findViewById<Button>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
+        findViewById<Button>(R.id.btnPrev).setOnClickListener { step(-1) }
+        findViewById<Button>(R.id.btnNext).setOnClickListener { step(+1) }
+        findViewById<Button>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
         btnAuto.setOnClickListener { toggleAuto() }
 
         footer.findViewById<TextView>(R.id.tvWhatsapp).setOnClickListener {
@@ -127,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        btnAuto.alpha = 0.5f
         updateTabs()
         checkPermissionsAndStart()
     }
@@ -194,8 +195,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun styleTab(b: Button, active: Boolean) {
-        b.setBackgroundResource(if (active) R.drawable.btn_accent else R.drawable.btn_off)
-        b.setTextColor(if (active) 0xFF0F172A.toInt() else 0xFFFFFFFF.toInt())
+        b.setBackgroundResource(if (active) R.drawable.tab_active else R.drawable.tab_off)
+        b.setTextColor(if (active) 0xFFFF8800.toInt() else 0xFF9E9E9E.toInt())
     }
 
     private fun setStatus(msg: String) {
@@ -204,9 +205,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleAuto() {
         autoNext = !autoNext
-        btnAuto.setBackgroundResource(if (autoNext) R.drawable.btn_green else R.drawable.btn_off)
-        btnAuto.setTextColor(if (autoNext) 0xFFFFFFFF.toInt() else 0xFF94A3B8.toInt())
-        btnAuto.text = if (autoNext) "🔁 Auto: ON" else "🔁 Auto: OFF"
+        btnAuto.setBackgroundResource(if (autoNext) R.drawable.ctrl_on else R.drawable.ctrl_off)
+        btnAuto.alpha = if (autoNext) 1f else 0.5f
         setStatus(if (autoNext) "🔁 Auto-avance activado" else "🔁 Auto-avance desactivado")
     }
 
@@ -385,8 +385,10 @@ class MainActivity : AppCompatActivity() {
             val item = items[position]
             val isPlaying = item.id == playingId && item.isMusic == playingMusic
             v.findViewById<TextView>(R.id.itemName).text = item.name
-            v.findViewById<TextView>(R.id.itemAction).text =
-                if (isPlaying) "▶️ Reproduciendo" else "Reproducir ➔"
+            v.findViewById<TextView>(R.id.itemIcon).text = if (item.isMusic) "🎵" else "🎬"
+            val action = v.findViewById<TextView>(R.id.itemAction)
+            action.text = if (isPlaying) "▶ Reproduciendo en el TV" else ""
+            action.visibility = if (isPlaying) View.VISIBLE else View.GONE
             v.setBackgroundResource(if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
             return v
         }
