@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="vlc_orange">#FF8800</color>
-    <color name="vlc_orange_dark">#E67300</color>
-    <color name="vlc_bg">#121212</color>
-    <color name="vlc_surface">#1E1E1E</color>
-    <color name="vlc_surface2">#2A2A2A</color>
+    <color name="accent">#22D3EE</color>
+    <color name="accent_dark">#0EA5C6</color>
+    <color name="vlc_bg">#0B0F14</color>
+    <color name="vlc_surface">#131A22</color>
+    <color name="vlc_surface2">#1C2530</color>
     <color name="vlc_text">#FFFFFF</color>
-    <color name="vlc_muted">#9E9E9E</color>
-    <color name="ic_launcher_bg">#121212</color>
+    <color name="vlc_muted">#8B98A5</color>
+    <color name="ic_launcher_bg">#0B0F14</color>
 </resources>

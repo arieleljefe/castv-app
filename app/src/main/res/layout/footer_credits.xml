@@ -9,7 +9,7 @@
 
     <TextView
         android:text="Creado por Ariel De Jesus Bueno"
-        android:textColor="#9E9E9E"
+        android:textColor="#8B98A5"
         android:textSize="13sp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />

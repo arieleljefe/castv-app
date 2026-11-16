@@ -2,7 +2,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape>
-            <solid android:color="@color/vlc_orange"/>
+            <solid android:color="@color/accent"/>
         </shape>
     </item>
     <item android:top="2dp">

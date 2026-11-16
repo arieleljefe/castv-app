@@ -21,6 +21,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.BaseAdapter
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.Button
 import android.widget.ListView
@@ -47,8 +48,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var seekBar: SeekBar
     private lateinit var btnMovies: Button
     private lateinit var btnMusic: Button
-    private lateinit var btnAuto: Button
-    private lateinit var btnMute: Button
+    private lateinit var btnAuto: ImageButton
+    private lateinit var btnMute: ImageButton
     private lateinit var volSeek: SeekBar
 
     private lateinit var etSearch: EditText
@@ -234,20 +235,20 @@ class MainActivity : AppCompatActivity() {
         btnQueue.setOnClickListener { showQueue() }
         btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
         btnMusic.setOnClickListener { showMusic() }
-        findViewById<Button>(R.id.btnPause).setOnClickListener {
+        findViewById<View>(R.id.btnPause).setOnClickListener {
             if (localActive) {
                 withLocal { it.pause() }
                 saveProgress()
             } else thread { TvController.pause() }
         }
-        findViewById<Button>(R.id.btnPlay).setOnClickListener {
+        findViewById<View>(R.id.btnPlay).setOnClickListener {
             manualStop = false
             if (localActive) {
                 pausedByFocus = false
                 withLocal { it.start() }
             } else thread { TvController.play() }
         }
-        findViewById<Button>(R.id.btnStop).setOnClickListener {
+        findViewById<View>(R.id.btnStop).setOnClickListener {
             manualStop = true
             saveProgress()
             if (localActive) {
@@ -258,9 +259,9 @@ class MainActivity : AppCompatActivity() {
             }
             adapter.notifyDataSetChanged()
         }
-        findViewById<Button>(R.id.btnPrev).setOnClickListener { step(-1) }
-        findViewById<Button>(R.id.btnNext).setOnClickListener { step(+1) }
-        findViewById<Button>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
+        findViewById<View>(R.id.btnPrev).setOnClickListener { step(-1) }
+        findViewById<View>(R.id.btnNext).setOnClickListener { step(+1) }
+        findViewById<View>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
         btnAuto.setOnClickListener { toggleAuto() }
 
         findViewById<Button>(R.id.btnBack10).setOnClickListener {
@@ -275,7 +276,7 @@ class MainActivity : AppCompatActivity() {
         }
         btnMute.setOnClickListener {
             muted = !muted
-            btnMute.text = if (muted) "🔇" else "🔊"
+            btnMute.setImageResource(if (muted) R.drawable.ic_vol_off else R.drawable.ic_vol_on)
             val m = muted
             if (localActive) applyLocalVolume() else thread { TvController.setMute(m) }
         }
@@ -473,6 +474,11 @@ class MainActivity : AppCompatActivity() {
         btnFolder.text = "📁 " + (selectedFolder?.substringAfterLast('/') ?: "Todas") +
                 " (${currentList.size})"
         btnView.text = viewMode.label
+        val on = 0xFF22D3EE.toInt()
+        val off = 0xFFFFFFFF.toInt()
+        btnView.setTextColor(if (viewMode != ViewMode.ALL) on else off)
+        btnFolder.setTextColor(if (selectedFolder != null) on else off)
+        btnSort.setTextColor(off)
         btnDups.text = when {
             dupIds.isEmpty() -> "⧉ Sin duplicados"
             Store.hideDups -> "⧉ Duplicados ocultos (${dupIds.size})"
@@ -515,7 +521,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun styleTab(b: Button, active: Boolean) {
         b.setBackgroundResource(if (active) R.drawable.tab_active else R.drawable.tab_off)
-        b.setTextColor(if (active) 0xFFFF8800.toInt() else 0xFF9E9E9E.toInt())
+        b.setTextColor(if (active) 0xFF22D3EE.toInt() else 0xFF8B98A5.toInt())
     }
 
     private fun setStatus(msg: String) {
@@ -742,8 +748,8 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------- Reproducción en el teléfono
 
     private fun updateOutputButton() {
-        btnOutput.text = if (outPhone) "🔊 Música en: 📱 Teléfono" else "🔊 Música en: 📺 TV"
-        btnOutput.setTextColor(if (outPhone) 0xFFFF8800.toInt() else 0xFFFFFFFF.toInt())
+        btnOutput.text = if (outPhone) "Música en: Teléfono" else "Música en: TV"
+        btnOutput.setTextColor(if (outPhone) 0xFF22D3EE.toInt() else 0xFFFFFFFF.toInt())
     }
 
     private fun withLocal(block: (MediaPlayer) -> Unit) {
@@ -898,7 +904,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateNowFav() {
         val fav = playingItem?.let { Store.isFav(it) } ?: false
         btnNowFav.text = if (fav) "★" else "☆"
-        btnNowFav.setTextColor(if (fav) 0xFFFFC107.toInt() else 0xFF9E9E9E.toInt())
+        btnNowFav.setTextColor(if (fav) 0xFFFFC107.toInt() else 0xFF8B98A5.toInt())
     }
 
     private fun toggleFav(item: MediaItem) {
@@ -909,7 +915,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateQueueBadge() {
         btnQueue.text = if (queue.isEmpty()) "☰" else "☰ ${queue.size}"
-        btnQueue.setTextColor(if (queue.isEmpty()) 0xFF9E9E9E.toInt() else 0xFFFF8800.toInt())
+        btnQueue.setTextColor(if (queue.isEmpty()) 0xFF8B98A5.toInt() else 0xFF22D3EE.toInt())
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
@@ -1056,12 +1062,12 @@ class MainActivity : AppCompatActivity() {
             val fav = v.findViewById<TextView>(R.id.itemFav)
             val isFav = Store.isFav(item)
             fav.text = if (isFav) "★" else "☆"
-            fav.setTextColor(if (isFav) 0xFFFFC107.toInt() else 0xFF9E9E9E.toInt())
+            fav.setTextColor(if (isFav) 0xFFFFC107.toInt() else 0xFF8B98A5.toInt())
             fav.setOnClickListener { toggleFav(item) }
             val action = v.findViewById<TextView>(R.id.itemAction)
             if (isPlaying) {
                 action.text = if (playingLocal) "▶ Reproduciendo en el teléfono" else "▶ Reproduciendo en el TV"
-                action.setTextColor(0xFFFF8800.toInt())
+                action.setTextColor(0xFF22D3EE.toInt())
                 action.visibility = View.VISIBLE
             } else {
                 val saved = Store.resumeAt(item)
@@ -1071,7 +1077,7 @@ class MainActivity : AppCompatActivity() {
                 parts.add(item.folder.substringAfterLast('/'))
                 if (item.id in dupIds) parts.add("duplicado")
                 action.text = parts.joinToString("  ·  ")
-                action.setTextColor(if (saved >= 10) 0xFFFF8800.toInt() else 0xFF9E9E9E.toInt())
+                action.setTextColor(if (saved >= 10) 0xFF22D3EE.toInt() else 0xFF8B98A5.toInt())
                 action.visibility = View.VISIBLE
             }
             v.setBackgroundResource(if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)

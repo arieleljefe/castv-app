@@ -2,7 +2,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:gravity="bottom" android:height="3dp">
         <shape>
-            <solid android:color="@color/vlc_orange"/>
+            <solid android:color="@color/accent"/>
         </shape>
     </item>
 </layer-list>

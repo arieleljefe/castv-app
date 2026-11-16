@@ -6,14 +6,14 @@
     android:viewportHeight="108">
     <!-- TV -->
     <path
-        android:strokeColor="#FF8800"
+        android:strokeColor="#22D3EE"
         android:strokeWidth="4"
         android:strokeLineJoin="round"
         android:strokeLineCap="round"
         android:pathData="M30,36 L78,36 Q80,36 80,38 L80,66 Q80,68 78,68 L30,68 Q28,68 28,66 L28,38 Q28,36 30,36 Z" />
     <!-- Soporte del TV -->
     <path
-        android:strokeColor="#FF8800"
+        android:strokeColor="#22D3EE"
         android:strokeWidth="4"
         android:strokeLineCap="round"
         android:pathData="M44,76 L64,76" />
