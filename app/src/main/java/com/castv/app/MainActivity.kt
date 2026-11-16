@@ -1687,7 +1687,7 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------- Velocidad y ecualizador (teléfono)
 
     private fun speedShort(): String {
-        val i = speedValues.indexOf(speed)
+        val i = speedValues.indexOfFirst { it == speed }
         return if (i >= 0) speedLabels[i].substringBefore(' ') else "${speed}x"
     }
 
@@ -1706,7 +1706,7 @@ class MainActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("Velocidad de reproducción")
-            .setSingleChoiceItems(speedLabels, speedValues.indexOf(speed)) { d, which ->
+            .setSingleChoiceItems(speedLabels, speedValues.indexOfFirst { it == speed }) { d, which ->
                 speed = speedValues[which]
                 speedTouched = true
                 applySpeed()
