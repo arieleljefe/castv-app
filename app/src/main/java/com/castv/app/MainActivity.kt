@@ -1,7 +1,13 @@
 package com.castv.app
 
 import android.Manifest
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.app.NotificationCompat
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -99,6 +105,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Controles de la notificación
+    companion object {
+        const val ACT_PREV = "com.castv.app.ACT_PREV"
+        const val ACT_TOGGLE = "com.castv.app.ACT_TOGGLE"
+        const val ACT_NEXT = "com.castv.app.ACT_NEXT"
+        const val CHANNEL_ID = "castv_channel"
+    }
+    @Volatile private var tvPlaying = false
+    private var lastNotifKey = ""
+    private var notifReceiverRegistered = false
+
+    private val notifReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACT_PREV -> step(-1)
+                ACT_NEXT -> step(+1)
+                ACT_TOGGLE -> togglePlayPause()
+            }
+        }
+    }
+
     private var viewMode = ViewMode.ALL
     private var dupIds: Set<Long> = emptySet()               // copias repetidas (se conserva la más antigua)
     private val queue = ArrayList<MediaItem>()               // cola: suena antes de seguir con la lista
@@ -128,7 +155,10 @@ class MainActivity : AppCompatActivity() {
 
     private val requiredPermissions by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO)
+            arrayOf(
+                Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
@@ -141,6 +171,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         Store.init(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT) }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(notifReceiver, nf)
+        notifReceiverRegistered = true
 
         listFiles = findViewById(R.id.listFiles)
         val inflater = LayoutInflater.from(this)
@@ -343,6 +377,11 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         monitoring = false
         stopLocal()
+        if (notifReceiverRegistered) {
+            try { unregisterReceiver(notifReceiver) } catch (e: Exception) { }
+            notifReceiverRegistered = false
+        }
+        postDefaultNotification()
         super.onDestroy()
     }
 
@@ -719,6 +758,8 @@ class MainActivity : AppCompatActivity() {
 
         if (tick % 2 != 0) return
         val state = TvController.getTransportState()
+        tvPlaying = state == "PLAYING"
+        refreshNotification()
 
         // Retomar donde se dejó: en cuanto el TV ya está reproduciendo, salta al segundo guardado
         val resume = pendingResume
@@ -743,6 +784,81 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    // ------------------------------------- Notificación con controles
+
+    private fun localIsPlaying(): Boolean =
+        try { localPlayer?.isPlaying == true } catch (e: Exception) { false }
+
+    /** Pausa / reanuda, ya sea en el teléfono o en el TV. */
+    private fun togglePlayPause() {
+        if (localActive) {
+            if (localIsPlaying()) {
+                withLocal { it.pause() }
+                saveProgress()
+            } else {
+                pausedByFocus = false
+                withLocal { it.start() }
+            }
+        } else {
+            val playingNow = tvPlaying
+            manualStop = false
+            thread { if (playingNow) TvController.pause() else TvController.play() }
+        }
+        lastNotifKey = ""   // fuerza refrescar el botón en el próximo ciclo
+    }
+
+    private fun refreshNotification() {
+        val item = playingItem ?: return
+        val playing = if (localActive) localIsPlaying() else tvPlaying
+        val key = "${item.id}|${item.isMusic}|$playing|$localActive"
+        if (key == lastNotifKey) return
+        lastNotifKey = key
+
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        fun act(action: String, req: Int) =
+            PendingIntent.getBroadcast(this, req, Intent(action).setPackage(packageName), flags)
+        val open = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            flags
+        )
+        val where = if (localActive) "teléfono" else "TV"
+        val n = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(item.name)
+            .setContentText(if (playing) "Sonando en el $where" else "En pausa · $where")
+            .setContentIntent(open)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(android.R.drawable.ic_media_previous, "Anterior", act(ACT_PREV, 1))
+            .addAction(
+                if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                if (playing) "Pausa" else "Reproducir", act(ACT_TOGGLE, 2)
+            )
+            .addAction(android.R.drawable.ic_media_next, "Siguiente", act(ACT_NEXT, 3))
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+            )
+            .build()
+        try {
+            getSystemService(NotificationManager::class.java).notify(1, n)
+        } catch (e: Exception) { }
+    }
+
+    /** Al cerrar la app, la notificación vuelve a ser la sencilla del servicio. */
+    private fun postDefaultNotification() {
+        try {
+            val n = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("CASTV activo")
+                .setContentText("Listo para transmitir al TV")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(1, n)
+        } catch (e: Exception) { }
     }
 
     // ------------------------------------- Reproducción en el teléfono
@@ -868,6 +984,7 @@ class MainActivity : AppCompatActivity() {
             wasPlaying = true
             if (tick % 6 == 0) saveProgress()
         }
+        refreshNotification()
     }
 
     // ------------------------------------- Favoritos, continuar, cola
