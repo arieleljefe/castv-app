@@ -14,7 +14,7 @@ object TvController {
     var tvPort: Int = 38400
     var controlPath: String = "/upnp/control/mingusavtr"
 
-    /** Busca el TV en la red local por SSDP (igual que hicimos con el script ssdp.py),
+    /** Busca el TV en la red local por SSDP,
      *  para no tener que hardcodear la IP del televisor. */
     fun discoverTv(timeoutMs: Int = 4000): Boolean {
         val socket = DatagramSocket()
@@ -54,8 +54,7 @@ object TvController {
         }
     }
 
-    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport.
-     *  Si falla, se queda con la ruta por defecto. */
+    /** Lee la descripción UPnP del TV y saca el controlURL de AVTransport. */
     private fun fetchControlPath(descUrl: String) {
         try {
             val conn = URL(descUrl).openConnection() as HttpURLConnection
@@ -144,20 +143,21 @@ $innerXml
         val upnpClass = if (isMusic) "object.item.audioItem.musicTrack" else "object.item.videoItem"
         val protocolInfo = "http-get:*:$mime:DLNA.ORG_OP=01;DLNA.ORG_CI=0;" +
                 "DLNA.ORG_FLAGS=01700000000000000000000000000000"
-        // DIDL bien formado y escapado UNA sola vez al meterlo en el SOAP
+        
+        // CORREGIDO: restricted="0" para que VIDAA permita la reproducción directa
         val didl = "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" " +
                 "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" " +
                 "xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">" +
-                "<item id=\"1\" parentID=\"0\" restricted=\"1\">" +
+                "<item id=\"1\" parentID=\"0\" restricted=\"0\">" +
                 "<dc:title>${xmlEscape(title)}</dc:title>" +
                 "<upnp:class>$upnpClass</upnp:class>" +
                 "<res protocolInfo=\"${xmlEscape(protocolInfo)}\">${xmlEscape(mediaUrl)}</res>" +
                 "</item></DIDL-Lite>"
+        
         val inner = "<InstanceID>0</InstanceID>" +
                 "<CurrentURI>${xmlEscape(mediaUrl)}</CurrentURI>" +
                 "<CurrentURIMetaData>${xmlEscape(didl)}</CurrentURIMetaData>"
 
-        // Stop previo: evita que el TV se quede con la URI/caché anterior
         sendSoap("Stop", "<InstanceID>0</InstanceID>")
         Thread.sleep(400)
         val ok1 = sendSoap("SetAVTransportURI", inner)
