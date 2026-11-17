@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v12)
+# Registro de cambios y guía de continuidad – CASTV (v16)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -19,6 +19,23 @@ git push origin main
 ```
 
 **Si todo se rompe**, volver al último punto bueno: la rama `respaldo-antes-de-restaurar`, la etiqueta `v2.1-estable` (si ya se creó) o el commit `d7010ac` (Etapa 11).
+
+---
+
+## ⚠️ Antes de seguir: confirmar cuál es la copia buena del proyecto (17 nov 2026)
+
+En esta conversación se trabajó sobre **`~/castv-app`** (Etapa 11 = commit `b99ba6f`, arreglo `indexOf` = `1608196`, **Etapa 12 = `2c37468`**). Este changelog (v13) habla de **otra copia**: `~/castv-nuevo/castv-fresh` (Etapa 11 = `d7010ac`, arreglo `indexOf` = `dc6e415`) que ya tiene reproductor de video, temas, color de acento, borrado y nombres legibles.
+
+- Esas funciones (VideoPlayerActivity, DebugLog, temas, acento, selección múltiple, papelera) **NO están** en la Etapa 12 de `~/castv-app`: ese zip se hizo a partir del zip de la Etapa 11.
+- El push de la Etapa 12 a GitHub entró sin problema, así que ahora mismo `origin/main` apunta a `2c37468`. Si `castv-fresh` tiene commits propios sin subir, su próximo `git push` va a ser rechazado (historias distintas).
+- **Antes de la Etapa 13, comprobar en las dos carpetas** (pegar uno por uno):
+
+```bash
+cd ~/castv-app && git log --oneline -3 && git remote -v
+cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
+```
+
+- Decidir cuál es la buena: lo normal es quedarse con **`castv-fresh`** (tiene más funciones) y **traer a mano la Etapa 12** (`Player.kt`) encima, por partes. Nunca hacer `push --force` sin tener la copia de seguridad.
 
 ---
 
@@ -53,6 +70,7 @@ git push origin main
 4. **Regla del changelog (pedida por Ariel):** siempre se entrega **primero** el changelog completo y actualizado, con lo hecho y lo que falta, antes que cualquier parche o respuesta larga, por si se acaban los tokens.
    **Regla anterior:** al terminar o integrar algo, se anota aquí con ✅. **Siempre se entrega primero el changelog actualizado**, antes que cualquier otra cosa, por si se acaban los tokens.
 5. Probar siempre que el parche aplica antes de entregarlo (`git apply --check`), y entregar pasos de prueba con cada cambio.
+6. **Notas en el código y detalle de novedades en el changelog:** En cada cambio o etapa nueva se deben poner comentarios claros directamente en el código (por ejemplo, `// [Etapa 13-A] ...`) indicando qué se modificó o añadió, y registrar en este changelog tanto la novedad exacta como la forma en que queda funcionando la app.
 
 ### Lecciones aprendidas (para no repetir errores)
 
@@ -65,6 +83,12 @@ git push origin main
 - Nunca subir `.gradle/` ni `build/` a git (pasan de 100 MB y GitHub rechaza el push); `.gitignore` ya los excluye.
 - En Termux, `ps` no siempre muestra procesos de otras sesiones; buscar por `python`.
 
+- **Termux no deja escribir en `/tmp`** ("Permission denied"). Usar una carpeta propia, p. ej. `~/tmp-castv`. Por eso la primera vez no se copió nada y el commit decía "nothing to commit".
+- Si el commit dice **"nothing to commit, working tree clean"** justo después de copiar archivos nuevos, la copia **no ocurrió**: comprobar con `ls` que existe un archivo nuevo del cambio (p. ej. `Player.kt`) antes del commit.
+- Los zip de proyecto traen su propia carpeta `.git`; **no copiarla encima** del repo. El zip de la Etapa 12 ya sale sin `.git`.
+- Un cambio grande hecho **sin poder compilar** (como la Etapa 12) puede traer errores de compilación; la verdad la dice GitHub Actions. Buscar `e: file` en los registros.
+- En `~/castv-app` los cambios de la Etapa 12 se entregaron como **zip del proyecto completo** (más fácil que `.patch` cuando el parche "ya estaba aplicado" o no aplica). Pasos: descomprimir en `~/tmp-castv`, `cp -r ~/tmp-castv/castv-app/. ~/castv-app/`, `ls` para confirmar el archivo nuevo, `git add -A`, commit y push.
+
 ### Texto para pegarle a otro asistente
 
 > Soy Ariel y estoy desarrollando la app Android CASTV (repo `arieleljefe/castv-app`). Te paso el archivo CHANGELOG.md, que tiene el contexto, las reglas de trabajo, el historial y la hoja de ruta al final. Lee primero la sección "Contexto para otro asistente" y "Hoja de ruta". Trabajo desde Termux en el teléfono, así que dame comandos cortos para pegar uno por uno y los cambios como archivos .patch. Continúa por la sección "Próxima función".
@@ -73,18 +97,43 @@ git push origin main
 
 ## Cambios pendientes de probar
 
-### 2026-11-17 · Papelera de Android (opcional) 🧪 (subiendo; falta confirmar el build y probar)
+### 2026-11-17 · Etapa 13-A: Reproducir enlace (mp4 / HLS) con selector de destino 🧪 (hecho sobre `castv-fresh`; **no compilado**, falta build de Actions y probar)
 
-- **Qué:** nuevo menú **⋮ → Borrado: a la papelera / permanente** (solo Android 11 o superior). Por defecto **va a la papelera** de Android: se recupera desde Galería o Mis archivos durante unos 30 días. Con "permanente" funciona como antes. El aviso de confirmación dice cuál de los dos va a pasar. En Android 10 o anterior no existe papelera y sigue siendo permanente.
-- **Archivos:** `MainActivity.kt` (`useTrash`, `toggleTrash`, `confirmDelete`, `deleteItems`, `finishDelete`, menú).
+- **Qué:** nuevo **⋮ → Reproducir enlace…**. Se pega una URL (si el portapapeles trae un `http(s)://`, se pre-rellena) y salen dos botones: **📺 Al TV** y **📱 En el móvil**.
+  - **📺 Al TV:** la URL se manda directo por DLNA (`TvController.setUriAndPlay`), sin pasar por el servidor del puerto 8000. MIME: `video/mp4`, o `application/vnd.apple.mpegurl` si la URL termina en `.m3u8`. Antes detiene lo que suene.
+  - **📱 En el móvil:** abre `VideoPlayerActivity` con la URL (un solo video, sin punto de reanudación ni subtítulos recordados). Desde ahí, el botón **📺 TV** manda el mismo enlace al TV (empieza desde el inicio; no se reanuda en el segundo actual).
+  - Avisa si el enlace no empieza con http/https, si el TV no está encontrado, o si el TV rechaza el enlace.
+- **Archivos:** `MainActivity.kt` (`askLinkAndPlay`, `playLink`, `isHls`, `linkTitle`, menú id 15, resultado `tvUrl`), `VideoPlayerActivity.kt` (extra `url`/`urlTitle`, ítem con `id = 0`, `sendToTv` con `tvUrl`). Comentarios `// [Etapa 13-A]` en el código. Sin cambios de permisos (ya hay INTERNET y `usesCleartextTraffic`).
+- **Probar** (usa las fuentes de la sección "Fuentes legales", plan F):
+  1. ⋮ → Reproducir enlace… → pega el enlace A.1 → **📱 En el móvil**: debe reproducirse.
+  2. Mismo enlace → **📺 Al TV**: debe sonar en el TV. Si falla, `curl -s http://127.0.0.1:8000/log` y anota la respuesta del `SetAVTransportURI`.
+  3. Enlace A.2 (`https`) al TV: anota si el JVC lo rechaza.
+  4. Enlace HLS A.3 al móvil y luego al TV: si el TV falla y el móvil no, el JVC no lee HLS por DLNA.
+  5. Dentro del reproductor con un enlace, tocar 📺 TV: debe volver a la lista y mandarlo al TV.
+- **Limitaciones:** el TV recibe la URL directa; no hay barra de progreso ni control de posición para enlaces; las transmisiones en vivo no tienen duración.
+- **Si falla:** `git revert` del commit "Etapa 13-A: reproducir enlace".
+- **Riesgo:** bajo. Es código nuevo y aparte; no toca el envío de archivos locales al TV.
+
+### 2026-11-17 · Etapa 12: segundo plano real, reanudar sesión y cola editable 🧪 (subido a `~/castv-app` como `2c37468`; falta ver el build de Actions y probar)
+
+- **Qué:**
+  1. **Segundo plano real:** el motor de reproducción (música del teléfono, cola, avance automático, notificación y botones) salió de la pantalla y vive en un objeto nuevo, `Player`, que arranca el servicio `CastvService`. Si se cierra la app desde recientes, la música del teléfono sigue y el avance automático también.
+  2. **Reanudar sesión:** se guarda qué sonaba, el segundo en que iba, la cola y la lista con la que se avanza. Al abrir la app aparece en pausa con "↩ Sesión anterior…"; al tocar ▶ sigue desde ese punto. No se guarda nada hasta haber intentado recuperar la sesión anterior (evita borrarla al arrancar).
+  3. **Cola editable:** mantener y arrastrar (o el asa ≡) para ordenar, deslizar a un lado para quitar, ▲▼ y ✕ como antes, y **Guardar lista** (guarda lo que suena más la cola como lista de reproducción). La cola ahora **sobrevive al cierre de la app**.
+  4. **⋮ → Detener y salir:** detiene todo, para el servicio y cierra la app; la sesión queda guardada.
+- **Archivos:** `Player.kt` (nuevo), `MainActivity.kt` (ahora es solo pantalla; las propiedades `queue`, `playlist`, `repeatMode`, etc. delegan en `Player`), `CastvService.kt` (arranca `Player.init` y `Player.startMonitor`), `res/layout/item_queue.xml` (asa ≡), `app/build.gradle` (recyclerview 1.3.2; versión 2.2 / código 3).
 - **Probar:**
-  1. ⋮ → debe decir "Borrado: a la papelera". Borra una canción de prueba: el aviso dice "¿Mover a la papelera?" y al final "🗑 En la papelera: 1".
-  2. Abre Mis archivos (papelera) o Galería (videos → Papelera): debe estar ahí y se puede restaurar. Al restaurar, vuelve a aparecer en CASTV (cierra y abre la app).
-  3. ⋮ → Borrado: permanente. Borra otra: el aviso dice "¿Eliminar?" y desaparece del todo.
-- **Si falla:** `git revert` del commit "Papelera de Android opcional".
-- **Riesgo:** bajo. Solo cambia la llamada del sistema que se usa al borrar.
+  1. Salida en Teléfono, pon música, cierra la app desde recientes: debe seguir sonando y pasar a la siguiente sola.
+  2. Mete 3 canciones en la cola, arrástralas para cambiar el orden, quita una deslizándola, cierra la app y ábrela: la cola debe seguir igual.
+  3. **Guardar lista** en la cola: debe aparecer en ⋮ → Mis listas.
+  4. ⋮ → Detener y salir; abre otra vez: debe salir "Sesión anterior" en pausa; ▶ debe seguir desde el minuto guardado.
+  5. Con salida en TV, repetir 1 y 4 (en el TV la pista actual sigue sola aunque se cierre la app; el avance a la siguiente depende del servicio activo).
+  6. Notificación: Anterior / Pausa / Siguiente deben funcionar con la app cerrada.
+- **Limitaciones conocidas:** no se compiló en el asistente (puede haber errores de build). Si el sistema mata el proceso, la música se corta y solo queda la sesión guardada para continuar. No incluye lo de `castv-fresh` (ver aviso de arriba).
+- **Si falla:** `git revert 2c37468` (y `git push`). Punto bueno anterior: `1608196`.
+- **Riesgo:** medio-alto. Es un cambio de arquitectura (se movieron unas 700 líneas de `MainActivity` a `Player`).
 
-### 2026-11-17 · README, copia de seguridad y Release de GitHub 🧪 (subiendo; falta crear la etiqueta y confirmar el Release)
+### 2026-11-17 · README, copia de seguridad y Release de GitHub 🧪 (README y workflow subidos ✅; falta la etiqueta y confirmar el Release)
 
 - **Qué:** `README.md` actualizado (funciones nuevas, instalar desde **Releases**, cómo publicar una versión, tabla de archivos). El workflow `.github/workflows/build.yml` ahora, al subir una etiqueta que empiece con `v`, compila y **publica el APK en Releases** como `CASTV-<etiqueta>.apk` (con permiso `contents: write`).
 - **Archivos:** `README.md`, `.github/workflows/build.yml`.
@@ -92,6 +141,7 @@ git push origin main
   1. Copia de seguridad: `cd ~ && zip -r ~/storage/downloads/castv-backup-$(date +%Y%m%d-%H%M).zip castv-nuevo/castv-fresh -x "*/build/*" "*/.gradle/*"` (si falta zip: `pkg install zip`).
   2. Etiqueta: `cd ~/castv-nuevo/castv-fresh && git tag -a v2.1-estable -m "Versión estable 2.1" && git push origin v2.1-estable`.
   3. En GitHub → Actions debe correr un build de la etiqueta; al terminar, en **Releases** aparece `CASTV-v2.1-estable.apk`.
+- **Estado de la etiqueta:** el 17 nov 2026 el push de `v2.1-estable` fue rechazado porque **ya existía en GitHub** (de un intento anterior). Pendiente decidir: usar `v2.2` (recomendado) o reemplazarla con `git push origin v2.1-estable --force`. Antes mirar `git ls-remote --tags origin`. La copia de seguridad en zip ya se creó en Descargas.
 - **Si falla:** si el Release no aparece, abrir el run de la etiqueta y revisar el paso "Publicar Release". Para borrar una etiqueta mala: `git tag -d v2.1-estable && git push origin :refs/tags/v2.1-estable`.
 - **Riesgo:** bajo. Solo toca documentación y el workflow; el APK del Release es de depuración (firma debug), igual que el que ya se instala.
 
@@ -142,6 +192,18 @@ git push origin main
 ---
 
 ## Historial
+
+### 2026-11-17 · Papelera de Android (opcional) ✅
+
+- **Qué:** nuevo menú **⋮ → Borrado: a la papelera / permanente** (solo Android 11 o superior). Por defecto **va a la papelera** de Android: se recupera desde Galería o Mis archivos durante unos 30 días. Con "permanente" funciona como antes. El aviso de confirmación dice cuál de los dos va a pasar. En Android 10 o anterior no existe papelera y sigue siendo permanente.
+- **Archivos:** `MainActivity.kt` (`useTrash`, `toggleTrash`, `confirmDelete`, `deleteItems`, `finishDelete`, menú).
+- **Probar:**
+  1. ⋮ → debe decir "Borrado: a la papelera". Borra una canción de prueba: el aviso dice "¿Mover a la papelera?" y al final "🗑 En la papelera: 1".
+  2. Abre Mis archivos (papelera) o Galería (videos → Papelera): debe estar ahí y se puede restaurar. Al restaurar, vuelve a aparecer en CASTV (cierra y abre la app).
+  3. ⋮ → Borrado: permanente. Borra otra: el aviso dice "¿Eliminar?" y desaparece del todo.
+- **Si falla:** `git revert` del commit "Papelera de Android opcional".
+- **Riesgo:** bajo. Solo cambia la llamada del sistema que se usa al borrar.
+- **Resultado:** probado en el teléfono, todo bien (confirmado por Ariel el 17 nov 2026).
 
 ### 2026-11-17 · Videos en el teléfono (salida Teléfono/TV para video y música) ✅
 
@@ -244,6 +306,133 @@ git push origin main
 
 ---
 
+## Ideas, recomendaciones, pros y contras (17 nov 2026)
+
+Resumen de lo hablado con Ariel. Orden = lo que recomiendo hacer primero. "Decisión" indica lo que ya decidió Ariel.
+
+### 1. Reproducir un enlace (mp4 o HLS .m3u8) con selector de destino — ➡️ SIGUIENTE (Etapa 13, parte A)
+
+- **Qué:** menú ⋮ → "Reproducir enlace…": al pegar una URL, la app pregunta dónde se quiere ver mediante dos botones claros (**📺 Al TV** o **📱 En el Móvil**) antes de iniciar la reproducción.
+- **Cómo quedará funcionando la app:** al elegir **📺 Al TV**, la URL se envía directo por DLNA (`SetAVTransportURI`) sin pasar por el servidor local del puerto 8000; al elegir **📱 En el Móvil**, se abre directamente `VideoPlayerActivity` con el enlace cargado.
+- **Pros:**
+  - Cambio pequeño y modular (un diálogo con selector de destino y reutilización de `TvController.setUriAndPlay` y `VideoPlayerActivity`).
+  - Flexibilidad inmediata sin tener que cambiar el interruptor general de salida antes de pegar el enlace.
+  - Si va al TV, el televisor descarga el stream directo de internet sin gastar datos ni batería del teléfono; si va al móvil, aprovecha el soporte nativo de Android para HLS.
+- **Contras / riesgos:**
+  - Muchos TV DLNA **rechazan `https://`**; conviene probar primero con `http://`.
+  - **No se sabe si el JVC VIDAA lee HLS** (`.m3u8`) por DLNA: hay que probarlo (si no lo soporta, solo funcionará en el móvil o con `.mp4` en el TV).
+  - Los enlaces públicos caducan o cambian, y las transmisiones en vivo no tienen duración fija (la barra de progreso no aplica).
+  - El tipo MIME debe enviarse correctamente en el DIDL-Lite (`video/mp4` para mp4 y `application/vnd.apple.mpegurl` para HLS).
+
+### 2. Listas M3U (canales como si fueran archivos) — Etapa 13, parte B
+
+- **Qué:** cargar una lista `.m3u`/`.m3u8` desde un enlace o desde un archivo, y que sus canales salgan en una pestaña con buscador, favoritos y orden, como los archivos del teléfono.
+- **Pros:** reutiliza la lista, la búsqueda y los favoritos que ya existen; con fuentes oficiales es 100 % legal; el TV recibe el enlace directo.
+- **Contras / riesgos:**
+  - Las listas grandes (iptv-org tiene miles de canales) hay que bajarlas y leerlas en segundo plano.
+  - Muchos canales están caídos, con bloqueo por país o con calidad irregular: es normal que unos funcionen y otros no.
+  - Lo que se cargue es **responsabilidad de quien lo carga**; la app solo es un reproductor.
+- **Cómo:** parser simple de `#EXTINF` (nombre, logo `tvg-logo`, grupo `group-title`) + la línea de la URL; guardar la lista cargada en `Store`; marcar canales favoritos.
+- **Recomendación:** empezar con listas por categoría o país (cientos de canales) en vez del índice completo.
+
+### 3. Mejoras para varios TV (bajo riesgo)
+
+- **Ya existe:** búsqueda SSDP de todos los aparatos DLNA/UPnP; salen en ⋮ → Elegir TV (Samsung, LG, Sony, Philips, Android TV con DLNA, otros VIDAA).
+- **Por hacer:** recordar el último TV elegido (ya se guarda la IP; mostrarlo claro), mostrar nombre y modelo, y un **modo de prueba** que mande un mp4 conocido y deje el resultado en `/log` para depurar un TV nuevo.
+- **Pros:** poco código, útil si Ariel cambia de TV o la app se comparte.
+- **Contras:** **solo probado con el JVC**; cada marca es más o menos estricta con el formato (códecs, MIME, https). No se puede garantizar que todos funcionen.
+
+### 4. Lo que NO se puede (o no conviene)
+
+| Idea | Por qué no |
+|---|---|
+| Netflix, Disney+, Prime y similares | Llevan **DRM**; no se pueden mandar por DLNA ni reproducir en una app propia. |
+| YouTube hacia el TV | Usa Cast/DIAL, no DLNA. |
+| Chromecast y AirPlay | Otros protocolos; soportarlos es un **proyecto grande aparte** (y cada uno con sus requisitos). |
+| Servidor DLNA/NAS para explorar la red | **Descartado por Ariel (17 nov 2026):** es engorroso y puede fallar. |
+| Listas o fuentes "piratas" / IPTV de pago revendido | No se arman ni se recomiendan. Canales premium (deportes de pago, HBO, etc.) en una lista gratis suelen ser no autorizados. |
+
+### 5. Ideas de la Etapa 12 y otras (por decidir)
+
+| Idea | Pros | Contras |
+|---|---|---|
+| **Subtítulos al TV por DLNA** | Seguirían en el TV | Experimental: depende de si el JVC acepta subtítulos externos; alternativa de quemarlos con ffmpeg hace el APK muy pesado. |
+| **Crossfade / sin pausas entre pistas** | Se oye más profesional | Solo en el teléfono (el TV no lo permite); requiere dos reproductores a la vez. |
+| **Normalizar volumen entre canciones** | Menos saltos de volumen | Poco fiable sin analizar cada archivo; solo teléfono. |
+| **Widget en la pantalla de inicio** (play, pausa, siguiente) | Comodidad | Más código y pruebas; bajo valor si ya está la notificación. |
+| **Exportar / importar listas y favoritos** | No se pierden al reinstalar o cambiar de teléfono | Hay que cuidar el formato (las claves son tipo+nombre+duración). |
+| **Letra sincronizada (LRCLIB)** | Bonito para música | Necesita internet; solo en teléfono; aparcado. |
+| **Generar subtítulos automáticos** (Vosk ~50 MB o Whisper ~75-150 MB) | Útil para videos sin subtítulos | Código nativo, APK mucho más grande y riesgo de build; aparcado. |
+| **Convertir `.opus`/`.m4a` a mp3** en la app | El TV los leería | Obliga a incluir ffmpeg y el APK crece mucho; mientras tanto se convierte con Termux. |
+| **Mini reproductor más compacto** | Más espacio para la lista | Es solo aspecto. |
+
+---
+
+## Fuentes legales para probar enlaces y canales gratis (17 nov 2026)
+
+**Importante:** los enlaces cambian y los canales caen. Esto es para **probar el reproductor**, no una garantía. Todo lo que se cargue es responsabilidad de quien lo use. Nada de lo siguiente es de pago ni pirata.
+
+### A. Enlaces de prueba técnica (los más seguros: están hechos para eso)
+
+Ordenados del más fácil al más difícil. Si uno funciona en el TV, pasar al siguiente.
+
+1. **mp4 sencillo (Big Buck Bunny, Blender, licencia CC BY 3.0)** — el mejor primer intento, porque va en `http://` y es H.264:
+   `http://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4`
+2. **mp4 de muestra (misma película, otro servidor):**
+   `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
+3. **HLS de prueba de Mux (Big Buck Bunny en varias calidades, H.264/AAC):**
+   `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`
+4. **HLS de ejemplo de Apple:**
+   `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8`
+
+- Si el TV rechaza los `https://`, probar el 1 (ya es `http://`). Si el 1 va y el 3 no, **el JVC no lee HLS por DLNA**.
+- Otras películas abiertas de Blender (CC BY): *Sintel* (https://cloud.blender.org/films/sintel) y *Tears of Steel* (https://media.xiph.org/tearsofsteel/). Entrar a la página y copiar el enlace del archivo mp4.
+
+### B. Listas de canales gratis (M3U)
+
+| Lista | Qué es | Enlace |
+|---|---|---|
+| **Free-TV/IPTV** | Lista cuidada: solo canales que se ofrecen **oficialmente gratis** (antena abierta o internet), sin canales de pago, adultos o religiosos. Pocos canales, de calidad. **La mejor para empezar.** | `https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8` (repositorio: github.com/Free-TV/IPTV) |
+| **iptv-org/iptv** | La colección más grande (miles de canales de todo el mundo), organizada por categoría, país e idioma. Son **enlaces enviados por usuarios** a transmisiones públicas; los autores dicen no controlar el destino. | Índice: `https://iptv-org.github.io/iptv/index.m3u` · Noticias: `https://iptv-org.github.io/iptv/categories/news.m3u` · Documentales: `https://iptv-org.github.io/iptv/categories/documentary.m3u` · Música: `https://iptv-org.github.io/iptv/categories/music.m3u` · EE. UU.: `https://iptv-org.github.io/iptv/countries/us.m3u` (todas las listas: `PLAYLISTS.md` en github.com/iptv-org/iptv; los de otros países y idiomas siguen el mismo patrón, ej. `countries/do.m3u`, `languages/spa.m3u`: si no abre, buscarlo en `PLAYLISTS.md`) |
+
+- **Cómo usarlas con prudencia:** en iptv-org, quedarse con canales de **emisoras públicas o institucionales** y categorías como noticias, documentales, música, clima o ciencia. Si aparece un canal que normalmente es **de pago** (HBO, ESPN, deportes premium, películas recientes), saltarlo: probablemente no está autorizado.
+- Para empezar, **cargar listas por categoría o país**, no el índice completo.
+
+### C. Emisoras públicas y oficiales con transmisión gratis (ver en su sitio web)
+
+Estas emisoras ofrecen su señal en vivo gratis en su propia página o app oficial. **No verifiqué hoy sus enlaces directos `.m3u8`** (cambian seguido); lo más práctico es encontrarlos dentro de las listas B o usar su sitio oficial.
+
+- **NHK World-Japan** (Japón, inglés): su señal en vivo está disponible gratis en todo el mundo en su página.
+- **DW (Deutsche Welle)**: noticias y documentales, con señal en español.
+- **France 24**: noticias en francés, inglés y español.
+- **NASA** (NASA+ y canal de NASA TV): lanzamientos, estación espacial, ciencia.
+- **Al Jazeera English** y **Euronews**: noticias.
+- Televisoras públicas de cada país (por ejemplo RTVE en España), según lo que ofrezcan en internet.
+
+### D. Servicios gratis con anuncios (Pluto TV, Samsung TV Plus, Tubi, Plex, Roku Channel)
+
+- Son **legales** dentro de sus propias apps, pero **no dan enlaces públicos estables**. Las listas de terceros que extraen sus canales pueden violar sus términos de uso y los enlaces caducan: **no los usaría** como fuente de la app.
+
+### E. Qué evitar
+
+- Servicios de "IPTV" de suscripción barata, revendedores, credenciales Xtream/Stalker, o listas que prometen todos los canales de pago y deportes. Eso es contenido no autorizado.
+
+### F. Plan de prueba sugerido (anotar resultados aquí)
+
+| # | Prueba | Resultado |
+|---|---|---|
+| 1 | mp4 (enlace A.1) → teléfono | ⏳ |
+| 2 | mp4 (enlace A.1) → TV | ⏳ |
+| 3 | mp4 con `https` (A.2) → TV | ⏳ |
+| 4 | HLS (A.3) → teléfono | ⏳ |
+| 5 | HLS (A.3) → TV | ⏳ |
+| 6 | Un canal de Free-TV (en vivo) → TV | ⏳ |
+| 7 | Un canal de iptv-org → TV | ⏳ |
+
+Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log` (línea del `SetAVTransportURI`) y anotarla.
+
+---
+
 ## Plantilla para cada cambio nuevo
 
 ```
@@ -260,7 +449,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v12). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v16). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -271,19 +460,21 @@ Actualizada: 17 de noviembre de 2026 (v12). Cuando una función se termine, se m
 - Tema Sistema / Claro / Oscuro.
 - Lista: nombres legibles, búsqueda por ellos y carga en segundo plano.
 - Estabilidad: bloqueos de energía con la pantalla apagada y registro "Servidor iniciado".
-- Eliminar música y videos con selección múltiple (borrado permanente).
+- Eliminar música y videos con selección múltiple; papelera de Android opcional.
 - Videos en el teléfono (salida Teléfono/TV para video y música, con punto guardado).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
 
+- **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
 - **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
-- **Papelera de Android** (`papelera.patch`) y **README + Release** (`github_release.patch`): falta build verde y probar.
+- **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
+- **Etapa 13: reproducir enlace y listas M3U** (**13-A ya escrita el 17 nov, falta compilar y probar; sigue 13-B**) (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
 - **Pulir la app** (acordado con Ariel). Orden sugerido:
   1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
   2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
@@ -299,6 +490,7 @@ Actualizada: 17 de noviembre de 2026 (v12). Cuando una función se termine, se m
 
 ### 💡 Ideas sin decidir
 
+- **Propuestas del 17 nov 2026:** pasaron a la sección "Ideas, recomendaciones, pros y contras" (reproducir enlace y M3U ya están decididas como Etapa 13; servidor DLNA/NAS quedó **descartado** por Ariel).
 - **Aparcadas por decisión de Ariel (17 nov 2026), "primero pulir la app":**
   - Subtítulos en el TV por DLNA (experimental; depende de si el JVC VIDAA acepta subtítulos externos; probar con `/log`). Alternativa: quemarlos con ffmpeg (APK pesado).
   - Generar subtítulos escaneando videos (Vosk ~50 MB sin internet, Whisper ~75-150 MB, o servicio en línea). Código nativo: riesgo de build.
