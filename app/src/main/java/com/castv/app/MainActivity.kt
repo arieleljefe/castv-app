@@ -54,9 +54,6 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import java.net.Inet4Address
-import java.text.Normalizer
-import java.net.NetworkInterface
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -647,10 +644,8 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------- Buscar, ordenar, carpetas
 
-    private val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
-
-    private fun norm(s: String): String =
-        Normalizer.normalize(s, Normalizer.Form.NFD).replace(diacritics, "").lowercase()
+    // [Etapa 14-A] la lógica vive en CastvUtils.kt
+    private fun norm(s: String): String = CastvText.norm(s)
 
     private fun nameKey(m: MediaItem): String = nameKeyCache.getOrPut(m.id) { norm(m.name) }
 
@@ -677,25 +672,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Compara "Cap 2" antes que "Cap 10" (números por valor, no letra a letra). */
-    private fun naturalCompare(a: String, b: String): Int {
-        var i = 0; var j = 0
-        while (i < a.length && j < b.length) {
-            if (a[i].isDigit() && b[j].isDigit()) {
-                var ei = i; while (ei < a.length && a[ei].isDigit()) ei++
-                var ej = j; while (ej < b.length && b[ej].isDigit()) ej++
-                val na = a.substring(i, ei).trimStart('0')
-                val nb = b.substring(j, ej).trimStart('0')
-                if (na.length != nb.length) return na.length - nb.length
-                val c = na.compareTo(nb)
-                if (c != 0) return c
-                i = ei; j = ej
-            } else {
-                if (a[i] != b[j]) return a[i].compareTo(b[j])
-                i++; j++
-            }
-        }
-        return (a.length - i) - (b.length - j)
-    }
+    private fun naturalCompare(a: String, b: String): Int = CastvText.naturalCompare(a, b)
 
     private fun applyFilters() {
         var list = allItems
@@ -1043,12 +1020,7 @@ class MainActivity : AppCompatActivity() {
         if (repeatMode == Repeat.ALL || queue.isNotEmpty()) step(+1)
     }
 
-    private fun fmt(totalSec: Int): String {
-        val h = totalSec / 3600
-        val m = (totalSec % 3600) / 60
-        val s = totalSec % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%d:%02d", m, s)
-    }
+    private fun fmt(totalSec: Int): String = CastvText.fmtTime(totalSec)
 
     private fun resetProgress() {
         seekBar.isEnabled = false
@@ -1178,7 +1150,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
-                    else "❌ El TV rechazó el enlace (mira ⋮ log: curl -s http://127.0.0.1:8000/log)")
+                    else "❌ El TV no aceptó el enlace. ¿Está encendido y en el mismo Wi-Fi? Prueba otro enlace mp4.")
             }
         }
     }
@@ -1267,7 +1239,7 @@ class MainActivity : AppCompatActivity() {
                 return@thread
             }
             if (phoneIp == null) {
-                runOnUiThread { setStatus("⚠️ No se pudo determinar la red.") }
+                runOnUiThread { setStatus("⚠️ No se pudo determinar la red. Conéctate al mismo Wi-Fi que el TV.") }
                 return@thread
             }
             val kind = if (item.isMusic) "audio" else "video"
@@ -1278,7 +1250,7 @@ class MainActivity : AppCompatActivity() {
             playStartedAt = SystemClock.elapsedRealtime()
             runOnUiThread {
                 setStatus(
-                    if (!ok) "❌ Error al enviar al TV"
+                    if (!ok) "❌ No se pudo enviar al TV. ¿Está encendido y en el mismo Wi-Fi? Revisa ⋮ › Elegir TV."
                     else if (resumeAt > 0) "⏩ Retomando en ${fmt(resumeAt)}"
                     else "✅ Reproduciendo en el TV"
                 )
@@ -1287,31 +1259,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** IP del teléfono en la interfaz que realmente llega al TV (no la de datos móviles). */
-    private fun getLocalIpAddress(): String? {
-        val tv = TvController.tvIp
-        if (tv != null) {
-            try {
-                java.net.DatagramSocket().use { s ->
-                    s.connect(java.net.InetAddress.getByName(tv), 9) // no envía nada
-                    val ip = s.localAddress.hostAddress
-                    if (ip != null && ip != "0.0.0.0" && !ip.startsWith("127.")) return ip
-                }
-            } catch (e: Exception) { }
-        }
-        try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val iface = interfaces.nextElement()
-                if (!iface.name.startsWith("wlan")) continue
-                val addresses = iface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val addr = addresses.nextElement()
-                    if (!addr.isLoopbackAddress && addr is Inet4Address) return addr.hostAddress
-                }
-            }
-        } catch (e: Exception) { }
-        return null
-    }
+    private fun getLocalIpAddress(): String? = CastvNet.localIpAddress(TvController.tvIp)
 
     // ------------------------------------------- Monitor: progreso + auto-avance
 
@@ -1656,7 +1604,7 @@ class MainActivity : AppCompatActivity() {
                     stopLocal()
                     adapter.playingLocal = false
                     adapter.notifyDataSetChanged()
-                    setStatus("❌ No se pudo reproducir en el teléfono")
+                    setStatus("❌ No se pudo reproducir en el teléfono (formato no compatible o archivo dañado)")
                 }
                 true
             }
@@ -1665,7 +1613,7 @@ class MainActivity : AppCompatActivity() {
             stopLocal()
             adapter.playingLocal = false
             adapter.notifyDataSetChanged()
-            setStatus("❌ No se pudo reproducir en el teléfono")
+            setStatus("❌ No se pudo abrir el archivo en el teléfono. Prueba con otro.")
         }
     }
 
