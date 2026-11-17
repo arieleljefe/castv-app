@@ -366,8 +366,8 @@ class MainActivity : AppCompatActivity() {
                 adapter.playingLocal = false
                 adapter.notifyDataSetChanged()
             }
-            setStatus(if (outPhone) "📱 La música sonará en el teléfono (los videos siguen yendo al TV)"
-                      else "📺 La música sonará en el TV")
+            setStatus(if (outPhone) "📱 La música y los videos se verán en el teléfono"
+                      else "📺 La música y los videos irán al TV")
         }
 
         adapter = FileAdapter()
@@ -928,7 +928,7 @@ class MainActivity : AppCompatActivity() {
             Store.hideDups -> "Mostrar duplicados (${dupIds.size})"
             else -> "Ocultar duplicados (${dupIds.size})"
         })
-        pm.menu.add(0, 3, 2, if (outPhone) "Música en: Teléfono" else "Música en: TV")
+        pm.menu.add(0, 3, 2, if (outPhone) "Salida: Teléfono" else "Salida: TV")
         pm.menu.add(0, 4, 3, "Mis listas")
         if (showingMusic) {
             pm.menu.add(0, 5, 4, "Filtrar por artista")
@@ -1094,7 +1094,31 @@ class MainActivity : AppCompatActivity() {
         startPlayback(playlist[0])
     }
 
+    /** Video con la salida en "Teléfono": se abre el reproductor a pantalla completa. */
+    private fun playVideoOnPhone(item: MediaItem, resumeAt: Int) {
+        Store.registerPlay(item)
+        if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene en el TV o en el teléfono
+        adapter.playingId = -1
+        adapter.notifyDataSetChanged()
+        val i = Intent(this, VideoPlayerActivity::class.java)
+            .putExtra("uri", item.uriString)
+            .putExtra("id", item.id)
+            .putExtra("name", item.name)
+            .putExtra("dur", item.durationSec)
+            .putExtra("start", resumeAt)
+        startActivity(i)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::adapter.isInitialized) adapter.notifyDataSetChanged()   // refresca "Continuar" al volver del reproductor
+    }
+
     private fun startPlayback(item: MediaItem, resumeAt: Int = 0) {
+        if (!item.isMusic && outPhone) {
+            playVideoOnPhone(item, resumeAt)
+            return
+        }
         playingItem = item
         Store.registerPlay(item)
         pendingResume = resumeAt
@@ -1764,7 +1788,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun stopPlaybackForDelete() {
+    private fun stopCurrentPlayback() {
         manualStop = true
         if (localActive) stopLocal() else thread { TvController.stop() }
         playingItem = null
@@ -1777,7 +1801,7 @@ class MainActivity : AppCompatActivity() {
         val list = ArrayList(items)
         actionMode?.finish()
         val now = playingItem
-        if (now != null && list.any { it.id == now.id && it.isMusic == now.isMusic }) stopPlaybackForDelete()
+        if (now != null && list.any { it.id == now.id && it.isMusic == now.isMusic }) stopCurrentPlayback()
         deletedItems.clear()
         failedCount = 0
         if (Build.VERSION.SDK_INT >= 30) {

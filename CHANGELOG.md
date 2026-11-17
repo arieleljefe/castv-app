@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v7)
+# Registro de cambios y guía de continuidad – CASTV (v8)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -71,6 +71,20 @@ git push origin main
 ---
 
 ## Cambios pendientes de probar
+
+### 2026-11-17 · Videos en el teléfono (salida Teléfono/TV para video y música) 🧪 (subiendo; falta confirmar el build y probar)
+
+- **Qué:** el botón de salida (icono TV/teléfono, o ⋮ → Salida) ahora controla **música y videos**. Con "Teléfono", al tocar un video se abre un reproductor a pantalla completa en el teléfono (nueva `VideoPlayerActivity`) con controles, gira con el teléfono, mantiene la pantalla encendida y **recuerda el punto donde lo dejaste** (aparece en "Continuar"). Con "TV" todo sigue igual que antes. Si algo suena en el TV o en el teléfono, se detiene al pasar el video al teléfono.
+- **Archivos:** `VideoPlayerActivity.kt` (nuevo), `AndroidManifest.xml` (nueva actividad), `MainActivity.kt` (`startPlayback`, texto del menú y avisos), `Store.kt` sin cambios.
+- **Probar:**
+  1. Pon la salida en Teléfono (icono cian). Toca un video: debe abrirse a pantalla completa y reproducirse con sonido.
+  2. Toca la pantalla: salen los controles (play/pausa, barra para adelantar). Gira el teléfono: no debe reiniciarse.
+  3. Atrás: vuelve a la lista. El video debe aparecer en "Continuar" con el tiempo guardado; al tocarlo ofrece "Continuar desde…".
+  4. Pon la salida en TV y reproduce el mismo video: debe ir al TV como siempre.
+  5. Con música sonando en el TV, pasa un video al teléfono: la música debe detenerse y no saltar a otra canción.
+- **Limitaciones conocidas:** no avanza solo al siguiente video; no pasa a TV desde ese reproductor (hay que volver y cambiar la salida); sin subtítulos.
+- **Si falla:** `git revert` del commit "Videos en el teléfono".
+- **Riesgo:** bajo-medio. No toca el envío al TV con la salida en TV. Los videos que el teléfono no pueda decodificar muestran un aviso y se cierra el reproductor.
 
 ### 2026-11-16 · Estabilidad (tanda 1) 🧪 (parcial)
 
@@ -204,7 +218,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v7). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v8). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -220,6 +234,7 @@ Actualizada: 17 de noviembre de 2026 (v7). Cuando una función se termine, se mu
 
 ### 🧪 Hecho, falta probar
 
+- **Videos en el teléfono.** Parche `video_telefono.patch`. Falta build verde y probar.
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
@@ -227,7 +242,7 @@ Actualizada: 17 de noviembre de 2026 (v7). Cuando una función se termine, se mu
 
 - Por decidir con Ariel. Candidatas:
   1. **Papelera en vez de borrado permanente** (cambio chico: `createTrashRequest`), si se quiere poder recuperar.
-  2. **Integrar piezas de la Etapa 12** (reproducir música en el teléfono con cola editable, retomar la sesión). Está en el zip `castv-backup-20261116-1723.zip`, en otra línea de código (`Player.kt`). Esa línea **no compiló** en GitHub (error de Kotlin sin ver las líneas `e: file://`), así que hay que traerla por partes.
+  2. **Integrar piezas de la Etapa 12** que aún no están (cola editable, retomar la sesión al abrir la app, reproducir en segundo plano con el motor `Player`). La música en el teléfono ya existe en esta línea. Está en el zip `castv-backup-20261116-1723.zip`, en otra línea de código (`Player.kt`). Esa línea **no compiló** en GitHub (error de Kotlin sin ver las líneas `e: file://`), así que hay que traerla por partes.
   3. Subir `README.md`, copia de seguridad + etiqueta `v2.1-estable` y Release del APK (ver lista de abajo).
   4. Subtítulos para videos.
 
