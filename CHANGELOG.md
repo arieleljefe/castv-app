@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v24)
+# Registro de cambios y guía de continuidad – CASTV (v25)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -34,7 +34,7 @@ git push origin main
 - ❌ **Paso 0, adelantar (seek) con el control remoto del TV:** no funciona. En `/log` solo está el `206` inicial; **el TV no hizo ningún `GET` más con `range=bytes=N-`**. **En diagnóstico** (ver abajo y la entrada "Paso 0" en "Cambios pendientes de probar").
 - ⚠️ **Enlaces de prueba que ya no sirven** (17 nov 2026): Blender `http` (301 → https → 404), Blender `https` directo (404) y Google `gtv-videos-bucket` (403). Usar **archive.org** (sección "Fuentes legales", A.5).
 
-**Decisión de Ariel (17 nov 2026, ~12:50): el diagnóstico del seek (puntos 1 a 4 de abajo) queda ⏳ PENDIENTE.** Se hará más tarde; por ahora se sigue con las mejoras de la app ("Pulir la app", ver "Hoja de ruta"). No se ha corrido ningún `curl` de diagnóstico todavía y no hay parche escrito. Verificado en Termux: `castv-fresh` está al día con `origin/main` y `CHANGELOG.md` del repo ya coincide con la v23 (`git commit` dijo "nothing to commit"; `git push` dijo "Everything up-to-date"). Esta v24 solo añade esta decisión.
+**Decisión de Ariel (17 nov 2026, ~12:50): el diagnóstico del seek (puntos 1 a 4 de abajo) queda ⏳ PENDIENTE.** Se hará más tarde; por ahora se sigue con las mejoras de la app ("Pulir la app", ver "Hoja de ruta"). No se ha corrido ningún `curl` de diagnóstico todavía y no hay parche escrito. Verificado en Termux: `castv-fresh` está al día con `origin/main` y `CHANGELOG.md` del repo ya coincide con la v23 (`git commit` dijo "nothing to commit"; `git push` dijo "Everything up-to-date"). La v25 añade además la sección "Prioridades acordadas" (abajo).
 
 **Qué sigue, en este orden:**
 
@@ -66,6 +66,39 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 - Si Ariel **ya subió este changelog** (v22/v23) al repo: `cd ~/castv-nuevo/castv-fresh && pwd && git log --oneline -3`, luego `cp ~/storage/downloads/CHANGELOG_v23.md CHANGELOG.md && git add -A && git commit -m "Changelog v23" && git push origin main`. Si el push es rechazado (historias distintas con `~/castv-app`), **no usar `--force`**: ver el aviso de abajo.
 - **Cuál es la copia buena del proyecto** (`~/castv-app` vs `~/castv-nuevo/castv-fresh`): sigue sin resolverse; ver el aviso de abajo.
 - Para este changelog **no** se ha marcado ✅ nada que Ariel no haya confirmado (regla 7).
+
+---
+
+## 🎯 Prioridades acordadas (17 nov 2026, v25) — LEER ANTES DE EMPEZAR
+
+**Objetivo de Ariel:** una app potente para **ambos usos**: (a) sus propios videos y música del teléfono, y (b) enlaces y canales (listas M3U). Principio: primero **fiable y con control completo**, luego funciones extra.
+
+**Si esta lista choca con "Qué sigue" de arriba, manda esta lista** (el diagnóstico del seek sigue aplazado por decisión de Ariel y entra en la prioridad 2).
+
+**Prioridad 0 · Base segura (antes de escribir funciones nuevas):**
+
+1. ⬜ Confirmar la copia buena del proyecto. Ya verificado el 17 nov: `~/castv-nuevo/castv-fresh` está al día con `origin/main` (mismo remoto `arieleljefe/castv-app`). Falta comprobar `~/castv-app` (¿tiene commits sin subir, como la Etapa 12 `2c37468`?). No usar `push --force`.
+2. ⬜ Ver que el último build de GitHub Actions salga verde.
+3. ⬜ Probar lo ya subido y marcarlo ✅ solo si Ariel lo confirma: aviso del puerto 8000, color de acento, siguiente video automático, ⏮ ⏭ y botón 📺 TV.
+4. ⬜ README + etiqueta `v2.1-estable` + Release (punto de vuelta seguro).
+
+**Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
+
+**Prioridad 2 · Control completo desde el móvil:** barra de progreso con seek, volumen, pausa/reanudar/detener y estado real del TV (posición y duración). Aquí entra el **diagnóstico del seek** (aplazado): primero los dos `curl` de "Qué sigue", luego la prueba de control con video local y la prueba B, y después un parche pequeño y aditivo (`// [Etapa 13-A.4]`). Cerrar también el resto del Paso 0 (pausa, detener, salir de CASTV mientras suena un enlace).
+
+**Prioridad 3 · Segundo plano sólido (Etapa 12):** cola editable, retomar sesión, notificación con controles. Traer `Player.kt` a `castv-fresh` por partes, después de resolver la prioridad 0.
+
+**Prioridad 4 · Enlaces y listas M3U (Etapa 13-B, partes B.1 a B.4):** pegar un enlace o una lista (por enlace o archivo), pestaña de canales, búsqueda y favoritos. Usar solo fuentes legales (sección "Fuentes legales"). Después, 13-C.
+
+**Prioridad 5 · Varios TV:** detección automática, recordar el último TV, mostrar nombre y modelo, modo de prueba.
+
+**Ideas para el futuro (sin fecha):**
+
+- Subtítulos en el TV por DLNA (experimental; depende de que el TV los acepte).
+- Convertir `.opus` / `.m4a` / `.mkv` dentro de la app con ffmpeg (el APK crece mucho; mientras tanto, convertir con Termux).
+- Generar subtítulos escaneando videos (Vosk / Whisper) y letra sincronizada (LRCLIB).
+- Mini reproductor más compacto y mensajes de error más claros al enviar al TV.
+- HLS al TV: descartado por ahora (❌ 13-A.3); HLS queda solo para el móvil.
 
 ---
 
@@ -627,7 +660,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v24). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v25). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
