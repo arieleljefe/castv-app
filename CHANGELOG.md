@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v28)
+# Registro de cambios y guía de continuidad – CASTV (v29)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -28,6 +28,7 @@ git push origin main
 
 **Hecho en esta sesión (con pruebas en el Hisense HL1):**
 
+- ✅ **Etapa 14 (17 nov 2026, tarde): orden del código y mensajes de error claros.** Commit **`ac51ab7`** subido a `main` (`72c3d10..ac51ab7`), build en verde y **confirmado por Ariel (\"ya funciona\")** tras probar la app en el móvil. Detalle en el Historial (entrada \"Etapa 14\"). Punto de vuelta atrás: rama **`respaldo-antes-14`** (= `72c3d10`, Changelog v28).
 - ❌ **13-A.3 (HLS al TV)** registrado en la v22: el TV pide la lista `.m3u8` y no sigue los enlaces. HLS queda solo para el móvil.
 - ✅ **Paso 0, enlace con redirección:** archive.org (`big_buck_bunny_720p_surround.mp4`, 61,9 MB) → 📺 Al TV: `RELAY redirige (302) -> https://dn710604.ca.archive.org/...`, luego `RELAY 206 ... 0-61878608/61878609`. **El video se ve en el TV** (confirmado por Ariel).
 - ✅ `flower.mp4` de MDN sigue funcionando en el TV (`206`, 1 128 375 bytes). Ya estaba ✅ en 13-A.2.
@@ -56,7 +57,7 @@ git push origin main
 **Archivos que hay que subir a la conversación para seguir** (el asistente no los tiene; sin ellos no se puede asegurar que compile). Copiarlos a Descargas con:
 
 ```bash
-cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/{Store,MainActivity,MediaServer,TvController}.kt ~/storage/downloads/
+cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/{Store,MainActivity,MediaServer,TvController,CastvUtils}.kt ~/storage/downloads/
 ```
 
 Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para el seek), `Store.kt` (para 13-B). `VideoPlayerActivity.kt`, `DebugLog.kt` y `CastvService.kt` solo si se tocan.
@@ -82,7 +83,7 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. ⬜ Falta solo el aviso del puerto 8000 ocupado.
 4. 🧪 README y workflow ya subidos. Etiqueta **`v2.2`** subida por Ariel el 17 nov 2026 ("todo subió bien"; `v2.1-estable` ya existía de antes y no se tocó, sin `--force`). ⬜ Falta confirmar que en GitHub → Releases aparezca `CASTV-v2.2.apk`.
 
-**Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
+**Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento) — 🟢 primer paso hecho (Etapa 14-A, `ac51ab7`, confirmado por Ariel el 17 nov 2026): `norm`, `naturalCompare`, `fmt` y la IP del teléfono ya viven en `CastvUtils.kt`. Falta seguir sacando partes (diálogo del puerto, lógica de envío al TV, pantallas):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
 
 **Prioridad 2 · Control completo desde el móvil:** barra de progreso con seek, volumen, pausa/reanudar/detener y estado real del TV (posición y duración). Aquí entra el **diagnóstico del seek** (aplazado): primero los dos `curl` de "Qué sigue", luego la prueba de control con video local y la prueba B, y después un parche pequeño y aditivo (`// [Etapa 13-A.4]`). Cerrar también el resto del Paso 0 (pausa, detener, salir de CASTV mientras suena un enlace).
 
@@ -97,7 +98,7 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 - Subtítulos en el TV por DLNA (experimental; depende de que el TV los acepte).
 - Convertir `.opus` / `.m4a` / `.mkv` dentro de la app con ffmpeg (el APK crece mucho; mientras tanto, convertir con Termux).
 - Generar subtítulos escaneando videos (Vosk / Whisper) y letra sincronizada (LRCLIB).
-- Mini reproductor más compacto y mensajes de error más claros al enviar al TV.
+- Mini reproductor más compacto. (Los mensajes de error más claros al enviar al TV ya se hicieron: Etapa 14-B ✅.)
 - HLS al TV: descartado por ahora (❌ 13-A.3); HLS queda solo para el móvil.
 
 ---
@@ -400,6 +401,25 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 
 ## Historial
 
+### 2026-11-17 · Etapa 14: orden del código (14-A) y mensajes de error claros (14-B) ✅ (commit `ac51ab7`; confirmado por Ariel: \"ya funciona\")
+
+- **Qué:** cambio interno sin funciones nuevas.
+  - **14-A:** se sacó de `MainActivity.kt` la lógica sin estado y se movió a un archivo nuevo, **`CastvUtils.kt`** (comentarios `// [Etapa 14-A]`):
+    - `object CastvText`: `norm()` (minúsculas y sin acentos), `naturalCompare()` (\"Cap 2\" antes que \"Cap 10\") y `fmtTime()` (75 → `1:15`; 3725 → `1:02:05`).
+    - `object CastvNet`: `localIpAddress(tvIp)` (IP del teléfono en la interfaz que llega al TV).
+    - En `MainActivity.kt` quedan `norm`, `naturalCompare`, `fmt` y `getLocalIpAddress` como funciones privadas de una línea que **delegan** en `CastvText` / `CastvNet`, así que ninguna llamada existente cambió. Se quitaron los imports que ya no se usan (`Inet4Address`, `Normalizer`, `NetworkInterface`). `MainActivity.kt` pasó de 2 479 a 2 427 líneas.
+  - **14-B:** los avisos de error ya no mandan a mirar el log con `curl`; ahora dicen la causa probable:
+    - Enlace rechazado: \"El TV no aceptó el enlace. ¿Está encendido y en el mismo Wi-Fi? Prueba otro enlace mp4.\"
+    - Sin red: \"No se pudo determinar la red. Conéctate al mismo Wi-Fi que el TV.\"
+    - Envío fallido: \"No se pudo enviar al TV. ¿Está encendido y en el mismo Wi-Fi? Revisa ⋮ › Elegir TV.\"
+    - Reproducción local: \"…formato no compatible o archivo dañado\" y \"No se pudo abrir el archivo en el teléfono. Prueba con otro.\"
+- **Archivos:** `CastvUtils.kt` (nuevo) y `MainActivity.kt`. Parches: `etapa14a_orden_utils.patch`, `etapa14b_mensajes_tv.patch`; se aplicó el combinado `etapa14_completo.patch`.
+- **Cómo se aplicó (para repetirlo si hace falta):** `git hash-object` de `MainActivity.kt` dio `9ae115aab402332b5f597284c809f2ec7e92c521` antes y `35f6fa3cc94ed315eadf099c7ed8062a6f40b6ba` después (los dos coincidieron con lo esperado); `git apply --check` dio OK; commit `ac51ab7`; `git push origin main` sin problemas.
+- **Cómo queda funcionando:** idéntico a antes, salvo los textos de error nuevos. Orden por nombre, búsqueda sin acentos, tiempos del seekbar y detección de la IP del teléfono usan ahora las funciones de `CastvUtils.kt`.
+- **Prueba:** Ariel instaló el APK y dijo \"ya funciona\" (17 nov 2026) tras las pruebas sugeridas (orden natural, búsqueda sin acentos, tiempos del seekbar, mensajes de error y envío al TV). No se anotó el detalle de cada una.
+- **Si falla / se quiere quitar:** `git revert ac51ab7` y `git push origin main`, o volver a la rama `respaldo-antes-14`.
+- **Lección:** al preparar un parche, comparar el `git hash-object` del archivo real con el que muestra la línea `index` del parche; si coincide, el parche aplica sin sorpresas.
+
 ### 2026-11-17 · Papelera de Android (opcional) ✅
 
 - **Qué:** nuevo menú **⋮ → Borrado: a la papelera / permanente** (solo Android 11 o superior). Por defecto **va a la papelera** de Android: se recupera desde Galería o Mis archivos durante unos 30 días. Con "permanente" funciona como antes. El aviso de confirmación dice cuál de los dos va a pasar. En Android 10 o anterior no existe papelera y sigue siendo permanente.
@@ -663,7 +683,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v28). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v29). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -680,6 +700,7 @@ Actualizada: 17 de noviembre de 2026 (v28). Cuando una función se termine, se m
 - **Paso 0 (parcial): enlace con redirección (302) por `/relay` → TV** (archive.org, 17 nov 2026, confirmado por Ariel).
 - **Reproductor de video:** subtítulos, siguiente video automático, ⏮ ⏭ (video y música) y botón 📺 TV (confirmado por Ariel, 17 nov 2026).
 - **Color de acento** (Cian, Verde, Naranja, Morado): funciona (confirmado por Ariel, 17 nov 2026).
+- **Etapa 14 (`ac51ab7`): orden del código (`CastvUtils.kt`) y mensajes de error claros al enviar al TV** (confirmado por Ariel, 17 nov 2026).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
@@ -716,7 +737,6 @@ Actualizada: 17 de noviembre de 2026 (v28). Cuando una función se termine, se m
   - Letra sincronizada de canciones desde internet (LRCLIB), solo en el teléfono.
 
 - Mini reproductor más compacto.
-- Mensajes de error más claros al enviar al TV.
 
 ### ℹ️ Ya existía en la app (no hay que hacerlo)
 
