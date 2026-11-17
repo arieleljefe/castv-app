@@ -57,6 +57,17 @@ object Store {
         if (resumePrefs.contains(k)) resumePrefs.edit().remove(k).apply()
     }
 
+    /** Borra todo rastro de un archivo eliminado: favoritos, listas, punto guardado y estadísticas. */
+    fun forget(item: MediaItem) {
+        val k = key(item)
+        if (favs.remove(k)) prefs.edit().putStringSet("fav", HashSet(favs)).apply()
+        var changed = false
+        for (l in lists.values) if (l.remove(k)) changed = true
+        if (changed) saveLists()
+        resumePrefs.edit().remove(k).apply()
+        statsPrefs.edit().remove("c|$k").remove("t|$k").apply()
+    }
+
     // ------------------------------------------------------------ Duplicados
 
     var hideDups: Boolean

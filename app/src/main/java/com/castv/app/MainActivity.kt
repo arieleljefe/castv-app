@@ -8,7 +8,13 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContentUris
 import android.content.Intent
+import android.app.RecoverableSecurityException
+import android.provider.MediaStore
+import android.view.Menu
+import android.view.MenuItem
+import androidx.appcompat.view.ActionMode
 import android.content.IntentFilter
 import androidx.core.app.NotificationCompat
 import android.content.pm.PackageManager
@@ -489,11 +495,15 @@ class MainActivity : AppCompatActivity() {
 
         listFiles.setOnItemClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
-            if (idx in currentList.indices) playFromList(idx)
+            if (idx in currentList.indices) {
+                if (selecting) toggleSelect(currentList[idx]) else playFromList(idx)
+            }
         }
         listFiles.setOnItemLongClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
-            if (idx in currentList.indices) showItemMenu(currentList[idx])
+            if (idx in currentList.indices) {
+                if (selecting) toggleSelect(currentList[idx]) else startSelection(currentList[idx])
+            }
             true
         }
 
@@ -521,6 +531,7 @@ class MainActivity : AppCompatActivity() {
         // Primero se cierra lo que esté abierto; con música en el teléfono, "atrás" minimiza
         // en vez de cerrar y cortar la música
         when {
+            selecting -> actionMode?.finish()
             searchBar.visibility == View.VISIBLE -> toggleSearch()
             playerExpanded.visibility == View.VISIBLE -> setPlayerExpanded(false)
             hasActiveFilter() -> clearFilters()
@@ -603,6 +614,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Lee la lista en segundo plano para que la pantalla no se congele al abrir. */
     private fun loadMedia(music: Boolean) {
+        actionMode?.finish()
         showingMusic = music
         getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("lastMusic", music).apply()
         nameKeyCache.clear()
@@ -1672,7 +1684,203 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Pulsación larga en una fila. */
+    // ---------------------------------------------- Selección y borrado
+
+    private val reqDelete = 4711
+    private val reqDeleteOne = 4712
+    private var selecting = false
+    private val selectedIds = HashSet<Long>()
+    private var actionMode: ActionMode? = null
+    private var pendingDelete: List<MediaItem> = emptyList()   // Android 11+: todo el grupo
+    private val deleteQueue = ArrayList<MediaItem>()           // Android 10 o menos: uno por uno
+    private val deletedItems = ArrayList<MediaItem>()
+    private var failedCount = 0
+
+    private fun updateSelectionTitle() {
+        actionMode?.title = if (selectedIds.size == 1) "1 seleccionado" else "${selectedIds.size} seleccionados"
+    }
+
+    private fun toggleSelect(item: MediaItem) {
+        if (!selectedIds.remove(item.id)) selectedIds.add(item.id)
+        if (selectedIds.isEmpty()) {
+            actionMode?.finish()
+            return
+        }
+        updateSelectionTitle()
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun startSelection(first: MediaItem) {
+        selectedIds.clear()
+        selectedIds.add(first.id)
+        selecting = true
+        actionMode = startSupportActionMode(object : ActionMode.Callback {
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                menu.add(0, 1, 0, "Todo").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                menu.add(0, 2, 1, "🗑 Borrar").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                mode.title = "1 seleccionado"
+                return true
+            }
+
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                when (item.itemId) {
+                    1 -> {
+                        for (m in currentList) selectedIds.add(m.id)
+                        updateSelectionTitle()
+                        adapter.notifyDataSetChanged()
+                    }
+                    2 -> confirmDelete(currentList.filter { it.id in selectedIds })
+                }
+                return true
+            }
+
+            override fun onDestroyActionMode(mode: ActionMode) {
+                selecting = false
+                selectedIds.clear()
+                actionMode = null
+                adapter.notifyDataSetChanged()
+            }
+        })
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun uriOf(item: MediaItem): Uri {
+        val base = if (item.isMusic) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                   else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        return ContentUris.withAppendedId(base, item.id)
+    }
+
+    private fun confirmDelete(items: List<MediaItem>) {
+        if (items.isEmpty()) return
+        val msg = if (items.size == 1) "«${prettyTitle(items[0])}» se eliminará del teléfono. No se puede deshacer."
+                  else "Se eliminarán ${items.size} archivos del teléfono. No se puede deshacer."
+        AlertDialog.Builder(this)
+            .setTitle("¿Eliminar?")
+            .setMessage(msg)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar") { _, _ -> deleteItems(items) }
+            .show()
+    }
+
+    private fun stopPlaybackForDelete() {
+        manualStop = true
+        if (localActive) stopLocal() else thread { TvController.stop() }
+        playingItem = null
+        resetProgress()
+        lastNotifKey = ""
+        postDefaultNotification()
+    }
+
+    private fun deleteItems(items: List<MediaItem>) {
+        val list = ArrayList(items)
+        actionMode?.finish()
+        val now = playingItem
+        if (now != null && list.any { it.id == now.id && it.isMusic == now.isMusic }) stopPlaybackForDelete()
+        deletedItems.clear()
+        failedCount = 0
+        if (Build.VERSION.SDK_INT >= 30) {
+            // Una sola confirmación del sistema para todo el grupo
+            pendingDelete = list
+            try {
+                val pi = MediaStore.createDeleteRequest(contentResolver, list.map { uriOf(it) })
+                startIntentSenderForResult(pi.intentSender, reqDelete, null, 0, 0, 0)
+            } catch (e: Exception) {
+                toast("No se pudo pedir el permiso: ${e.message}")
+            }
+        } else {
+            deleteQueue.clear()
+            deleteQueue.addAll(list)
+            deleteNext()
+        }
+    }
+
+    /** Android 10 o anterior: borra uno por uno; si el sistema pide permiso, se continúa en onActivityResult. */
+    private fun deleteNext() {
+        while (deleteQueue.isNotEmpty()) {
+            val item = deleteQueue[0]
+            try {
+                contentResolver.delete(uriOf(item), null, null)
+                deleteQueue.removeAt(0)
+                deletedItems.add(item)
+            } catch (e: SecurityException) {
+                if (Build.VERSION.SDK_INT >= 29 && e is RecoverableSecurityException) {
+                    try {
+                        startIntentSenderForResult(
+                            e.userAction.actionIntent.intentSender, reqDeleteOne, null, 0, 0, 0)
+                        return
+                    } catch (x: Exception) { }
+                }
+                deleteQueue.removeAt(0)
+                failedCount++
+            } catch (e: Exception) {
+                deleteQueue.removeAt(0)
+                failedCount++
+            }
+        }
+        finishDelete()
+    }
+
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            reqDelete -> {
+                if (resultCode == RESULT_OK) deletedItems.addAll(pendingDelete)
+                pendingDelete = emptyList()
+                finishDelete()
+            }
+            reqDeleteOne -> {
+                val item = deleteQueue.firstOrNull()
+                if (item != null) {
+                    if (resultCode == RESULT_OK) {
+                        try {
+                            contentResolver.delete(uriOf(item), null, null)
+                            deletedItems.add(item)
+                        } catch (e: Exception) { failedCount++ }
+                    } else {
+                        failedCount++
+                    }
+                    deleteQueue.removeAt(0)
+                }
+                deleteNext()
+            }
+        }
+    }
+
+    private fun finishDelete() {
+        val gone = ArrayList(deletedItems)
+        deletedItems.clear()
+        val failed = failedCount
+        failedCount = 0
+        if (gone.isNotEmpty()) afterDeleted(gone)
+        toast(
+            if (gone.isEmpty()) "No se eliminó nada"
+            else if (failed > 0) "🗑 Eliminados: ${gone.size} · sin permiso: $failed"
+            else "🗑 Eliminados: ${gone.size}"
+        )
+    }
+
+    /** Quita los archivos borrados de la lista, la cola, favoritos, listas, puntos guardados y estadísticas. */
+    private fun afterDeleted(gone: List<MediaItem>) {
+        val ids = HashSet<String>()
+        for (g in gone) ids.add((if (g.isMusic) "a" else "v") + g.id)
+        fun isGone(m: MediaItem) = ids.contains((if (m.isMusic) "a" else "v") + m.id)
+        queue.removeAll { isGone(it) }
+        updateQueueBadge()
+        playlist = playlist.filter { !isGone(it) }
+        val cur = playingItem
+        playIndex = if (cur == null) -1 else playlist.indexOfFirst { it.id == cur.id && it.isMusic == cur.isMusic }
+        allItems = allItems.filter { !isGone(it) }
+        for (g in gone) {
+            if (allItems.none { Store.key(it) == Store.key(g) }) Store.forget(g)
+        }
+        dupIds = computeDups(allItems)
+        applyFilters()
+    }
+
+    /** Menú de una fila (botón ⋮). */
     private fun showItemMenu(item: MediaItem) {
         val labels = ArrayList<String>()
         val actions = ArrayList<() -> Unit>()
@@ -1692,6 +1900,8 @@ class MainActivity : AppCompatActivity() {
             labels.add("➖ Quitar de «$pl»")
             actions.add { Store.removeFromList(pl, item); applyFilters() }
         }
+        labels.add("🗑 Eliminar del teléfono…")
+        actions.add { confirmDelete(listOf(item)) }
         if (Store.resumeAt(item) >= 10) {
             labels.add("↺ Olvidar el punto guardado")
             actions.add { Store.clearResume(item); applyFilters() }
@@ -2059,7 +2269,8 @@ class MainActivity : AppCompatActivity() {
                 .inflate(R.layout.item_file, parent, false)
             val item = items[position]
             val isPlaying = item.id == playingId && item.isMusic == playingMusic
-            v.findViewById<TextView>(R.id.itemName).text = prettyTitle(item)
+            val sel = selecting && item.id in selectedIds
+            v.findViewById<TextView>(R.id.itemName).text = (if (sel) "✓ " else "") + prettyTitle(item)
             val section = v.findViewById<TextView>(R.id.itemSection)
             val byName = sortMode == Sort.NAME_ASC || sortMode == Sort.NAME_DESC
             val letter = sectionLetter(item.name)
@@ -2095,7 +2306,7 @@ class MainActivity : AppCompatActivity() {
             }
             action.visibility = View.VISIBLE
             v.findViewById<View>(R.id.itemRow).setBackgroundResource(
-                if (isPlaying) R.drawable.item_bg_playing else R.drawable.item_bg)
+                if (isPlaying || sel) R.drawable.item_bg_playing else R.drawable.item_bg)
             return v
         }
     }
