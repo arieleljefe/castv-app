@@ -4,7 +4,7 @@ Reproductor para Android que **envía tus videos y música al TV por la red Wi-F
 
 Creado por **Ariel De Jesus Bueno**.
 
-> Estado: versión estable **2.1** (Etapa 11). Probada con un TV JVC. Si tu TV usa otro sistema, puede que algún detalle cambie (ver [Problemas frecuentes](#problemas-frecuentes)).
+> Estado: versión **2.1**. Probada con un TV JVC y un Samsung Galaxy S21 Ultra. Si tu TV usa otro sistema, puede que algún detalle cambie (ver [Problemas frecuentes](#problemas-frecuentes)).
 
 ---
 
@@ -18,6 +18,9 @@ Creado por **Ariel De Jesus Bueno**.
 - **Cola de reproducción**, **listas propias**, aleatorio y repetir.
 - **Temporizador de apagado**, **velocidad de reproducción** y **ecualizador** (en el teléfono).
 - Controles en la **notificación** y en la **pantalla de bloqueo**, con carátula.
+- **Salida a elegir: TV o teléfono**, para música y para video. En el teléfono, los videos se ven a pantalla completa, pasan solos al siguiente, recuerdan el punto donde los dejaste y muestran **subtítulos** (`.srt` / `.vtt`). Desde ahí puedes mandar el video al TV con el botón 📺.
+- **Borrar música y videos** desde la app (uno por uno o varios a la vez con pulsación larga). En Android 11 o superior se puede mandar a la **papelera** de Android o borrar para siempre.
+- **Tema** claro, oscuro o del sistema, y **color de acento** a elegir.
 - Servidor interno y **registro de depuración** que se puede leer desde Termux.
 
 ## Requisitos
@@ -35,26 +38,29 @@ Los demás formatos (`.opus`, `.m4a`, `.mkv`, `.flac`, etc.) muchos TV no los le
 
 ## Instalar (solo usar la app)
 
-### Opción A: descargar el APK ya compilado
+### Opción A: descargar desde Releases (la más fácil)
 
-1. En este repositorio entra a **Actions** (Acciones) y abre el último run con check verde.
+1. En este repositorio entra a **Releases** (columna derecha, o la pestaña "Releases").
+2. Descarga el archivo `CASTV-….apk` de la versión más reciente.
+3. Ábrelo en el teléfono. Si Android lo pide, permite **instalar apps de origen desconocido** para tu navegador o gestor de archivos.
+4. Abre CASTV y acepta los permisos de **archivos/multimedia** y **notificaciones**.
+
+### Opción B: descargar el último build de Actions
+
+1. Entra a **Actions** y abre el último run con check verde.
 2. Al final de la página, en **Artifacts**, descarga `castv-apk`.
 3. Descomprime el zip y abre `app-debug.apk` en el teléfono.
-4. Si Android lo pide, permite **instalar apps de origen desconocido** para tu navegador o gestor de archivos.
-5. Abre CASTV y acepta los permisos de **archivos/multimedia** y **notificaciones**.
-
-### Opción B: usar un Release
-
-Si el autor publica un APK en la sección **Releases**, descárgalo de ahí e instálalo igual.
 
 ---
 
 ## Usar la app
 
-1. Conecta el teléfono y el TV a la misma Wi-Fi y enciende el TV.
+1. Conecta el teléfono y el TV a la misma Wi-Fi y enciende el TV (si solo vas a usar el teléfono, no hace falta el TV).
 2. Abre CASTV: busca el TV sola. Si hay varios aparatos, usa **⋮ → Elegir TV**.
 3. Toca un video o canción: aparece "Reproduciendo en el TV".
 4. Controla con la barra inferior, la notificación o la pantalla de bloqueo.
+5. Para ver o escuchar en el propio teléfono, toca el icono de salida (TV / teléfono) de la parte superior.
+6. Para borrar: mantén pulsada una fila, marca las que quieras y toca **🗑 Borrar** (o usa ⋮ → Eliminar en una fila).
 
 Mantén la app abierta o en segundo plano mientras reproduces: el teléfono funciona como servidor del archivo.
 
@@ -101,13 +107,24 @@ El APK queda en `app/build/outputs/apk/debug/app-debug.apk`.
 ## Subir tus cambios desde Termux (flujo del autor)
 
 ```bash
-cd ~/castv-restore/castv-app
+cd ~/castv-nuevo/castv-fresh
 git add -A
 git commit -m "Descripción del cambio"
 git push origin main
 ```
 
 Al subir a `main`, GitHub compila el APK nuevo automáticamente.
+
+### Publicar una versión (Release)
+
+Al subir una **etiqueta** que empiece con `v`, GitHub compila el APK y lo publica solo en **Releases**:
+
+```bash
+git tag -a v2.1-estable -m "Versión estable 2.1"
+git push origin v2.1-estable
+```
+
+(Cambia el nombre de la etiqueta en cada versión nueva, por ejemplo `v2.2`.)
 
 ---
 
@@ -123,6 +140,7 @@ Al subir a `main`, GitHub compila el APK nuevo automáticamente.
 | Archivo | Para qué sirve |
 |---|---|
 | `MainActivity.kt` | Interfaz, listas, cola, controles, temporizador, ecualizador |
+| `VideoPlayerActivity.kt` | Reproductor de video a pantalla completa en el teléfono, con subtítulos |
 | `TvController.kt` | Búsqueda del TV y órdenes UPnP/SOAP |
 | `MediaServer.kt` | Servidor HTTP que entrega los archivos al TV |
 | `MediaScanner.kt` | Lee videos y música del teléfono; tipo MIME por extensión |

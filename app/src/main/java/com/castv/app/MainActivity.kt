@@ -940,6 +940,9 @@ class MainActivity : AppCompatActivity() {
         pm.menu.add(0, 10, 9, "Elegir TV")
         pm.menu.add(0, 12, 10, "Tema: " + themeLabel())
         pm.menu.add(0, 13, 11, "Color: " + accentNames[savedAccent().coerceIn(0, 3)])
+        if (Build.VERSION.SDK_INT >= 30) {
+            pm.menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
+        }
         pm.menu.add(0, 11, 12, "Mis redes y contacto")
         pm.setOnMenuItemClickListener { mi ->
             when (mi.itemId) {
@@ -959,6 +962,7 @@ class MainActivity : AppCompatActivity() {
                 11 -> showSocials()
                 12 -> pickTheme()
                 13 -> pickAccent()
+                14 -> toggleTrash()
             }
             true
         }
@@ -1733,6 +1737,7 @@ class MainActivity : AppCompatActivity() {
     private val deleteQueue = ArrayList<MediaItem>()           // Android 10 o menos: uno por uno
     private val deletedItems = ArrayList<MediaItem>()
     private var failedCount = 0
+    private var lastWasTrash = false
 
     private fun updateSelectionTitle() {
         actionMode?.title = if (selectedIds.size == 1) "1 seleccionado" else "${selectedIds.size} seleccionados"
@@ -1790,15 +1795,29 @@ class MainActivity : AppCompatActivity() {
         return ContentUris.withAppendedId(base, item.id)
     }
 
+    /** Android 11+: se puede mandar a la papelera del sistema (se recupera en Galería / Mis archivos). */
+    private fun useTrash(): Boolean =
+        Build.VERSION.SDK_INT >= 30 &&
+            getSharedPreferences("castv", MODE_PRIVATE).getBoolean("trash", true)
+
+    private fun toggleTrash() {
+        val now = !useTrash()
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("trash", now).apply()
+        toast(if (now) "🗑 Lo borrado irá a la papelera de Android"
+              else "⚠️ Lo borrado se eliminará para siempre")
+    }
+
     private fun confirmDelete(items: List<MediaItem>) {
         if (items.isEmpty()) return
-        val msg = if (items.size == 1) "«${prettyTitle(items[0])}» se eliminará del teléfono. No se puede deshacer."
-                  else "Se eliminarán ${items.size} archivos del teléfono. No se puede deshacer."
+        val trash = useTrash()
+        val what = if (items.size == 1) "«${prettyTitle(items[0])}»" else "${items.size} archivos"
+        val msg = if (trash) "$what irá a la papelera de Android. Se puede recuperar desde Galería o Mis archivos durante unos 30 días."
+                  else "$what se eliminará del teléfono. No se puede deshacer."
         AlertDialog.Builder(this)
-            .setTitle("¿Eliminar?")
+            .setTitle(if (trash) "¿Mover a la papelera?" else "¿Eliminar?")
             .setMessage(msg)
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Eliminar") { _, _ -> deleteItems(items) }
+            .setPositiveButton(if (trash) "A la papelera" else "Eliminar") { _, _ -> deleteItems(items) }
             .show()
     }
 
@@ -1818,11 +1837,15 @@ class MainActivity : AppCompatActivity() {
         if (now != null && list.any { it.id == now.id && it.isMusic == now.isMusic }) stopCurrentPlayback()
         deletedItems.clear()
         failedCount = 0
+        lastWasTrash = false
         if (Build.VERSION.SDK_INT >= 30) {
             // Una sola confirmación del sistema para todo el grupo
             pendingDelete = list
+            lastWasTrash = useTrash()
             try {
-                val pi = MediaStore.createDeleteRequest(contentResolver, list.map { uriOf(it) })
+                val uris = list.map { uriOf(it) }
+                val pi = if (lastWasTrash) MediaStore.createTrashRequest(contentResolver, uris, true)
+                         else MediaStore.createDeleteRequest(contentResolver, uris)
                 startIntentSenderForResult(pi.intentSender, reqDelete, null, 0, 0, 0)
             } catch (e: Exception) {
                 toast("No se pudo pedir el permiso: ${e.message}")
@@ -1910,8 +1933,9 @@ class MainActivity : AppCompatActivity() {
         failedCount = 0
         if (gone.isNotEmpty()) afterDeleted(gone)
         toast(
-            if (gone.isEmpty()) "No se eliminó nada"
+            if (gone.isEmpty()) (if (lastWasTrash) "No se movió nada" else "No se eliminó nada")
             else if (failed > 0) "🗑 Eliminados: ${gone.size} · sin permiso: $failed"
+            else if (lastWasTrash) "🗑 En la papelera: ${gone.size}"
             else "🗑 Eliminados: ${gone.size}"
         )
     }

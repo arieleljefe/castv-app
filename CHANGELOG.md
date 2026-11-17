@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v10)
+# Registro de cambios y guía de continuidad – CASTV (v12)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -73,7 +73,29 @@ git push origin main
 
 ## Cambios pendientes de probar
 
-### 2026-11-17 · Reproductor de video: siguiente video, botón TV y subtítulos 🧪 (subiendo; falta confirmar el build y probar)
+### 2026-11-17 · Papelera de Android (opcional) 🧪 (subiendo; falta confirmar el build y probar)
+
+- **Qué:** nuevo menú **⋮ → Borrado: a la papelera / permanente** (solo Android 11 o superior). Por defecto **va a la papelera** de Android: se recupera desde Galería o Mis archivos durante unos 30 días. Con "permanente" funciona como antes. El aviso de confirmación dice cuál de los dos va a pasar. En Android 10 o anterior no existe papelera y sigue siendo permanente.
+- **Archivos:** `MainActivity.kt` (`useTrash`, `toggleTrash`, `confirmDelete`, `deleteItems`, `finishDelete`, menú).
+- **Probar:**
+  1. ⋮ → debe decir "Borrado: a la papelera". Borra una canción de prueba: el aviso dice "¿Mover a la papelera?" y al final "🗑 En la papelera: 1".
+  2. Abre Mis archivos (papelera) o Galería (videos → Papelera): debe estar ahí y se puede restaurar. Al restaurar, vuelve a aparecer en CASTV (cierra y abre la app).
+  3. ⋮ → Borrado: permanente. Borra otra: el aviso dice "¿Eliminar?" y desaparece del todo.
+- **Si falla:** `git revert` del commit "Papelera de Android opcional".
+- **Riesgo:** bajo. Solo cambia la llamada del sistema que se usa al borrar.
+
+### 2026-11-17 · README, copia de seguridad y Release de GitHub 🧪 (subiendo; falta crear la etiqueta y confirmar el Release)
+
+- **Qué:** `README.md` actualizado (funciones nuevas, instalar desde **Releases**, cómo publicar una versión, tabla de archivos). El workflow `.github/workflows/build.yml` ahora, al subir una etiqueta que empiece con `v`, compila y **publica el APK en Releases** como `CASTV-<etiqueta>.apk` (con permiso `contents: write`).
+- **Archivos:** `README.md`, `.github/workflows/build.yml`.
+- **Pasos (después de subir los parches y con el build en verde):**
+  1. Copia de seguridad: `cd ~ && zip -r ~/storage/downloads/castv-backup-$(date +%Y%m%d-%H%M).zip castv-nuevo/castv-fresh -x "*/build/*" "*/.gradle/*"` (si falta zip: `pkg install zip`).
+  2. Etiqueta: `cd ~/castv-nuevo/castv-fresh && git tag -a v2.1-estable -m "Versión estable 2.1" && git push origin v2.1-estable`.
+  3. En GitHub → Actions debe correr un build de la etiqueta; al terminar, en **Releases** aparece `CASTV-v2.1-estable.apk`.
+- **Si falla:** si el Release no aparece, abrir el run de la etiqueta y revisar el paso "Publicar Release". Para borrar una etiqueta mala: `git tag -d v2.1-estable && git push origin :refs/tags/v2.1-estable`.
+- **Riesgo:** bajo. Solo toca documentación y el workflow; el APK del Release es de depuración (firma debug), igual que el que ya se instala.
+
+### 2026-11-17 · Reproductor de video: siguiente video, botón TV y subtítulos ✅ (subtítulos probados; falta confirmar siguiente video y botón TV)
 
 - **Qué:** en el reproductor de video del teléfono:
   1. **Siguiente video automático:** al terminar pasa solo al siguiente de la lista; los botones ⏮ ⏭ de los controles saltan al anterior/siguiente. Si un video no se puede reproducir, avisa y sigue con el siguiente.
@@ -238,7 +260,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v10). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v12). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -255,28 +277,32 @@ Actualizada: 17 de noviembre de 2026 (v10). Cuando una función se termine, se m
 
 ### 🧪 Hecho, falta probar
 
-- **Reproductor de video: siguiente video, botón TV y subtítulos.** Parche `video_extras.patch`. Falta build verde y probar.
+- **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
+- **Papelera de Android** (`papelera.patch`) y **README + Release** (`github_release.patch`): falta build verde y probar.
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
-- Por decidir con Ariel. Candidatas:
-  1. **Papelera en vez de borrado permanente** (cambio chico: `createTrashRequest`), si se quiere poder recuperar.
-  2. **Integrar piezas de la Etapa 12** que aún no están (cola editable, retomar la sesión al abrir la app, reproducir en segundo plano con el motor `Player`). La música en el teléfono ya existe en esta línea. Está en el zip `castv-backup-20261116-1723.zip`, en otra línea de código (`Player.kt`). Esa línea **no compiló** en GitHub (error de Kotlin sin ver las líneas `e: file://`), así que hay que traerla por partes.
-  3. Subir `README.md`, copia de seguridad + etiqueta `v2.1-estable` y Release del APK (ver lista de abajo).
-  4. Subtítulos para videos.
+- **Pulir la app** (acordado con Ariel). Orden sugerido:
+  1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
+  2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
+  3. (Hecho, falta probar) Papelera opcional; README + etiqueta + Release.
+  4. Integrar piezas de la Etapa 12 que falten (cola editable, retomar sesión, segundo plano con `Player`), por partes.
 
 ### ⬜ Por agregar (en este orden)
 
-1. Subir `README.md` al repositorio (el archivo ya está hecho).
-2. Copia de seguridad: zip en Descargas + etiqueta `v2.1-estable` en GitHub.
-3. Publicar el APK como **Release** de GitHub, para que se descargue fácil.
+1. (En curso) `README.md`, copia de seguridad con etiqueta `v2.1-estable` y Release del APK: ver "Cambios pendientes de probar".
 4. Añadir un archivo `LICENSE` (por ejemplo MIT), si se quiere compartir el código.
 5. **Subtítulos para videos.** Depende de que el TV los acepte por DLNA; hay que probarlo.
 6. **Convertir `.opus` / `.m4a` a mp3 desde la app.** Pesado: obliga a incluir ffmpeg y el APK crece mucho. Mientras tanto se convierte con Termux.
 
 ### 💡 Ideas sin decidir
+
+- **Aparcadas por decisión de Ariel (17 nov 2026), "primero pulir la app":**
+  - Subtítulos en el TV por DLNA (experimental; depende de si el JVC VIDAA acepta subtítulos externos; probar con `/log`). Alternativa: quemarlos con ffmpeg (APK pesado).
+  - Generar subtítulos escaneando videos (Vosk ~50 MB sin internet, Whisper ~75-150 MB, o servicio en línea). Código nativo: riesgo de build.
+  - Letra sincronizada de canciones desde internet (LRCLIB), solo en el teléfono.
 
 - Mini reproductor más compacto.
 - Mensajes de error más claros al enviar al TV.
