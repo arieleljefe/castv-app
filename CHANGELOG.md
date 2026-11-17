@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v19)
+# Registro de cambios y guía de continuidad – CASTV (v20)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -101,7 +101,7 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 
 ## Cambios pendientes de probar
 
-### 2026-11-17 · Etapa 13-A.2: intermediario `/relay` para que el TV reciba enlaces 🧪 (parche `etapa13a2_relay.patch` **aplicado y subido** el 17 nov 2026 como commit `11d93df`; falta ver el build de Actions y probar con el TV)
+### 2026-11-17 · Etapa 13-A.2: intermediario `/relay` para que el TV reciba enlaces ✅ (commit `11d93df`; **probado: el TV reproduce el mp4 del enlace**, confirmado por Ariel el 17 nov 2026)
 
 - **Por qué:** con la Etapa 13-A el teléfono manda el enlace al TV y el TV lo **acepta** (`SetAVTransportURI` responde 200, también el `Play`), pero **nunca pide el video**: en `/log` no aparece ningún `GET`. Con archivos locales sí funciona porque la URL es `http://IP-del-teléfono:PUERTO/video/ID.mp4`. El enlace de Blender (`http://download.blender.org/...`) responde **301 → https** y el destino da 404; el JVC VIDAA casi nunca lee `https` por DLNA ni sigue redirecciones.
 - **Qué hace el parche:** para enlaces **mp4** (no `.m3u8`), la app ya no manda al TV la URL de internet, sino `http://IP-del-teléfono:PUERTO/relay/<enlace en base64>.mp4`. El TV pide eso al teléfono y el **teléfono baja el video** del enlace original: sigue redirecciones a mano (hasta 8, incluido http → https), reenvía la cabecera `Range` (así se puede adelantar), responde `HEAD`, copia el tipo MIME del origen (si no es video/audio usa `video/mp4`) y añade cabeceras DLNA. **HLS (`.m3u8`) sigue yendo directo** al TV; queda para después.
@@ -111,7 +111,10 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
   - ✅ Los nombres que usa el parche **sí existen**: `ServerPort.port` (`DebugLog.kt` línea 34, `object ServerPort { @Volatile var port = 8000 }`) y `getLocalIpAddress(): String?` (`MainActivity.kt` línea 1279). No hace falta ninguna corrección.
   - ⚠️ **Corrección a este changelog:** la Etapa 13-A.1 decía que el puerto real está en `ServerState.port`. Es **`ServerPort.port`**; `ServerState` solo guarda `error` (aviso de puerto ocupado). Corregido abajo.
   - `TvController.setUriAndPlay(mediaUrl, title, mime, isMusic)` ya acepta cualquier URL: no se cambió.
-- **Probar:**
+- **Resultado de la prueba (17 nov 2026, 11:34):** con `flower.mp4` de MDN (`https`) → 📺 Al TV, el `/log` mostró `ENLACE: https://... -> http://192.168.100.43:8000/relay/....mp4`, `SOAP Stop/SetAVTransportURI/Play -> 200`, **el TV pidió `GET /relay/...` con `range=bytes=0-`** y la app respondió `RELAY 206 video/mp4 longitud=1128375 range=bytes 0-1128374/1128375`. Hubo además un segundo `GET` sin rango (`ua=curl/7.19.5`, lo hace el TV) con `RELAY 200`. **El video se ve en el TV.** Antes, en la misma sesión, un mp3 local al TV también funcionó (`206`/`200`): sin regresión en `/audio/`.
+- **Dato nuevo:** el `user-agent` del TV es `HISENSE-HL1 ... HbbTV/1.1.1 ... CE-HTML/1.0` (el "JVC VIDAA" es de fábrica Hisense). Útil para depurar.
+- **Conclusión:** la sospecha 1 era la buena: el TV no lee `https` ni sigue redirecciones; con el puente por `http` del teléfono sí. Con esto el TV **sí** lee enlaces mp4 externos.
+- **Probar (pasos que se usaron / pendientes):**
   1. Aplicar (ver pasos en la sección de arriba, "Cómo se trabaja", punto 3), compilar en Actions y esperar el APK en verde.
   2. Con CASTV abierto: ⋮ → Reproducir enlace… → pega el mp4 de MDN `flower.mp4` o el de samplelib → **📺 Al TV**.
   3. `curl -s http://127.0.0.1:PUERTO/log` (PUERTO = 8000 o el siguiente libre): debe verse `ENLACE: https://... -> http://IP:PUERTO/relay/....mp4`, luego un `GET /relay/...` **del TV** y líneas `RELAY ... 200` o `206`.
@@ -457,10 +460,10 @@ Estas emisoras ofrecen su señal en vivo gratis en su propia página o app ofici
 | # | Prueba | Resultado |
 |---|---|---|
 | 1 | mp4 (enlace A.1) → teléfono | ⏳ |
-| 2 | mp4 (enlace A.1) → TV | ❌ el TV no lo pide (sin `GET` en el log); enlace de Blender redirige 301 a https y el destino da 404 |
-| 3 | mp4 con `https` (A.2) → TV | ❌ el TV no lo acepta (Ariel: ningún enlace funciona) |
+| 2 | mp4 (enlace A.1) → TV | ❌ directo (sin `GET`; Blender redirige 301 a https y da 404). Con `/relay` (13-A.2): ⏳ falta repetir con una URL que no dé 404 |
+| 3 | mp4 con `https` → TV | ✅ con `/relay` (13-A.2): `flower.mp4` de MDN se ve en el TV (17 nov 2026) |
 | 4 | HLS (A.3) → teléfono | ⏳ |
-| 5 | HLS (A.3) → TV | ❌ el TV lo rechaza; el HLS de Mux sí funciona en el móvil (según Ariel) |
+| 5 | HLS (A.3) → TV | ❌ directo: el TV lo rechaza (aún sin relay para HLS); el HLS de Mux sí funciona en el móvil (según Ariel) |
 | 6 | Un canal de Free-TV (en vivo) → TV | ⏳ |
 | 7 | Un canal de iptv-org → TV | ⏳ |
 
@@ -484,7 +487,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v19). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v20). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -497,6 +500,7 @@ Actualizada: 17 de noviembre de 2026 (v19). Cuando una función se termine, se m
 - Estabilidad: bloqueos de energía con la pantalla apagada y registro "Servidor iniciado".
 - Eliminar música y videos con selección múltiple; papelera de Android opcional.
 - Videos en el teléfono (salida Teléfono/TV para video y música, con punto guardado).
+- **Etapa 13-A.2: enlaces mp4 (https) al TV con `/relay`** (`11d93df`, probado el 17 nov 2026).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
@@ -504,13 +508,13 @@ Actualizada: 17 de noviembre de 2026 (v19). Cuando una función se termine, se m
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
 - **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
 - **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
-- **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` subido como `11d93df`; falta ver el build y probar con el TV.
+- **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` .
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
-- **Etapa 13: reproducir enlace y listas M3U** (**13-A subida; al móvil funciona, al TV no. 13-A.2 intermediario `/relay`: subido como `11d93df`; falta ver el build y probar con el TV; después 13-B**) (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
+- **Etapa 13: reproducir enlace y listas M3U** (**13-A y 13-A.2 hechas: mp4 funciona en móvil y en TV (vía `/relay`). Pendiente: probar adelantar (seek) en el TV, enlace con redirección, y HLS (13-A.3, opcional). Siguiente: 13-B listas M3U.** (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
 - **Pulir la app** (acordado con Ariel). Orden sugerido:
   1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
   2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
