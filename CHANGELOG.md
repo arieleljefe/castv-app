@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v27)
+# Registro de cambios y guía de continuidad – CASTV (v28)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -78,9 +78,9 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 **Prioridad 0 · Base segura (antes de escribir funciones nuevas):**
 
 1. ✅ **Copia buena confirmada (17 nov 2026, ~13:04, capturas de Ariel): `~/castv-nuevo/castv-fresh`.** La carpeta `~/castv-app` **ya no existe** en Termux. `castv-fresh` está al día con `origin/main` (`cabadc8` = Changelog v26) y su historia sigue la Etapa 13 (`ec47026`, `98bcf78`, `11d93df`, `f1ca913`). **La Etapa 12 (`2c37468`) NO está en este repo**: `git cat-file -t 2c37468` dijo "Not a valid object name" y no hay commits con "etapa 12". Si hace falta esa función, hay que reescribir `Player.kt` o recuperar el zip de la Etapa 12 (si Ariel aún lo tiene), siempre por partes (Prioridad 3).
-2. ⬜ Ver que el último build de GitHub Actions salga verde.
+2. ✅ Build de GitHub Actions en verde (confirmado por Ariel, 17 nov 2026).
 3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. ⬜ Falta solo el aviso del puerto 8000 ocupado.
-4. ⬜ README + etiqueta `v2.1-estable` + Release (punto de vuelta seguro).
+4. 🧪 README y workflow ya subidos. Etiqueta **`v2.2`** subida por Ariel el 17 nov 2026 ("todo subió bien"; `v2.1-estable` ya existía de antes y no se tocó, sin `--force`). ⬜ Falta confirmar que en GitHub → Releases aparezca `CASTV-v2.2.apk`.
 
 **Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
 
@@ -102,7 +102,7 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 
 ---
 
-## ✅ RESUELTO el 17 nov 2026 (v27): la copia buena es `castv-fresh` (ver Prioridad 0). El texto de abajo es histórico: `~/castv-app` ya no existe y `origin/main` NO apunta a `2c37468`.
+## ✅ RESUELTO el 17 nov 2026 (v28): la copia buena es `castv-fresh` (ver Prioridad 0). El texto de abajo es histórico: `~/castv-app` ya no existe y `origin/main` NO apunta a `2c37468`.
 
 ## (Histórico) Antes de seguir: confirmar cuál es la copia buena del proyecto (17 nov 2026)
 
@@ -347,7 +347,8 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
   1. Copia de seguridad: `cd ~ && zip -r ~/storage/downloads/castv-backup-$(date +%Y%m%d-%H%M).zip castv-nuevo/castv-fresh -x "*/build/*" "*/.gradle/*"` (si falta zip: `pkg install zip`).
   2. Etiqueta: `cd ~/castv-nuevo/castv-fresh && git tag -a v2.1-estable -m "Versión estable 2.1" && git push origin v2.1-estable`.
   3. En GitHub → Actions debe correr un build de la etiqueta; al terminar, en **Releases** aparece `CASTV-v2.1-estable.apk`.
-- **Estado de la etiqueta:** el 17 nov 2026 el push de `v2.1-estable` fue rechazado porque **ya existía en GitHub** (de un intento anterior). Pendiente decidir: usar `v2.2` (recomendado) o reemplazarla con `git push origin v2.1-estable --force`. Antes mirar `git ls-remote --tags origin`. La copia de seguridad en zip ya se creó en Descargas.
+- **Actualización 17 nov 2026 (v28):** se usó la etiqueta `v2.2` (sin `--force`) y Ariel confirmó que todo subió bien. Falta ver el Release `CASTV-v2.2.apk`.
+- **Estado de la etiqueta (antes):** el 17 nov 2026 el push de `v2.1-estable` fue rechazado porque **ya existía en GitHub** (de un intento anterior). Pendiente decidir: usar `v2.2` (recomendado) o reemplazarla con `git push origin v2.1-estable --force`. Antes mirar `git ls-remote --tags origin`. La copia de seguridad en zip ya se creó en Descargas.
 - **Si falla:** si el Release no aparece, abrir el run de la etiqueta y revisar el paso "Publicar Release". Para borrar una etiqueta mala: `git tag -d v2.1-estable && git push origin :refs/tags/v2.1-estable`.
 - **Riesgo:** bajo. Solo toca documentación y el workflow; el APK del Release es de depuración (firma debug), igual que el que ya se instala.
 
@@ -662,7 +663,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v27). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v28). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
