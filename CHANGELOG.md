@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v29)
+# Registro de cambios y guía de continuidad – CASTV (v30)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -26,7 +26,11 @@ git push origin main
 
 **Para quien siga (otro asistente o yo mismo más tarde): empieza aquí.**
 
-**Hecho en esta sesión (con pruebas en el Hisense HL1):**
+**Estado al entregar la v30 (17 nov 2026, tarde, Ariel fuera de casa, sin el TV):** la base es `c637aa5` (Changelog v29). Encima se subió la Etapa 14-C (abajo). **Ariel dijo que "subió bien todo"; todavía NO ha confirmado el build en verde, ni que el APK nuevo funcione.** Por la regla 7 se marca 🧪, no ✅.
+
+- 🧪 **Etapa 14-C (17 nov 2026): orden del código, segundo paso.** Commit "Etapa 14-C: PortDialog.kt y TvSend.kt" subido a `main` encima de `c637aa5` (hash exacto: `git log --oneline -3`). **Sin cambio de comportamiento.** El diálogo del puerto ocupado vive ahora en `PortDialog.kt` y las URL que se mandan al TV (`/relay` y `/audio`/`/video`) se arman en `TvSend.kt`. Detalle en el Historial (entrada "Etapa 14-C"). Punto de vuelta atrás: `git revert` de ese commit o el commit `c637aa5`. **Falta:** ver el build en verde, probar la app en el móvil sin TV y, en casa, probar el envío al TV (ver la entrada del Historial).
+
+**Hecho antes en esta sesión (con pruebas en el Hisense HL1):**
 
 - ✅ **Etapa 14 (17 nov 2026, tarde): orden del código y mensajes de error claros.** Commit **`ac51ab7`** subido a `main` (`72c3d10..ac51ab7`), build en verde y **confirmado por Ariel (\"ya funciona\")** tras probar la app en el móvil. Detalle en el Historial (entrada \"Etapa 14\"). Punto de vuelta atrás: rama **`respaldo-antes-14`** (= `72c3d10`, Changelog v28).
 - ❌ **13-A.3 (HLS al TV)** registrado en la v22: el TV pide la lista `.m3u8` y no sigue los enlaces. HLS queda solo para el móvil.
@@ -80,10 +84,10 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 
 1. ✅ **Copia buena confirmada (17 nov 2026, ~13:04, capturas de Ariel): `~/castv-nuevo/castv-fresh`.** La carpeta `~/castv-app` **ya no existe** en Termux. `castv-fresh` está al día con `origin/main` (`cabadc8` = Changelog v26) y su historia sigue la Etapa 13 (`ec47026`, `98bcf78`, `11d93df`, `f1ca913`). **La Etapa 12 (`2c37468`) NO está en este repo**: `git cat-file -t 2c37468` dijo "Not a valid object name" y no hay commits con "etapa 12". Si hace falta esa función, hay que reescribir `Player.kt` o recuperar el zip de la Etapa 12 (si Ariel aún lo tiene), siempre por partes (Prioridad 3).
 2. ✅ Build de GitHub Actions en verde (confirmado por Ariel, 17 nov 2026).
-3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. ⬜ Falta solo el aviso del puerto 8000 ocupado.
+3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. 🔎 **Aviso del puerto 8000 ocupado (17 nov 2026, v30):** el aviso **ya existe en el código** (`warnIfPortBusy`, ahora en `PortDialog.kt`). Desde la Etapa 13-A.1 el servicio prueba los puertos 8000 a 8010, así que si el 8000 está ocupado usa el 8001 y **no sale aviso**; solo saldría si estuvieran ocupados los 11. La prueba antigua ("con `python castv_app.py` corriendo...") ya no provoca el aviso. Propuesta del asistente: darlo por cubierto. **Ariel no ha confirmado esa decisión, queda ⏳ hasta que la confirme.**
 4. 🧪 README y workflow ya subidos. Etiqueta **`v2.2`** subida por Ariel el 17 nov 2026 ("todo subió bien"; `v2.1-estable` ya existía de antes y no se tocó, sin `--force`). ⬜ Falta confirmar que en GitHub → Releases aparezca `CASTV-v2.2.apk`.
 
-**Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento) — 🟢 primer paso hecho (Etapa 14-A, `ac51ab7`, confirmado por Ariel el 17 nov 2026): `norm`, `naturalCompare`, `fmt` y la IP del teléfono ya viven en `CastvUtils.kt`. Falta seguir sacando partes (diálogo del puerto, lógica de envío al TV, pantallas):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
+**Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento) — 🟢 primer paso hecho (Etapa 14-A, `ac51ab7`, confirmado por Ariel el 17 nov 2026): `norm`, `naturalCompare`, `fmt` y la IP del teléfono ya viven en `CastvUtils.kt`. 🧪 **Segundo paso (Etapa 14-C, subido, falta probar): el diálogo del puerto pasó a `PortDialog.kt` y las URL de envío al TV a `TvSend.kt`. Falta seguir sacando partes (la lógica de envío al TV con su hilo y sus avisos, y las pantallas):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
 
 **Prioridad 2 · Control completo desde el móvil:** barra de progreso con seek, volumen, pausa/reanudar/detener y estado real del TV (posición y duración). Aquí entra el **diagnóstico del seek** (aplazado): primero los dos `curl` de "Qué sigue", luego la prueba de control con video local y la prueba B, y después un parche pequeño y aditivo (`// [Etapa 13-A.4]`). Cerrar también el resto del Paso 0 (pausa, detener, salir de CASTV mientras suena un enlace).
 
@@ -401,6 +405,26 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 
 ## Historial
 
+### 2026-11-17 · Etapa 14-C: diálogo del puerto (`PortDialog.kt`) y URL de envío al TV (`TvSend.kt`) 🧪 (subido; falta confirmar build y probar)
+
+- **Qué:** cambio interno sin funciones nuevas. Segundo paso de la Prioridad 1 (orden del código). Comentarios `// [Etapa 14-C]`.
+  - **`PortDialog.kt` (nuevo):** `object PortDialog` con `showIfBusy(activity)`. Es el diálogo "⚠️ Puerto 8000 ocupado", con **el mismo texto** y las mismas condiciones (`ServerState.error`, `isFinishing`). En `MainActivity.kt`, `warnIfPortBusy()` quedó como una línea que delega y sus dos llamadas (al abrir y al intentar enviar al TV) no cambiaron.
+  - **`TvSend.kt` (nuevo):** `object TvSend` con `relayUrl(phoneIp, url, hls)` (enlace de internet por `/relay`, con el token base64 y la extensión `m3u8` o `mp4`) y `mediaUrl(phoneIp, kind, id, ext)` (archivo local por `/audio` o `/video`). Salen **las mismas URL que antes**. `playLink` y `startPlayback` las usan.
+- **Archivos:** `PortDialog.kt` (nuevo), `TvSend.kt` (nuevo) y `MainActivity.kt` (2 427 → 2 411 líneas). Parche: `etapa14c_orden_dialogo_envio.patch`.
+- **Cómo se aplicó:** `git hash-object` de `MainActivity.kt` dio `35f6fa3cc94ed315eadf099c7ed8062a6f40b6ba` antes (coincidió) y debe dar `9f39250888ebad8d7fd2d3b3280974ecb5ecb675` después; el `grep` de nombres repetidos no devolvió nada; `git apply --check` OK; `grep -c "Etapa 14-C"` dio `3`; `git status -s` mostró `M MainActivity.kt` y `?? PortDialog.kt`, `?? TvSend.kt`; commit y `git push origin main` hechos por Ariel ("subió bien todo").
+- **Cómo debe quedar funcionando:** idéntico a antes. No cambia ningún texto ni ninguna URL.
+- **Nota:** el parche **no se pudo compilar** donde se escribió; solo se comprobó que aplicaba. Lo que lo confirma es el build de GitHub Actions.
+- **Probar (sin TV, desde la calle):**
+  1. Pestaña Actions: el último build ("Etapa 14-C") en verde. Si falla, pasar el error.
+  2. Instalar el APK nuevo encima del actual.
+  3. Las listas de música y videos cargan.
+  4. Con la salida en Teléfono: reproducir una música y un video; ⏮ ⏭ y el siguiente automático.
+  5. "Reproducir enlace…" con un mp4 de archive.org (A.5) → **📱 En el móvil**.
+- **Probar (en casa, con el TV):** (a) una música o un video local enviado al TV; (b) un enlace mp4 con **📺 Al TV** y revisar en `curl -s http://127.0.0.1:8000/log` que salga `ENLACE: ... -> http://IP:8000/relay/...mp4`.
+- **Si falla / se quiere quitar:** `git revert` del commit "Etapa 14-C: PortDialog.kt y TvSend.kt" y `git push origin main`, o volver al commit `c637aa5`.
+- **Riesgo:** bajo. Solo mueve código. Un fallo se vería como error de compilación en Actions.
+- **Hallazgo:** el aviso del puerto 8000 ya no se puede provocar con la prueba antigua (ver Prioridad 0, punto 3).
+
 ### 2026-11-17 · Etapa 14: orden del código (14-A) y mensajes de error claros (14-B) ✅ (commit `ac51ab7`; confirmado por Ariel: \"ya funciona\")
 
 - **Qué:** cambio interno sin funciones nuevas.
@@ -683,7 +707,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v29). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v30). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -710,7 +734,8 @@ Actualizada: 17 de noviembre de 2026 (v29). Cuando una función se termine, se m
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): ⚠️ **no está en el repo actual** (`2c37468` no existe en `castv-fresh`; `~/castv-app` ya no existe, 17 nov 2026). Hay que reescribirla o recuperarla por partes (Prioridad 3).
 - **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
 - **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` .
-- **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
+- **Etapa 14-C (`PortDialog.kt` y `TvSend.kt`):** subida el 17 nov 2026; falta confirmar el build en verde y probar en el móvil y, en casa, el envío al TV (ver su entrada del Historial).
+- **Aviso de puerto 8000 ocupado:** el código ya existe (ahora en `PortDialog.kt`). Como el servicio prueba del 8000 al 8010, la prueba antigua ya no lo provoca. Pendiente de que Ariel confirme si se da por cubierto.
 
 ### ➡️ Próxima función
 
