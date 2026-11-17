@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v22)
+# Registro de cambios y guía de continuidad – CASTV (v23)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -19,6 +19,51 @@ git push origin main
 ```
 
 **Si todo se rompe**, volver al último punto bueno: la rama `respaldo-antes-de-restaurar`, la etiqueta `v2.1-estable` (si ya se creó) o el commit `d7010ac` (Etapa 11).
+
+---
+
+## 📍 Dónde nos quedamos (cierre de la sesión del 17 nov 2026, ~12:35)
+
+**Para quien siga (otro asistente o yo mismo más tarde): empieza aquí.**
+
+**Hecho en esta sesión (con pruebas en el Hisense HL1):**
+
+- ❌ **13-A.3 (HLS al TV)** registrado en la v22: el TV pide la lista `.m3u8` y no sigue los enlaces. HLS queda solo para el móvil.
+- ✅ **Paso 0, enlace con redirección:** archive.org (`big_buck_bunny_720p_surround.mp4`, 61,9 MB) → 📺 Al TV: `RELAY redirige (302) -> https://dn710604.ca.archive.org/...`, luego `RELAY 206 ... 0-61878608/61878609`. **El video se ve en el TV** (confirmado por Ariel).
+- ✅ `flower.mp4` de MDN sigue funcionando en el TV (`206`, 1 128 375 bytes). Ya estaba ✅ en 13-A.2.
+- ❌ **Paso 0, adelantar (seek) con el control remoto del TV:** no funciona. En `/log` solo está el `206` inicial; **el TV no hizo ningún `GET` más con `range=bytes=N-`**. **En diagnóstico** (ver abajo y la entrada "Paso 0" en "Cambios pendientes de probar").
+- ⚠️ **Enlaces de prueba que ya no sirven** (17 nov 2026): Blender `http` (301 → https → 404), Blender `https` directo (404) y Google `gtv-videos-bucket` (403). Usar **archive.org** (sección "Fuentes legales", A.5).
+
+**Qué sigue, en este orden:**
+
+1. **Diagnosticar el seek (sin parche).** Con un video largo enviado al TV (archive.org, A.5), pegar uno por uno:
+   ```bash
+   P=$(curl -s http://127.0.0.1:8000/log | grep -o '/relay/[A-Za-z0-9_-]*\.mp4' | tail -1); echo $P
+   ```
+   ```bash
+   curl -s -D - -o /dev/null --max-time 3 -H "Range: bytes=30000000-" "http://127.0.0.1:8000$P"
+   ```
+   (Si el puerto no es 8000, usar 8001, 8002…). Mirar en la respuesta: `HTTP/1.1 206`, `Content-Range: bytes 30000000-61878608/61878609`, `Accept-Ranges: bytes` y una línea `contentFeatures.dlna.org` con `DLNA.ORG_OP=01`. **Anotar qué falta.**
+2. **Prueba de control:** mandar al TV un **video local del teléfono** (no un enlace) y adelantar con el mismo control remoto. Si adelanta → el fallo es solo de `/relay`; si no → es del TV o de la información DLNA que manda la app.
+3. **Prueba B pendiente:** adelantar con los botones/barra de **CASTV en el móvil** con un enlace al TV y mirar `/log` (¿sale una línea `SOAP Seek`?). Si no sale, la app no manda la orden `Seek` para enlaces.
+4. **Según el resultado, un parche pequeño y aditivo** (todavía **no escrito**): cabeceras `Accept-Ranges` / `contentFeatures.dlna.org` en `/relay` (`MediaServer.kt`) y/o `Seek` en `TvController.kt` / `MainActivity.kt`. Comentarios `// [Etapa 13-A.4]`. No tocar `/video/` ni `/audio/`.
+5. **Resto del Paso 0:** pausa/reanudar/detener con un enlace; salir de CASTV mientras suena un enlace.
+6. **Paso 2 · Etapa 13-B** (listas M3U, partes B.1 a B.4), luego **Paso 3 · 13-C**. Ver "Plan de trabajo próximo".
+7. Pendientes antiguos (aviso del puerto 8000, color de acento, siguiente video y botón TV, README + Release, Etapa 12): ver "Hoja de ruta".
+
+**Archivos que hay que subir a la conversación para seguir** (el asistente no los tiene; sin ellos no se puede asegurar que compile). Copiarlos a Descargas con:
+
+```bash
+cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/{Store,MainActivity,MediaServer,TvController}.kt ~/storage/downloads/
+```
+
+Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para el seek), `Store.kt` (para 13-B). `VideoPlayerActivity.kt`, `DebugLog.kt` y `CastvService.kt` solo si se tocan.
+
+**Cosas por confirmar (no se sabe):**
+
+- Si Ariel **ya subió este changelog** (v22/v23) al repo: `cd ~/castv-nuevo/castv-fresh && pwd && git log --oneline -3`, luego `cp ~/storage/downloads/CHANGELOG_v23.md CHANGELOG.md && git add -A && git commit -m "Changelog v23" && git push origin main`. Si el push es rechazado (historias distintas con `~/castv-app`), **no usar `--force`**: ver el aviso de abajo.
+- **Cuál es la copia buena del proyecto** (`~/castv-app` vs `~/castv-nuevo/castv-fresh`): sigue sin resolverse; ver el aviso de abajo.
+- Para este changelog **no** se ha marcado ✅ nada que Ariel no haya confirmado (regla 7).
 
 ---
 
@@ -71,7 +116,7 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
    **Regla anterior:** al terminar o integrar algo, se anota aquí con ✅. **Siempre se entrega primero el changelog actualizado**, antes que cualquier otra cosa, por si se acaban los tokens.
 5. Probar siempre que el parche aplica antes de entregarlo (`git apply --check`), y entregar pasos de prueba con cada cambio.
 6. **Notas en el código y detalle de novedades en el changelog:** En cada cambio o etapa nueva se deben poner comentarios claros directamente en el código (por ejemplo, `// [Etapa 13-A] ...`) indicando qué se modificó o añadió, y registrar en este changelog tanto la novedad exacta como la forma en que queda funcionando la app.
-7. **Cuándo se entrega un changelog nuevo (regla de Ariel, 17 nov 2026, vale desde la v21):** se entrega **solo** (a) cuando se escribe o cambia el **plan** (como esta v21) y (b) cuando **Ariel confirma que un cambio funciona** ("ya funciona"). Entre una cosa y otra, los parches se entregan **sin** changelog nuevo. Mientras Ariel no confirme, la etapa queda en este archivo como ⬜ o 🧪 y **no** se marca ✅. Así no se pierde nada y el estado del archivo es siempre el último confirmado. Esta regla ajusta la 4: el changelog sigue yendo **primero** cuando toca entregarlo.
+7. **Cuándo se entrega un changelog nuevo (regla de Ariel, 17 nov 2026, vale desde la v21):** se entrega **solo** (a) cuando se escribe o cambia el **plan** (como esta v21) y (b) cuando **Ariel confirma que un cambio funciona** ("ya funciona"). Entre una cosa y otra, los parches se entregan **sin** changelog nuevo. Mientras Ariel no confirme, la etapa queda en este archivo como ⬜ o 🧪 y **no** se marca ✅. Así no se pierde nada y el estado del archivo es siempre el último confirmado. Esta regla ajusta la 4: el changelog sigue yendo **primero** cuando toca entregarlo. **(c)** También se entrega cuando **Ariel lo pide expresamente** (17 nov 2026, v23: "pasa el changelog para seguir más tarde"); en ese caso se anota todo lo hecho, lo pendiente y lo que **no** está confirmado, sin marcar ✅ nada que Ariel no haya confirmado.
 
 ### Lecciones aprendidas (para no repetir errores)
 
@@ -96,6 +141,12 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 
 - **El Hisense HL1 no lee HLS por DLNA** (13-A.3, 17 nov 2026): pide la lista `.m3u8` y no sigue sus enlaces, aunque venga reescrita a `http` por `/relay`. En `/log` se reconoce porque, tras `RELAY HLS lista: N enlaces reescritos`, no aparece ningún `GET /relay/...` más. Para canales en vivo el destino es el móvil.
 
+- **Enlaces de prueba que caen (17 nov 2026):** Blender `http` (301 → https → 404), Blender `https` directo (404) y Google `gtv-videos-bucket` (403) ya no sirven. **`RELAY: el origen respondió 403/404` en `/log` = el fallo es del origen del enlace**, no de la app ni del TV. Usar **archive.org** (`https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4`), que además redirige (302) y prueba la redirección del relay.
+- **El Hisense hace dos `GET` por cada enlace:** uno con `ua=HISENSE-HL1... HbbTV/1.1.1` y `range=bytes=0-`, y otro con `ua=curl/7.19.5` y `range=-` (sonda del propio TV, misma IP 192.168.100.14). El `200` de la segunda no es un error.
+- **Un `flower.mp4` (1,1 MB) no sirve para probar el seek:** el TV lo baja entero en una sola petición. Usar un video largo.
+- **Cómo se ve en `/log` que "no adelanta":** tras el `RELAY 206 ... 0-FINAL/TOTAL` inicial no aparece ningún `GET` más con `range=bytes=N-` (N distinto de 0). Para distinguir si el que falla es el TV o la app, mirar también si sale una línea `SOAP Seek`.
+- **Procedimiento del changelog:** `cp ~/storage/downloads/CHANGELOG_vN.md CHANGELOG.md` **sobrescribe a propósito**: cada versión es el archivo completo (no hay que fusionar nada). Siempre con `pwd` y `git log` antes.
+
 ### Texto para pegarle a otro asistente
 
 > Soy Ariel y estoy desarrollando la app Android CASTV (repo `arieleljefe/castv-app`). Te paso el archivo CHANGELOG.md, que tiene el contexto, las reglas de trabajo, el historial y la hoja de ruta al final. Lee primero la sección "Contexto para otro asistente" y "Hoja de ruta". Trabajo desde Termux en el teléfono, así que dame comandos cortos para pegar uno por uno y los cambios como archivos .patch. Continúa por la sección "Próxima función".
@@ -106,12 +157,13 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 
 **Reglas de este plan:** un parche por paso, `git apply --check` antes de entregarlo, comentarios `// [Etapa X]` en el código, pasos de prueba con cada parche, y **changelog nuevo solo cuando Ariel confirme que funciona** (regla 7). Estado de todos los pasos de abajo: ⬜ por hacer.
 
-**Archivos que hay que subir a la conversación para poder escribir los parches** (el asistente no los tiene; sin ellos no se puede asegurar que compile): `MainActivity.kt` (obligatorio para 13-B y 13-C), `Store.kt` (favoritos/listas, para 13-B), `VideoPlayerActivity.kt` (para HLS en móvil), `DebugLog.kt` y `CastvService.kt` (para el puerto y el arranque). `MediaServer.kt` y `TvController.kt` ya se tienen, pero **cambiaron** (Etapa 13-A.2): subir la versión actual de `MediaServer.kt` para no escribir sobre una copia vieja.
+**Archivos que hay que subir a la conversación para poder escribir los parches** (el asistente no los tiene; sin ellos no se puede asegurar que compile): `MainActivity.kt` (obligatorio para 13-B y 13-C), `Store.kt` (favoritos/listas, para 13-B), `VideoPlayerActivity.kt` (para HLS en móvil), `DebugLog.kt` y `CastvService.kt` (para el puerto y el arranque). `MediaServer.kt` y `TvController.kt` ya se tenían, pero **cambiaron** (Etapa 13-A.2 y 13-A.3): subir la versión actual de **las dos** (`TvController.kt` hace falta para diagnosticar el seek) para no escribir sobre una copia vieja. Comando para copiarlos: ver "Dónde nos quedamos" (arriba).
 
-### Paso 0 · Terminar de probar 13-A.2 (sin parche)
+### Paso 0 · Terminar de probar 13-A.2 (sin parche) — **en curso** (17 nov 2026)
 
-- ⬜ **Adelantar (seek) en el TV** con el mismo mp4: en `/log` debe salir un `GET /relay/...` con `range=bytes=N-` (N distinto de 0) y `RELAY 206`.
-- ⬜ **Enlace con redirección** (samplelib u otro que redirija): en `/log` debe salir `RELAY redirige (30x) -> ...` y luego el video en el TV.
+- ❌ **Adelantar (seek) en el TV** con el control remoto del TV: archive.org 720p (61,9 MB) → el relay respondió `RELAY 206 ... 0-61878608/61878609` (todo el archivo desde el principio) y **no hubo ningún `GET` posterior con `range=bytes=N-`**. Con `flower.mp4` no se puede probar (pesa 1,1 MB). **Diagnóstico pendiente** (⏳, pasos 1 a 4 de "Dónde nos quedamos").
+  - **Hipótesis (sin confirmar):** (a) el relay no anuncia `Accept-Ranges: bytes` o `contentFeatures.dlna.org` con `DLNA.ORG_OP=01` (el TV entonces no intenta saltar); (b) el TV no adelanta con este tipo de envío DLNA aunque el archivo sea local; (c) la app no manda `Seek` por SOAP para enlaces. La entrada 13-A.2 dice que el relay reenvía `Range` y añade cabeceras DLNA, pero **no se ha verificado qué cabeceras salen**.
+- ✅ **Enlace con redirección:** archive.org → `RELAY redirige (302) -> https://dn710604.ca.archive.org/...`, luego `206`, y el video se ve en el TV (confirmado por Ariel, 17 nov 2026, ~12:31).
 - ⬜ **Pausa, reanudar y detener** con un enlace: el TV debe obedecer.
 - ⬜ **Salir de CASTV mientras suena un enlace:** anotar si se corta (el teléfono hace de puente; debería seguir mientras el servicio esté activo).
 
@@ -153,6 +205,20 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 
 ## Cambios pendientes de probar
 
+### 2026-11-17 · Paso 0: pruebas de 13-A.2 en el TV (12:28 a 12:33): redirección ✅, seek ❌ (en diagnóstico)
+
+- **Qué se probó:** enlaces mp4 distintos con 📺 Al TV (Hisense HL1, IP 192.168.100.14; teléfono 192.168.100.43:8000), mirando `curl -s http://127.0.0.1:8000/log | tail -15`.
+- **Resultados (17 nov 2026):**
+  1. **12:28 · `flower.mp4` de MDN:** `ENLACE ... -> http://192.168.100.43:8000/relay/....mp4`, `SOAP Stop/SetAVTransportURI/Play -> 200`, el TV pidió `range=bytes=0-` y recibió `RELAY 206 video/mp4 longitud=1128375 range=bytes 0-1128374/1128375`; segunda petición (`ua=curl/7.19.5`, `range=-`) con `RELAY 200`. ✅ Se ve en el TV (confirmado por Ariel).
+  2. **12:29 · Google `BigBuckBunny.mp4`:** `RELAY: el origen respondió 403` (dos veces). ❌ Fallo del origen: no se ve nada. No es del TV ni de la app.
+  3. **12:30 · Blender `https://download.blender.org/.../BigBuckBunny_320x180.mp4`:** `RELAY: el origen respondió 404` (dos veces). ❌ Fallo del origen.
+  4. **12:31 · archive.org `big_buck_bunny_720p_surround.mp4` (61 878 609 bytes):** `RELAY redirige (302) -> https://dn710604.ca.archive.org/0/items/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4`, `RELAY 206 video/mp4 longitud=61878609 range=bytes 0-61878608/61878609`; la sonda `curl/7.19.5` recibió `RELAY 200`. ✅ **El video se ve en el TV; la redirección funciona.**
+  5. **Adelantar con el control remoto del TV (video de archive.org):** ❌ no adelanta. En `/log` no aparece ningún `GET` nuevo con `range=bytes=N-` ni `SOAP Seek`. (Prueba con los botones de CASTV en el móvil: **no hecha**.)
+- **Conclusión provisional:** el relay funciona con redirecciones y con mp4 largos. El adelantar no funciona todavía y **no se sabe aún si es del relay, de la app o del TV**.
+- **Siguiente:** diagnóstico del seek (ver "Dónde nos quedamos", pasos 1 a 3). No hay parche escrito todavía.
+- **Si hace falta quitar algo:** no se cambió código en esta sesión; no hay nada que revertir.
+- **Riesgo:** ninguno (solo pruebas).
+
 ### 2026-11-17 · Etapa 13-A.3: HLS (`.m3u8`) por `/relay` ❌ (probado en el TV: **no funciona**; el relay sí responde, el móvil no se ve afectado)
 
 - **Qué:** `/relay/<token>.m3u8` baja la lista HLS, reescribe cada enlace (listas hijas, trozos `.ts`/`.m4s`, `#EXT-X-KEY`, `#EXT-X-MAP`, rutas relativas) para que apunten a `http://IP:PUERTO/relay/...`, y `playLink` manda también los `.m3u8` por `/relay` con MIME `application/vnd.apple.mpegurl`. Los trozos se servirían como el mp4 (redirecciones, `Range`, `video/mp2t`).
@@ -183,8 +249,8 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
   1. Aplicar (ver pasos en la sección de arriba, "Cómo se trabaja", punto 3), compilar en Actions y esperar el APK en verde.
   2. Con CASTV abierto: ⋮ → Reproducir enlace… → pega el mp4 de MDN `flower.mp4` o el de samplelib → **📺 Al TV**.
   3. `curl -s http://127.0.0.1:PUERTO/log` (PUERTO = 8000 o el siguiente libre): debe verse `ENLACE: https://... -> http://IP:PUERTO/relay/....mp4`, luego un `GET /relay/...` **del TV** y líneas `RELAY ... 200` o `206`.
-  4. Probar adelantar en el TV (debería salir `206` y `Content-Range`).
-  5. Probar el enlace de Blender (`http://download.blender.org/...`): en el log debe verse `RELAY redirige (301) -> https://...`. Si el destino da 404 es del origen, no de la app.
+  4. Probar adelantar en el TV (debería salir `206` y `Content-Range`). **Resultado 17 nov 2026: ❌ el TV no vuelve a pedir `Range` (ver Paso 0, en diagnóstico).**
+  5. Probar el enlace de Blender (`http://download.blender.org/...`): en el log debe verse `RELAY redirige (301) -> https://...`. Si el destino da 404 es del origen, no de la app. **17 nov 2026:** Blender ya da 404 (http y https); la redirección se comprobó con archive.org: ✅ `RELAY redirige (302)` y el video se ve.
   6. Probar un archivo local al TV: debe seguir igual que antes.
 - **Qué mirar si el TV sigue sin pedir nada:** si **sí** aparece `GET /relay` y el TV lo rechaza, el problema es el formato/MIME (sospecha 2); si **no** aparece ningún `GET`, el problema es la orden que mandamos (`protocolInfo`, DIDL) y habría que revisar `TvController`.
 - **Limitaciones:** el teléfono gasta datos y batería (hace de puente); sin barra de progreso para enlaces; si el origen no manda tamaño, se envía en trozos (`chunked`) y algunos TV no adelantan.
@@ -479,14 +545,18 @@ Resumen de lo hablado con Ariel. Orden = lo que recomiendo hacer primero. "Decis
 
 Ordenados del más fácil al más difícil. Si uno funciona en el TV, pasar al siguiente.
 
-1. **mp4 sencillo (Big Buck Bunny, Blender, licencia CC BY 3.0)** — el mejor primer intento, porque va en `http://` y es H.264:
+1. ❌ **CAÍDO (17 nov 2026: `http` → 301 → https → 404; `https` directo también 404).** mp4 sencillo (Big Buck Bunny, Blender, licencia CC BY 3.0), antes el mejor primer intento:
    `http://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4`
-2. **mp4 de muestra (misma película, otro servidor):**
+2. ❌ **403 desde el `/relay` (17 nov 2026).** mp4 de muestra (misma película, otro servidor):
    `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
 3. **HLS de prueba de Mux (Big Buck Bunny en varias calidades, H.264/AAC):**
    `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`
 4. **HLS de ejemplo de Apple:**
    `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8`
+5. ✅ **mp4 largo con redirección (archive.org, Big Buck Bunny 720p, 61,9 MB; funciona en el TV por `/relay`, 17 nov 2026).** El mejor para probar seek y redirecciones:
+   `https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4`
+6. ✅ **mp4 corto (MDN, 1,1 MB; funciona en el TV).** Solo sirve para comprobar que el TV lee un mp4 por `https`; no para el seek:
+   `https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4`
 
 - Si el TV rechaza los `https://`, probar el 1 (ya es `http://`). Si el 1 va y el 3 no, **el JVC no lee HLS por DLNA**.
 - Otras películas abiertas de Blender (CC BY): *Sintel* (https://cloud.blender.org/films/sintel) y *Tears of Steel* (https://media.xiph.org/tearsofsteel/). Entrar a la página y copiar el enlace del archivo mp4.
@@ -525,12 +595,15 @@ Estas emisoras ofrecen su señal en vivo gratis en su propia página o app ofici
 | # | Prueba | Resultado |
 |---|---|---|
 | 1 | mp4 (enlace A.1) → teléfono | ⏳ |
-| 2 | mp4 (enlace A.1) → TV | ❌ directo (sin `GET`; Blender redirige 301 a https y da 404). Con `/relay` (13-A.2): ⏳ falta repetir con una URL que no dé 404 |
+| 2 | mp4 (enlace A.1) → TV | ❌ directo (sin `GET`; Blender redirige 301 a https y da 404). Con `/relay` (13-A.2): Blender (http y https) da 404 y Google (A.2) da 403 (17 nov 2026): fallos del origen. ✅ Repetido con archive.org (A.5): se ve en el TV |
 | 3 | mp4 con `https` → TV | ✅ con `/relay` (13-A.2): `flower.mp4` de MDN se ve en el TV (17 nov 2026) |
 | 4 | HLS (A.3) → teléfono | ⏳ |
 | 5 | HLS (A.3) → TV | ❌ directo: el TV lo rechaza. ❌ también con `/relay` (13-A.3, 17 nov 2026): el TV pide la lista (Mux y Apple `gear1`) y nunca los trozos; el HLS de Mux sí funciona en el móvil (según Ariel) |
 | 6 | Un canal de Free-TV (en vivo) → TV | ⏳ |
 | 7 | Un canal de iptv-org → TV | ⏳ |
+| 8 | mp4 largo con redirección 302 (archive.org, A.5) → TV | ✅ `RELAY redirige (302)` + `206`; se ve (17 nov 2026) |
+| 9 | Adelantar (seek) en el TV con el control remoto (archive.org) | ❌ el TV no pide ningún `Range` nuevo (17 nov 2026); en diagnóstico |
+| 10 | Adelantar con los botones de CASTV (móvil) → TV | ⏳ no hecha |
 
 Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log` (línea del `SetAVTransportURI`) y anotarla.
 
@@ -552,7 +625,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v21). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v23). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -566,9 +639,12 @@ Actualizada: 17 de noviembre de 2026 (v21). Cuando una función se termine, se m
 - Eliminar música y videos con selección múltiple; papelera de Android opcional.
 - Videos en el teléfono (salida Teléfono/TV para video y música, con punto guardado).
 - **Etapa 13-A.2: enlaces mp4 (https) al TV con `/relay`** (`11d93df`, probado el 17 nov 2026).
+- **Paso 0 (parcial): enlace con redirección (302) por `/relay` → TV** (archive.org, 17 nov 2026, confirmado por Ariel).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
+
+- **Paso 0 pendiente (17 nov 2026):** adelantar (seek) en el TV ❌ **en diagnóstico**; pausa/reanudar/detener ⬜; salir de CASTV mientras suena un enlace ⬜. Ver "Dónde nos quedamos".
 
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
 - **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
@@ -579,7 +655,7 @@ Actualizada: 17 de noviembre de 2026 (v21). Cuando una función se termine, se m
 
 ### ➡️ Próxima función
 
-- **Etapa 13: reproducir enlace y listas M3U** (**13-A y 13-A.2 hechas: mp4 funciona en móvil y en TV (vía `/relay`). Pendiente: probar adelantar (seek) en el TV, enlace con redirección, y ~~HLS (13-A.3)~~ (❌ en el TV, solo móvil). Siguiente: ver "Plan de trabajo próximo" (Paso 0 pruebas, Paso 1 HLS por `/relay`, Paso 2 listas M3U, Paso 3 varios TV).** (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
+- **Etapa 13: reproducir enlace y listas M3U** (**13-A y 13-A.2 hechas: mp4 funciona en móvil y en TV (vía `/relay`). Pendiente: diagnosticar el adelantar (seek) en el TV (❌ el 17 nov; ver "Dónde nos quedamos"), pausa/reanudar/detener y salir de CASTV mientras suena (enlace con redirección ya ✅), y ~~HLS (13-A.3)~~ (❌ en el TV, solo móvil). Siguiente: ver "Plan de trabajo próximo" (Paso 0 pruebas, Paso 1 HLS por `/relay`, Paso 2 listas M3U, Paso 3 varios TV).** (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
 - **Pulir la app** (acordado con Ariel). Orden sugerido:
   1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
   2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
