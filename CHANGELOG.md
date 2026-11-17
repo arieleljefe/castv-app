@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v25)
+# Registro de cambios y guía de continuidad – CASTV (v26)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -34,7 +34,7 @@ git push origin main
 - ❌ **Paso 0, adelantar (seek) con el control remoto del TV:** no funciona. En `/log` solo está el `206` inicial; **el TV no hizo ningún `GET` más con `range=bytes=N-`**. **En diagnóstico** (ver abajo y la entrada "Paso 0" en "Cambios pendientes de probar").
 - ⚠️ **Enlaces de prueba que ya no sirven** (17 nov 2026): Blender `http` (301 → https → 404), Blender `https` directo (404) y Google `gtv-videos-bucket` (403). Usar **archive.org** (sección "Fuentes legales", A.5).
 
-**Decisión de Ariel (17 nov 2026, ~12:50): el diagnóstico del seek (puntos 1 a 4 de abajo) queda ⏳ PENDIENTE.** Se hará más tarde; por ahora se sigue con las mejoras de la app ("Pulir la app", ver "Hoja de ruta"). No se ha corrido ningún `curl` de diagnóstico todavía y no hay parche escrito. Verificado en Termux: `castv-fresh` está al día con `origin/main` y `CHANGELOG.md` del repo ya coincide con la v23 (`git commit` dijo "nothing to commit"; `git push` dijo "Everything up-to-date"). La v25 añade además la sección "Prioridades acordadas" (abajo).
+**Decisión de Ariel (17 nov 2026, ~12:50): el diagnóstico del seek (puntos 1 a 4 de abajo) queda ⏳ PENDIENTE.** Se hará más tarde; por ahora se sigue con las mejoras de la app ("Pulir la app", ver "Hoja de ruta"). No se ha corrido ningún `curl` de diagnóstico todavía y no hay parche escrito. Verificado en Termux: `castv-fresh` está al día con `origin/main` y `CHANGELOG.md` del repo ya coincide con la v23 (`git commit` dijo "nothing to commit"; `git push` dijo "Everything up-to-date"). La v25 añadió además la sección "Prioridades acordadas" (abajo).
 
 **Qué sigue, en este orden:**
 
@@ -79,7 +79,7 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 
 1. ⬜ Confirmar la copia buena del proyecto. Ya verificado el 17 nov: `~/castv-nuevo/castv-fresh` está al día con `origin/main` (mismo remoto `arieleljefe/castv-app`). Falta comprobar `~/castv-app` (¿tiene commits sin subir, como la Etapa 12 `2c37468`?). No usar `push --force`.
 2. ⬜ Ver que el último build de GitHub Actions salga verde.
-3. ⬜ Probar lo ya subido y marcarlo ✅ solo si Ariel lo confirma: aviso del puerto 8000, color de acento, siguiente video automático, ⏮ ⏭ y botón 📺 TV.
+3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. ⬜ Falta solo el aviso del puerto 8000 ocupado.
 4. ⬜ README + etiqueta `v2.1-estable` + Release (punto de vuelta seguro).
 
 **Prioridad 1 · Orden del código (poco a poco, sin cambiar el comportamiento):** `MainActivity.kt` tiene casi toda la lógica. Al tocarlo, sacar partes a archivos propios (por ejemplo la lógica de cast y las pantallas) en parches pequeños. Así cada parche es más seguro. No hacerlo todo de una vez.
@@ -349,7 +349,7 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 - **Si falla:** si el Release no aparece, abrir el run de la etiqueta y revisar el paso "Publicar Release". Para borrar una etiqueta mala: `git tag -d v2.1-estable && git push origin :refs/tags/v2.1-estable`.
 - **Riesgo:** bajo. Solo toca documentación y el workflow; el APK del Release es de depuración (firma debug), igual que el que ya se instala.
 
-### 2026-11-17 · Reproductor de video: siguiente video, botón TV y subtítulos ✅ (subtítulos probados; falta confirmar siguiente video y botón TV)
+### 2026-11-17 · Reproductor de video: siguiente video, botón TV y subtítulos ✅ (todo confirmado por Ariel el 17 nov 2026)
 
 - **Qué:** en el reproductor de video del teléfono:
   1. **Siguiente video automático:** al terminar pasa solo al siguiente de la lista; los botones ⏮ ⏭ de los controles saltan al anterior/siguiente. Si un video no se puede reproducir, avisa y sigue con el siguiente.
@@ -379,7 +379,7 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 - **Si falla:** `git revert` del commit "Aviso de puerto 8000 ocupado y bloqueos de energía".
 - **Riesgo:** bajo. Posible mayor consumo de batería por los bloqueos de energía.
 
-### 2026-11-16 · Color de acento a elegir 🧪 (subido; falta confirmar el build y probar)
+### 2026-11-16 · Color de acento a elegir ✅ (funciona, confirmado por Ariel el 17 nov 2026)
 
 - **Qué:** nuevo menú **⋮ → Color** con Cian (el de siempre, por defecto), Verde, Naranja y Morado. Cambia botones, barra de progreso, pestañas, fondo del mini reproductor y la fila que se está reproduciendo. Cada color tiene su versión para el tema claro y para el oscuro.
 - **Archivos:** `res/values/attrs.xml` (nuevo), `res/values/colors.xml`, `res/values-night/colors.xml`, `res/values/styles.xml` (4 estilos de acento), 8 archivos de `layout/` y `drawable/` (`@color/accent` → `?attr/castvAccent`), `MainActivity.kt`.
@@ -660,7 +660,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v25). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v26). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -675,6 +675,8 @@ Actualizada: 17 de noviembre de 2026 (v25). Cuando una función se termine, se m
 - Videos en el teléfono (salida Teléfono/TV para video y música, con punto guardado).
 - **Etapa 13-A.2: enlaces mp4 (https) al TV con `/relay`** (`11d93df`, probado el 17 nov 2026).
 - **Paso 0 (parcial): enlace con redirección (302) por `/relay` → TV** (archive.org, 17 nov 2026, confirmado por Ariel).
+- **Reproductor de video:** subtítulos, siguiente video automático, ⏮ ⏭ (video y música) y botón 📺 TV (confirmado por Ariel, 17 nov 2026).
+- **Color de acento** (Cian, Verde, Naranja, Morado): funciona (confirmado por Ariel, 17 nov 2026).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
@@ -682,11 +684,9 @@ Actualizada: 17 de noviembre de 2026 (v25). Cuando una función se termine, se m
 - **Paso 0 pendiente (17 nov 2026):** adelantar (seek) en el TV ❌ **en diagnóstico, aplazado por Ariel (se retoma después de las mejoras)**; pausa/reanudar/detener ⬜; salir de CASTV mientras suena un enlace ⬜. Ver "Dónde nos quedamos".
 
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
-- **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
 - **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
 - **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` .
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
-- **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
