@@ -943,6 +943,7 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 30) {
             pm.menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
         }
+        pm.menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
         pm.menu.add(0, 11, 12, "Mis redes y contacto")
         pm.setOnMenuItemClickListener { mi ->
             when (mi.itemId) {
@@ -963,6 +964,7 @@ class MainActivity : AppCompatActivity() {
                 12 -> pickTheme()
                 13 -> pickAccent()
                 14 -> toggleTrash()
+                15 -> askLinkAndPlay()
             }
             true
         }
@@ -1099,6 +1101,77 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Video con la salida en "Teléfono": se abre el reproductor a pantalla completa. */
+    // ------------------------------------------- [Etapa 13-A] Reproducir enlace
+
+    /** Pide una URL (mp4 o HLS .m3u8) y deja elegir destino: 📺 TV o 📱 móvil. */
+    private fun askLinkAndPlay() {
+        val input = EditText(this).apply {
+            hint = "http://…/video.mp4  o  …/lista.m3u8"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI
+            // Si el portapapeles trae un enlace, se pre-rellena
+            try {
+                val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val c = cm.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                if (c != null && (c.startsWith("http://") || c.startsWith("https://"))) setText(c)
+            } catch (e: Exception) { }
+        }
+        val box = android.widget.FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Reproducir enlace")
+            .setView(box)
+            .setPositiveButton("📺 Al TV") { _, _ -> playLink(input.text.toString().trim(), true) }
+            .setNegativeButton("📱 En el móvil") { _, _ -> playLink(input.text.toString().trim(), false) }
+            .setNeutralButton("Cancelar", null)
+            .show()
+    }
+
+    private fun isHls(url: String) = url.substringBefore('?').lowercase().endsWith(".m3u8")
+
+    private fun linkTitle(url: String): String {
+        val last = url.substringBefore('?').trimEnd('/').substringAfterLast('/')
+        return if (last.isBlank()) "Enlace" else last
+    }
+
+    private fun playLink(url: String, toTv: Boolean) {
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            setStatus("⚠️ El enlace debe empezar con http:// o https://")
+            return
+        }
+        val title = linkTitle(url)
+        if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
+        stopLocal()
+        adapter.playingId = -1
+        adapter.notifyDataSetChanged()
+        if (!toTv) {
+            val i = Intent(this, VideoPlayerActivity::class.java)
+                .putExtra("url", url).putExtra("urlTitle", title)
+            @Suppress("DEPRECATION")
+            startActivityForResult(i, reqVideo)
+            return
+        }
+        // Directo al TV por DLNA: no pasa por el servidor del puerto 8000
+        if (url.startsWith("https://")) setStatus("🚀 Enviando enlace https al TV (algunos TV lo rechazan)…")
+        else setStatus("🚀 Enviando enlace al TV…")
+        thread {
+            if (TvController.tvIp == null) {
+                runOnUiThread { setStatus("⚠️ TV no encontrado todavía. Espera unos segundos o usa ⋮ › Elegir TV.") }
+                return@thread
+            }
+            val mime = if (isHls(url)) "application/vnd.apple.mpegurl" else "video/mp4"
+            val ok = TvController.setUriAndPlay(url, title, mime, false)
+            runOnUiThread {
+                setStatus(
+                    if (ok) "✅ Enlace en el TV"
+                    else "❌ El TV rechazó el enlace (mira ⋮ log: curl -s http://127.0.0.1:8000/log)")
+            }
+        }
+    }
+
     private fun playVideoOnPhone(item: MediaItem, resumeAt: Int) {
         Store.registerPlay(item)
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene en el TV o en el teléfono
@@ -1894,6 +1967,10 @@ class MainActivity : AppCompatActivity() {
             }
             reqVideo -> {
                 // 📺 TV desde el reproductor del teléfono: se manda ese video al TV desde el mismo punto
+                // [Etapa 13-A] 📺 desde un enlace: se manda la misma URL al TV
+                if (resultCode == RESULT_OK && data != null && data.hasExtra("tvUrl")) {
+                    playLink(data.getStringExtra("tvUrl") ?: "", true)
+                } else
                 if (resultCode == RESULT_OK && data != null && data.hasExtra("tvId")) {
                     val id = data.getLongExtra("tvId", 0L)
                     val base = MediaItem(

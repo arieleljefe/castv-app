@@ -70,17 +70,26 @@ class VideoPlayerActivity : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
         Store.init(this)
 
-        val ids = intent.getLongArrayExtra("ids") ?: LongArray(0)
-        val names = intent.getStringArrayExtra("names") ?: emptyArray()
-        val durs = intent.getIntArrayExtra("durs") ?: IntArray(0)
-        if (ids.isEmpty() || names.size != ids.size) {
-            finish()
-            return
-        }
-        items = ids.indices.map { i ->
-            MediaItem(
-                id = ids[i], name = names[i], uriString = uriFor(ids[i]).toString(),
-                isMusic = false, durationSec = durs.getOrElse(i) { 0 })
+        // [Etapa 13-A] Enlace directo (mp4 / HLS .m3u8): un solo "video" con id 0 y la URL en uriString
+        val streamUrl = intent.getStringExtra("url")
+        if (streamUrl != null) {
+            items = listOf(
+                MediaItem(
+                    id = 0L, name = intent.getStringExtra("urlTitle") ?: "Enlace",
+                    uriString = streamUrl, isMusic = false, durationSec = 0))
+        } else {
+            val ids = intent.getLongArrayExtra("ids") ?: LongArray(0)
+            val names = intent.getStringArrayExtra("names") ?: emptyArray()
+            val durs = intent.getIntArrayExtra("durs") ?: IntArray(0)
+            if (ids.isEmpty() || names.size != ids.size) {
+                finish()
+                return
+            }
+            items = ids.indices.map { i ->
+                MediaItem(
+                    id = ids[i], name = names[i], uriString = uriFor(ids[i]).toString(),
+                    isMusic = false, durationSec = durs.getOrElse(i) { 0 })
+            }
         }
         index = intent.getIntExtra("index", 0).coerceIn(0, items.size - 1)
         pendingStart = intent.getIntExtra("start", 0)
@@ -212,6 +221,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun saveProgress() {
         val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) return   // [Etapa 13-A] los enlaces no guardan punto de reanudación
         if (!::video.isInitialized) return
         val pos = try { video.currentPosition / 1000 } catch (e: Exception) { 0 }
         val dur = if (cur.durationSec > 0) cur.durationSec
@@ -223,6 +233,15 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** 📺 TV: vuelve a la lista y manda este video al TV desde el punto actual. */
     private fun sendToTv() {
         val cur = items[index]
+        if (cur.id == 0L) {   // [Etapa 13-A] enlace: se manda la URL tal cual al TV
+            val pos = try { video.currentPosition / 1000 } catch (e: Exception) { 0 }
+            setResult(
+                RESULT_OK,
+                Intent().putExtra("tvUrl", cur.uriString).putExtra("tvName", cur.name)
+                    .putExtra("tvPos", pos))
+            finish()
+            return
+        }
         val ext = cur.name.substringAfterLast('.', "").lowercase()
         if (ext != "mp4" && ext != "m4v") {
             toast("⚠️ El TV solo lee mp4 (este es .$ext)")
@@ -243,6 +262,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private fun subKey(m: MediaItem) = "s|" + Store.key(m)
 
     private fun loadSavedSub(m: MediaItem) {
+        if (m.id == 0L) return   // [Etapa 13-A] enlaces sin subtítulo recordado
         val u = subPrefs().getString(subKey(m), null) ?: return
         loadSub(Uri.parse(u), false)
     }
