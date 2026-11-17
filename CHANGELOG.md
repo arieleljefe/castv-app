@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v9)
+# Registro de cambios y guía de continuidad – CASTV (v10)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -60,6 +60,7 @@ git push origin main
 - `indexOf(speed)` con `speedValues` no compila; se usa `indexOfFirst { it == speed }`.
 - Si `git apply` dice "already exists" o "does not apply", normalmente el parche **ya estaba aplicado**: revisar con `git diff --stat` y `git log --oneline -5`.
 - Si `curl http://127.0.0.1:8000/log` responde `Server: SimpleHTTP ... Python`, es el script viejo: `pkill -f castv_app.py` y reiniciar CASTV.
+- Kotlin: dentro de una subclase de `View` (p. ej. `MediaController`), nombres como `overlay` o `background` se resuelven contra la propia vista; usar nombres propios como `topBar`.
 - Siempre confirmar con `pwd` y `git log` que se está dentro de `~/castv-nuevo/castv-fresh` antes de aplicar un parche; en `~` hay otros repos y se mezclan. Tras `git apply`, verificar con un `grep` de algo del parche antes de hacer commit.
 - Nunca subir `.gradle/` ni `build/` a git (pasan de 100 MB y GitHub rechaza el push); `.gitignore` ya los excluye.
 - En Termux, `ps` no siempre muestra procesos de otras sesiones; buscar por `python`.
@@ -86,6 +87,7 @@ git push origin main
   4. 💬 → Elegir archivo… → un `.srt`. Deben verse las líneas. Cierra y abre el mismo video: deben cargarse solos.
   5. 💬 → Retrasar / Adelantar 0,5 s: la sincronía debe cambiar.
 - **Limitaciones:** no lee subtítulos incrustados dentro del mkv/mp4 (solo archivos .srt/.vtt); los subtítulos son solo para el teléfono (al TV no se mandan); estilo fijo (texto blanco con fondo oscuro).
+- **Corrección de build:** el primer build falló (`VideoPlayerActivity.kt:152 Unresolved reference: visibility`) porque dentro del `MediaController` el nombre `overlay` se confundía con `View.overlay`; se renombró a `topBar` (parche `fix_overlay.patch`).
 - **Si falla:** `git revert` del commit "Reproductor: siguiente video, botón TV y subtítulos".
 - **Riesgo:** medio-bajo. Solo toca el reproductor del teléfono y el retorno a la lista; con la salida en TV todo sigue igual.
 
@@ -236,7 +238,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v9). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v10). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 

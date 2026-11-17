@@ -39,7 +39,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private lateinit var video: VideoView
     private lateinit var subText: TextView
-    private lateinit var overlay: LinearLayout
+    private lateinit var topBar: LinearLayout
     private lateinit var titleView: TextView
     private lateinit var controller: MediaController
 
@@ -113,7 +113,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             })
 
         // Barra superior: título + 💬 + 📺 (solo se ve cuando se muestran los controles)
-        overlay = LinearLayout(this).apply {
+        topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(20), dp(12), dp(10))
@@ -127,11 +127,11 @@ class VideoPlayerActivity : AppCompatActivity() {
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         }
-        overlay.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        overlay.addView(chip("💬") { showSubtitleMenu() })
-        overlay.addView(chip("📺 TV") { sendToTv() })
+        topBar.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        topBar.addView(chip("💬") { showSubtitleMenu() })
+        topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
-            overlay,
+            topBar,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
         setContentView(root)
@@ -144,12 +144,12 @@ class VideoPlayerActivity : AppCompatActivity() {
         controller = object : MediaController(this@VideoPlayerActivity) {
             override fun show(timeout: Int) {
                 super.show(timeout)
-                overlay.visibility = View.VISIBLE
+                topBar.visibility = View.VISIBLE
             }
 
             override fun hide() {
                 super.hide()
-                overlay.visibility = View.GONE
+                topBar.visibility = View.GONE
             }
         }
         controller.setPrevNextListeners({ playAt(index + 1) }, { playAt(index - 1) })
