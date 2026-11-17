@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Castv" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">?attr/castvAccent</item>
+        <item name="colorPrimaryDark">@color/vlc_bg</item>
+        <item name="colorAccent">?attr/castvAccent</item>
+        <item name="castvAccent">@color/accent_cyan</item>
+        <item name="castvAccentSoft">@color/accent_cyan_soft</item>
+        <item name="castvPlayingBg">@color/accent_cyan_bg</item>
+        <item name="android:windowBackground">@color/vlc_bg</item>
+        <item name="android:statusBarColor">@color/vlc_bg</item>
+        <item name="android:navigationBarColor">@color/vlc_surface</item>
+    </style>
+    <style name="AccentOverlayCyan">
+        <item name="castvAccent">@color/accent_cyan</item>
+        <item name="castvAccentSoft">@color/accent_cyan_soft</item>
+        <item name="castvPlayingBg">@color/accent_cyan_bg</item>
+    </style>
+    <style name="AccentOverlayGreen">
+        <item name="castvAccent">@color/accent_green</item>
+        <item name="castvAccentSoft">@color/accent_green_soft</item>
+        <item name="castvPlayingBg">@color/accent_green_bg</item>
+    </style>
+    <style name="AccentOverlayOrange">
+        <item name="castvAccent">@color/accent_orange</item>
+        <item name="castvAccentSoft">@color/accent_orange_soft</item>
+        <item name="castvPlayingBg">@color/accent_orange_bg</item>
+    </style>
+    <style name="AccentOverlayPurple">
+        <item name="castvAccent">@color/accent_purple</item>
+        <item name="castvAccentSoft">@color/accent_purple_soft</item>
+        <item name="castvPlayingBg">@color/accent_purple_bg</item>
+    </style>
+</resources>

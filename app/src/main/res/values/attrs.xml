@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="castvAccent" format="color"/>
+    <attr name="castvAccentSoft" format="color"/>
+    <attr name="castvPlayingBg" format="color"/>
+</resources>

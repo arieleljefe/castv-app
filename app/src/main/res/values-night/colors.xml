@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#22D3EE</color>
+    <color name="accent_dark">#0EA5C6</color>
+    <color name="vlc_bg">#0B0F14</color>
+    <color name="vlc_surface">#131A22</color>
+    <color name="vlc_surface2">#1C2530</color>
+    <color name="vlc_text">#FFFFFF</color>
+    <color name="vlc_muted">#8B98A5</color>
+    <color name="vlc_nav">#1F2A36</color>
+    <color name="vlc_stroke">#2B3846</color>
+    <color name="vlc_playing_bg">#0F2A33</color>
+    <color name="ic_launcher_bg">#0B0F14</color>
+    <!-- Colores de acento a elegir (⋮ → Color) -->
+    <color name="accent_cyan">#22D3EE</color>
+    <color name="accent_cyan_soft">#3322D3EE</color>
+    <color name="accent_cyan_bg">#0F2A33</color>
+    <color name="accent_green">#34D399</color>
+    <color name="accent_green_soft">#3334D399</color>
+    <color name="accent_green_bg">#0F2E22</color>
+    <color name="accent_orange">#FB923C</color>
+    <color name="accent_orange_soft">#33FB923C</color>
+    <color name="accent_orange_bg">#33200F</color>
+    <color name="accent_purple">#A78BFA</color>
+    <color name="accent_purple_soft">#33A78BFA</color>
+    <color name="accent_purple_bg">#1F1633</color>
+</resources>
