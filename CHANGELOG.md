@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v23)
+# Registro de cambios y guía de continuidad – CASTV (v24)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -33,6 +33,8 @@ git push origin main
 - ✅ `flower.mp4` de MDN sigue funcionando en el TV (`206`, 1 128 375 bytes). Ya estaba ✅ en 13-A.2.
 - ❌ **Paso 0, adelantar (seek) con el control remoto del TV:** no funciona. En `/log` solo está el `206` inicial; **el TV no hizo ningún `GET` más con `range=bytes=N-`**. **En diagnóstico** (ver abajo y la entrada "Paso 0" en "Cambios pendientes de probar").
 - ⚠️ **Enlaces de prueba que ya no sirven** (17 nov 2026): Blender `http` (301 → https → 404), Blender `https` directo (404) y Google `gtv-videos-bucket` (403). Usar **archive.org** (sección "Fuentes legales", A.5).
+
+**Decisión de Ariel (17 nov 2026, ~12:50): el diagnóstico del seek (puntos 1 a 4 de abajo) queda ⏳ PENDIENTE.** Se hará más tarde; por ahora se sigue con las mejoras de la app ("Pulir la app", ver "Hoja de ruta"). No se ha corrido ningún `curl` de diagnóstico todavía y no hay parche escrito. Verificado en Termux: `castv-fresh` está al día con `origin/main` y `CHANGELOG.md` del repo ya coincide con la v23 (`git commit` dijo "nothing to commit"; `git push` dijo "Everything up-to-date"). Esta v24 solo añade esta decisión.
 
 **Qué sigue, en este orden:**
 
@@ -625,7 +627,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v23). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v24). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -644,7 +646,7 @@ Actualizada: 17 de noviembre de 2026 (v23). Cuando una función se termine, se m
 
 ### 🧪 Hecho, falta probar
 
-- **Paso 0 pendiente (17 nov 2026):** adelantar (seek) en el TV ❌ **en diagnóstico**; pausa/reanudar/detener ⬜; salir de CASTV mientras suena un enlace ⬜. Ver "Dónde nos quedamos".
+- **Paso 0 pendiente (17 nov 2026):** adelantar (seek) en el TV ❌ **en diagnóstico, aplazado por Ariel (se retoma después de las mejoras)**; pausa/reanudar/detener ⬜; salir de CASTV mientras suena un enlace ⬜. Ver "Dónde nos quedamos".
 
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
 - **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
