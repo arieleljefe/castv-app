@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v26)
+# Registro de cambios y guía de continuidad – CASTV (v27)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -77,7 +77,7 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 
 **Prioridad 0 · Base segura (antes de escribir funciones nuevas):**
 
-1. ⬜ Confirmar la copia buena del proyecto. Ya verificado el 17 nov: `~/castv-nuevo/castv-fresh` está al día con `origin/main` (mismo remoto `arieleljefe/castv-app`). Falta comprobar `~/castv-app` (¿tiene commits sin subir, como la Etapa 12 `2c37468`?). No usar `push --force`.
+1. ✅ **Copia buena confirmada (17 nov 2026, ~13:04, capturas de Ariel): `~/castv-nuevo/castv-fresh`.** La carpeta `~/castv-app` **ya no existe** en Termux. `castv-fresh` está al día con `origin/main` (`cabadc8` = Changelog v26) y su historia sigue la Etapa 13 (`ec47026`, `98bcf78`, `11d93df`, `f1ca913`). **La Etapa 12 (`2c37468`) NO está en este repo**: `git cat-file -t 2c37468` dijo "Not a valid object name" y no hay commits con "etapa 12". Si hace falta esa función, hay que reescribir `Player.kt` o recuperar el zip de la Etapa 12 (si Ariel aún lo tiene), siempre por partes (Prioridad 3).
 2. ⬜ Ver que el último build de GitHub Actions salga verde.
 3. ✅ **Confirmado por Ariel (17 nov 2026):** siguiente video/música automático con ⏮ ⏭, botón 📺 TV del reproductor de video y color de acento funcionan bien. ⬜ Falta solo el aviso del puerto 8000 ocupado.
 4. ⬜ README + etiqueta `v2.1-estable` + Release (punto de vuelta seguro).
@@ -102,7 +102,9 @@ Son: `MainActivity.kt` (obligatorio), `MediaServer.kt` y `TvController.kt` (para
 
 ---
 
-## ⚠️ Antes de seguir: confirmar cuál es la copia buena del proyecto (17 nov 2026)
+## ✅ RESUELTO el 17 nov 2026 (v27): la copia buena es `castv-fresh` (ver Prioridad 0). El texto de abajo es histórico: `~/castv-app` ya no existe y `origin/main` NO apunta a `2c37468`.
+
+## (Histórico) Antes de seguir: confirmar cuál es la copia buena del proyecto (17 nov 2026)
 
 En esta conversación se trabajó sobre **`~/castv-app`** (Etapa 11 = commit `b99ba6f`, arreglo `indexOf` = `1608196`, **Etapa 12 = `2c37468`**). Este changelog (v13) habla de **otra copia**: `~/castv-nuevo/castv-fresh` (Etapa 11 = `d7010ac`, arreglo `indexOf` = `dc6e415`) que ya tiene reproductor de video, temas, color de acento, borrado y nombres legibles.
 
@@ -660,7 +662,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v26). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v27). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -683,7 +685,7 @@ Actualizada: 17 de noviembre de 2026 (v26). Cuando una función se termine, se m
 
 - **Paso 0 pendiente (17 nov 2026):** adelantar (seek) en el TV ❌ **en diagnóstico, aplazado por Ariel (se retoma después de las mejoras)**; pausa/reanudar/detener ⬜; salir de CASTV mientras suena un enlace ⬜. Ver "Dónde nos quedamos".
 
-- **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
+- **Etapa 12** (segundo plano real, reanudar sesión, cola editable): ⚠️ **no está en el repo actual** (`2c37468` no existe en `castv-fresh`; `~/castv-app` ya no existe, 17 nov 2026). Hay que reescribirla o recuperarla por partes (Prioridad 3).
 - **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
 - **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` .
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
