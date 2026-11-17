@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.InputStream
@@ -13,7 +15,10 @@ import java.net.URL
 /** Servidor HTTP embebido. URLs de la forma /video/123.mp4 o /audio/45.mp3.
  *  Soporta Content-Length, HEAD y Range (206), que los TV (VIDAA/DLNA) exigen.
  *  [Etapa 13-A.2] También /relay/<enlace en base64>.mp4: intermediario que baja un mp4 de internet
- *  (https, redirecciones) y se lo sirve al TV por http desde el teléfono. */
+ *  (https, redirecciones) y se lo sirve al TV por http desde el teléfono.
+ *  [Etapa 13-A.3] /relay/<enlace en base64>.m3u8: lista HLS. Se baja, se reescriben sus enlaces para que
+ *  apunten otra vez a /relay (lista maestra, listas hijas, trozos .ts/.m4s y llaves) y así el TV lo pide todo
+ *  por http al teléfono. */
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** Lee solo [length] bytes de un archivo y cierra el descriptor al terminar. */
@@ -62,7 +67,9 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         try {
             val parts = session.uri.trim('/').split("/")
             // [Etapa 13-A.2] /relay/<base64 del enlace>.mp4
-            if (parts.size == 2 && parts[0] == "relay") return serveRelay(session, parts[1].substringBeforeLast('.'))
+            // [Etapa 13-A.3] la extensión dice qué se pide: mp4, m3u8 (lista HLS), ts/m4s (trozos), key…
+            if (parts.size == 2 && parts[0] == "relay") return serveRelay(session,
+                parts[1].substringBeforeLast('.'), parts[1].substringAfterLast('.', "").lowercase())
             if (parts.size == 2) {
                 val kind = parts[0]
                 val id = parts[1].substringBeforeLast('.').toLongOrNull()
@@ -85,7 +92,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** [Etapa 13-A.2] Baja el mp4 del enlace original y se lo pasa al TV. Sigue redirecciones
      *  (incluido http -> https) y reenvía la cabecera Range para que el TV pueda adelantar. */
-    private fun serveRelay(session: IHTTPSession, token: String): Response {
+    private fun serveRelay(session: IHTTPSession, token: String, ext: String): Response {
         val target = try {
             String(android.util.Base64.decode(token,
                 android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING), Charsets.UTF_8)
@@ -94,7 +101,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             DebugLog.add("  RELAY: enlace no válido")
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Enlace no válido")
         }
-        val range = session.headers["range"]
+        // [Etapa 13-A.3] a una lista .m3u8 no se le reenvía Range (se baja entera para reescribirla)
+        val range = if (ext == "m3u8") null else session.headers["range"]
         var conn: HttpURLConnection? = null
         try {
             var current = target
@@ -137,7 +145,17 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     }, "text/plain", "El origen respondió $code")
             }
             val upMime = c.contentType?.substringBefore(';')?.trim()?.lowercase()
-            val mime = if (upMime != null && (upMime.startsWith("video/") || upMime.startsWith("audio/"))) upMime else "video/mp4"
+            // [Etapa 13-A.3] lista HLS: se reescribe y se sirve como lista, no como video
+            if (ext == "m3u8" || (upMime != null && upMime.contains("mpegurl"))) {
+                return serveHlsPlaylist(session, c, URL(current))
+            }
+            val mime = when {
+                upMime != null && (upMime.startsWith("video/") || upMime.startsWith("audio/")) -> upMime
+                ext == "ts" -> "video/mp2t"            // [Etapa 13-A.3] trozos HLS
+                ext == "aac" -> "audio/aac"
+                ext == "key" -> "application/octet-stream"
+                else -> "video/mp4"
+            }
             val len = c.contentLengthLong            // -1 si el origen no dice el tamaño
             val contentRange = c.getHeaderField("Content-Range")
             val acceptRanges = if (code == 206 || c.getHeaderField("Accept-Ranges")?.contains("bytes") == true) "bytes" else "none"
@@ -165,6 +183,69 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             DebugLog.add("  RELAY ERROR: ${e.javaClass.simpleName}: ${e.message}")
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
         }
+    }
+
+    /** [Etapa 13-A.3] Baja la lista HLS (.m3u8), reescribe cada enlace para que pase por /relay y se la
+     *  sirve al TV. [base] es la URL final (tras redirecciones) para resolver enlaces relativos. */
+    private fun serveHlsPlaylist(session: IHTTPSession, c: HttpURLConnection, base: URL): Response {
+        val raw = try {
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(8192)
+            c.inputStream.use { ins ->
+                while (true) {
+                    val n = ins.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    if (out.size() > 2_000_000) break
+                }
+            }
+            out.toByteArray()
+        } finally {
+            try { c.disconnect() } catch (_: Exception) {}
+        }
+        val text = String(raw, Charsets.UTF_8)
+        if (raw.size > 2_000_000 || !text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) {
+            DebugLog.add("  RELAY HLS: no parece una lista .m3u8 válida (${raw.size} bytes)")
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "No es una lista HLS válida")
+        }
+        val host = session.headers["host"]      // ip:puerto con el que el TV llegó al teléfono
+        val out = rewriteM3u8(text, base, host)
+        val links = out.lines().count { it.isNotBlank() && !it.startsWith("#") }
+        DebugLog.add("  -> RELAY HLS lista: $links enlaces reescritos (host=${host ?: "relativo"})")
+        val bytes = out.toByteArray(Charsets.UTF_8)
+        val response = newFixedLengthResponse(Response.Status.OK, "application/vnd.apple.mpegurl",
+            ByteArrayInputStream(bytes), bytes.size.toLong())
+        response.addHeader("Cache-Control", "no-cache")
+        response.addHeader("transferMode.dlna.org", "Streaming")
+        return response
+    }
+
+    /** [Etapa 13-A.3] Cambia cada enlace de la lista (líneas sueltas y URI="…" de #EXT-X-KEY, #EXT-X-MAP,
+     *  #EXT-X-MEDIA…) por http://host/relay/<base64>.<ext>. Los relativos se resuelven contra [base]. */
+    private fun rewriteM3u8(text: String, base: URL, host: String?): String {
+        val prefix = if (host != null) "http://$host" else ""
+        fun proxy(ref: String): String {
+            val abs = try { URL(base, ref).toString() } catch (e: Exception) { return ref }
+            if (!(abs.startsWith("http://") || abs.startsWith("https://"))) return ref
+            val tok = android.util.Base64.encodeToString(abs.toByteArray(Charsets.UTF_8),
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+            val ext = abs.substringBefore('#').substringBefore('?')
+                .substringAfterLast('/', "").substringAfterLast('.', "").lowercase()
+            val e = if (ext.length in 1..5 && ext.all { it.isLetterOrDigit() }) ext else "ts"
+            return "$prefix/relay/$tok.$e"
+        }
+        val uriAttr = Regex("URI=\"([^\"]*)\"")
+        val sb = StringBuilder()
+        for (line in text.split("\n")) {
+            val l = line.trimEnd('\r')
+            when {
+                l.isBlank() -> sb.append(l)
+                l.startsWith("#") -> sb.append(uriAttr.replace(l) { m -> "URI=\"" + proxy(m.groupValues[1]) + "\"" })
+                else -> sb.append(proxy(l.trim()))
+            }
+            sb.append("\n")
+        }
+        return sb.toString()
     }
 
     private fun serveFile(session: IHTTPSession, uri: Uri, mime: String): Response {

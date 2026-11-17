@@ -1164,12 +1164,14 @@ class MainActivity : AppCompatActivity() {
             }
             val mime = if (isHls(url)) "application/vnd.apple.mpegurl" else "video/mp4"
             // [Etapa 13-A.2] mp4: el TV pide el video al teléfono (/relay) y el teléfono lo baja del enlace
-            // (https, redirecciones). HLS (.m3u8) sigue yendo directo por ahora.
+            // (https, redirecciones).
+            // [Etapa 13-A.3] HLS (.m3u8) también va por /relay: el teléfono reescribe la lista y sirve los
+            // trozos, así el TV solo habla http con el teléfono. La extensión (.m3u8 o .mp4) le dice al relay qué es.
             val phoneIp = getLocalIpAddress()
-            val sendUrl = if (!isHls(url) && phoneIp != null) {
+            val sendUrl = if (phoneIp != null) {
                 val token = android.util.Base64.encodeToString(url.toByteArray(Charsets.UTF_8),
                     android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
-                "http://$phoneIp:${ServerPort.port}/relay/$token.mp4"
+                "http://$phoneIp:${ServerPort.port}/relay/$token.${if (isHls(url)) "m3u8" else "mp4"}"
             } else url
             DebugLog.add("ENLACE: $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
