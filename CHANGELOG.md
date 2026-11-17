@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v21)
+# Registro de cambios y guía de continuidad – CASTV (v22)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -94,6 +94,8 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 - Un cambio grande hecho **sin poder compilar** (como la Etapa 12) puede traer errores de compilación; la verdad la dice GitHub Actions. Buscar `e: file` en los registros.
 - En `~/castv-app` los cambios de la Etapa 12 se entregaron como **zip del proyecto completo** (más fácil que `.patch` cuando el parche "ya estaba aplicado" o no aplica). Pasos: descomprimir en `~/tmp-castv`, `cp -r ~/tmp-castv/castv-app/. ~/castv-app/`, `ls` para confirmar el archivo nuevo, `git add -A`, commit y push.
 
+- **El Hisense HL1 no lee HLS por DLNA** (13-A.3, 17 nov 2026): pide la lista `.m3u8` y no sigue sus enlaces, aunque venga reescrita a `http` por `/relay`. En `/log` se reconoce porque, tras `RELAY HLS lista: N enlaces reescritos`, no aparece ningún `GET /relay/...` más. Para canales en vivo el destino es el móvil.
+
 ### Texto para pegarle a otro asistente
 
 > Soy Ariel y estoy desarrollando la app Android CASTV (repo `arieleljefe/castv-app`). Te paso el archivo CHANGELOG.md, que tiene el contexto, las reglas de trabajo, el historial y la hoja de ruta al final. Lee primero la sección "Contexto para otro asistente" y "Hoja de ruta". Trabajo desde Termux en el teléfono, así que dame comandos cortos para pegar uno por uno y los cambios como archivos .patch. Continúa por la sección "Próxima función".
@@ -113,7 +115,9 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 - ⬜ **Pausa, reanudar y detener** con un enlace: el TV debe obedecer.
 - ⬜ **Salir de CASTV mientras suena un enlace:** anotar si se corta (el teléfono hace de puente; debería seguir mientras el servicio esté activo).
 
-### Paso 1 · Etapa 13-A.3: HLS (`.m3u8`) por `/relay` ⬜
+### Paso 1 · Etapa 13-A.3: HLS (`.m3u8`) por `/relay` ❌ (el TV no lo lee; ver su entrada arriba)
+
+- **Resultado (17 nov 2026):** el TV pide la lista y no pide los trozos, ni con lista maestra ni con lista directa. HLS queda solo para el móvil. Lo de abajo es el plan original.
 
 - **Por qué:** los canales en vivo casi siempre son HLS y el TV los rechaza directos. El teléfono puede bajar la lista y los trozos por `https` y servirlos por `http`.
 - **Cómo:** `/relay/<token>.m3u8` baja la lista del origen y **reescribe cada línea de URL** (trozos `.ts`/`.m4s`, listas hijas, `#EXT-X-KEY URI=`, `#EXT-X-MAP URI=`) a `http://IP:PUERTO/relay/<token-nuevo>.<ext>`, resolviendo las rutas relativas contra la URL base. Los trozos se sirven como el mp4: redirecciones, `Range`, MIME `video/mp2t` o el del origen. Lista maestra (varias calidades): reescribir también las listas hijas; si hay varias calidades, el parche puede **elegir la más baja o media** para no saturar el Wi-Fi (por decidir).
@@ -131,7 +135,7 @@ Se divide en partes pequeñas para poder probar cada una:
 - **B.3 · Buscador, grupos y favoritos de canales.** Reutiliza la búsqueda sin acentos, el orden A-Z/Z-A y la estrella de favoritos que ya existen; filtro por `group-title`.
 - **B.4 · Cargar desde archivo** `.m3u`/`.m3u8` (selector del sistema) y **actualizar/borrar** una lista cargada; guardar varias listas con nombre.
 - **Reglas de contenido:** solo se recomiendan fuentes de la sección "Fuentes legales" (Free-TV/IPTV primero, iptv-org por categoría o país, nunca el índice completo de golpe). Lo que se cargue es responsabilidad de quien lo carga; la app es solo un reproductor.
-- **Riesgos:** listas muy grandes (miles) → leer y mostrar en segundo plano y por partes; muchos canales caídos o bloqueados por país (normal); depende de que **13-A.3** funcione para que los canales HLS suenen en el TV (si el TV no lee HLS, los canales solo irán al móvil).
+- **Riesgos:** listas muy grandes (miles) → leer y mostrar en segundo plano y por partes; muchos canales caídos o bloqueados por país (normal); depende de que **13-A.3** funcione para que los canales HLS suenen en el TV (**13-A.3 falló: los canales HLS irán solo al móvil**; en el TV solo irán los que sean mp4 u otro enlace directo que el TV sí lea por `/relay`).
 - **Archivos:** `MainActivity.kt`, `Store.kt`, un archivo nuevo para el parser (p. ej. `M3uParser.kt`) y layouts/strings nuevos.
 - **Si falla:** `git revert` del commit de la parte que falle (cada B.x es un commit aparte).
 
@@ -148,6 +152,19 @@ Orden: **0 → 1 → 2 (B.1 a B.4) → 3**. Un paso se da por hecho solo cuando 
 ---
 
 ## Cambios pendientes de probar
+
+### 2026-11-17 · Etapa 13-A.3: HLS (`.m3u8`) por `/relay` ❌ (probado en el TV: **no funciona**; el relay sí responde, el móvil no se ve afectado)
+
+- **Qué:** `/relay/<token>.m3u8` baja la lista HLS, reescribe cada enlace (listas hijas, trozos `.ts`/`.m4s`, `#EXT-X-KEY`, `#EXT-X-MAP`, rutas relativas) para que apunten a `http://IP:PUERTO/relay/...`, y `playLink` manda también los `.m3u8` por `/relay` con MIME `application/vnd.apple.mpegurl`. Los trozos se servirían como el mp4 (redirecciones, `Range`, `video/mp2t`).
+- **Archivos:** `MediaServer.kt` (`serveRelay` con extensión, `serveHlsPlaylist`, `rewriteM3u8`) y `MainActivity.kt` (`playLink`). Comentarios `// [Etapa 13-A.3]` en el código. Parche `etapa13a3_hls.patch`: `git apply --check` OK sobre los archivos subidos; el APK `castv-apk.zip` ya lo incluye.
+- **Pruebas hechas (17 nov 2026, ~12:17 y 12:19, Hisense HL1):**
+  1. **Lista maestra** (Mux `x36xhzz.m3u8`) → 📺 Al TV: `ENLACE: ... -> http://192.168.100.43:8000/relay/....m3u8`, `SOAP Stop/SetAVTransportURI/Play -> 200`, el TV pidió **dos veces** `GET /relay/....m3u8` (`range=bytes=0-` con `ua=HISENSE-HL1...` y otra con `ua=curl/7.19.5`) y la app respondió `RELAY HLS lista: 5 enlaces reescritos`. **Después no hubo ningún `GET` más** (ni listas hijas ni trozos).
+  2. **Lista de medios directa** (Apple `bipbop_4x3/gear1/prog_index.m3u8`, una sola calidad) → 📺 Al TV: mismo comportamiento con `RELAY HLS lista: 181 enlaces reescritos`; el TV pidió la lista dos veces y **no pidió ningún trozo `.ts`**.
+- **Conclusión:** el relay HLS funciona (baja, reescribe y sirve la lista), pero el **Hisense HL1 / VIDAA no sigue los enlaces de una lista HLS recibida por DLNA**, ni maestra ni directa. Por la regla del plan, **HLS queda solo para el móvil** (reproductor propio, ya funciona según Ariel) y se sigue con 13-B.
+- **No se probó (por si algún día se retoma):** otro MIME (`application/x-mpegURL`), `protocolInfo` DLNA específico para HLS, o que el relay una los trozos en un solo flujo `video/mp2t` (muy pesado). Valor bajo: no se hace salvo que Ariel lo pida.
+- **Qué deja funcionando la app:** mp4 por `/relay` al TV igual que en 13-A.2; `.m3u8` al TV sigue pasando por `/relay` (inofensivo, el TV simplemente no reproduce); `.m3u8` en el móvil igual que antes. `/video/` y `/audio/` sin cambios.
+- **Si falla / se quiere quitar:** `git revert` del commit de 13-A.3 (es solo aditivo, no hace falta). Se recomienda **dejarlo**: no estorba y sirve de base si un TV futuro sí lee HLS (13-C.2, modo de prueba).
+- **Riesgo:** bajo.
 
 ### 2026-11-17 · Etapa 13-A.2: intermediario `/relay` para que el TV reciba enlaces ✅ (commit `11d93df`; **probado: el TV reproduce el mp4 del enlace**, confirmado por Ariel el 17 nov 2026)
 
@@ -511,7 +528,7 @@ Estas emisoras ofrecen su señal en vivo gratis en su propia página o app ofici
 | 2 | mp4 (enlace A.1) → TV | ❌ directo (sin `GET`; Blender redirige 301 a https y da 404). Con `/relay` (13-A.2): ⏳ falta repetir con una URL que no dé 404 |
 | 3 | mp4 con `https` → TV | ✅ con `/relay` (13-A.2): `flower.mp4` de MDN se ve en el TV (17 nov 2026) |
 | 4 | HLS (A.3) → teléfono | ⏳ |
-| 5 | HLS (A.3) → TV | ❌ directo: el TV lo rechaza (aún sin relay para HLS); el HLS de Mux sí funciona en el móvil (según Ariel) |
+| 5 | HLS (A.3) → TV | ❌ directo: el TV lo rechaza. ❌ también con `/relay` (13-A.3, 17 nov 2026): el TV pide la lista (Mux y Apple `gear1`) y nunca los trozos; el HLS de Mux sí funciona en el móvil (según Ariel) |
 | 6 | Un canal de Free-TV (en vivo) → TV | ⏳ |
 | 7 | Un canal de iptv-org → TV | ⏳ |
 
@@ -562,7 +579,7 @@ Actualizada: 17 de noviembre de 2026 (v21). Cuando una función se termine, se m
 
 ### ➡️ Próxima función
 
-- **Etapa 13: reproducir enlace y listas M3U** (**13-A y 13-A.2 hechas: mp4 funciona en móvil y en TV (vía `/relay`). Pendiente: probar adelantar (seek) en el TV, enlace con redirección, y HLS (13-A.3, opcional). Siguiente: ver "Plan de trabajo próximo" (Paso 0 pruebas, Paso 1 HLS por `/relay`, Paso 2 listas M3U, Paso 3 varios TV).** (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
+- **Etapa 13: reproducir enlace y listas M3U** (**13-A y 13-A.2 hechas: mp4 funciona en móvil y en TV (vía `/relay`). Pendiente: probar adelantar (seek) en el TV, enlace con redirección, y ~~HLS (13-A.3)~~ (❌ en el TV, solo móvil). Siguiente: ver "Plan de trabajo próximo" (Paso 0 pruebas, Paso 1 HLS por `/relay`, Paso 2 listas M3U, Paso 3 varios TV).** (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
 - **Pulir la app** (acordado con Ariel). Orden sugerido:
   1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
   2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
