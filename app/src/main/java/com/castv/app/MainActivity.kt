@@ -1262,7 +1262,7 @@ class MainActivity : AppCompatActivity() {
             val kind = if (item.isMusic) "audio" else "video"
             val ext = MediaScanner.extFor(item.name, item.isMusic)
             val mime = MediaScanner.mimeFor(item.name, item.isMusic)
-            val mediaUrl = "http://$phoneIp:8000/$kind/${item.id}.$ext"
+            val mediaUrl = "http://$phoneIp:${ServerPort.port}/$kind/${item.id}.$ext"
             val ok = TvController.setUriAndPlay(mediaUrl, prettyTitle(item), mime, item.isMusic)
             playStartedAt = SystemClock.elapsedRealtime()
             runOnUiThread {

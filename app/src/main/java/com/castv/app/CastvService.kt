@@ -43,11 +43,23 @@ class CastvService : Service() {
             DebugLog.add("No se pudieron activar los bloqueos de energía: ${e.message}")
         }
 
-        server = MediaServer(this, 8000)
+        // [Etapa 13-A.1] Prueba del 8000 al 8010 hasta encontrar un puerto libre
+        var started = false
+        var lastErr: Exception? = null
+        for (p in 8000..8010) {
+            try {
+                val s = MediaServer(this, p)
+                s.start()
+                server = s
+                ServerPort.port = p
+                started = true
+                break
+            } catch (e: Exception) { lastErr = e }
+        }
         try {
-            server?.start()
+            if (!started) throw (lastErr ?: Exception("sin puerto libre"))
             ServerState.error = null
-            DebugLog.add("Servidor iniciado en el puerto 8000")
+            DebugLog.add("Servidor iniciado en el puerto ${ServerPort.port}")
         } catch (e: Exception) {
             ServerState.error = "Puerto 8000 ocupado: ${e.message}"
             DebugLog.add("ERROR al iniciar el servidor: ${e.javaClass.simpleName}: ${e.message}")

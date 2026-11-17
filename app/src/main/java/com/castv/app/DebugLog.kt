@@ -29,3 +29,6 @@ object DebugLog {
 object ServerState {
     @Volatile var error: String? = null
 }
+
+/** [Etapa 13-A.1] Puerto en el que quedó abierto el servidor. */
+object ServerPort { @Volatile var port = 8000 }
