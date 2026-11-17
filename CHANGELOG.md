@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v18)
+# Registro de cambios y guía de continuidad – CASTV (v19)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -85,7 +85,8 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 - **`curl` al puerto 8000 sin respuesta con el aviso "puerto ocupado"** = el aviso es cierto y el servidor de CASTV no arrancó (algo ajeno lo ocupa, a veces otra app o una ejecución vieja de CASTV que Termux no ve). Se arregló buscando puerto libre (8000 a 8010, Etapa 13-A.1); el registro está en el puerto real: probar 8000, 8001, 8002…
 - **Un enlace que el móvil reproduce no implica que el TV lo lea:** el TV recibe la URL por DLNA, con `http` casi siempre sí y con `https`, redirecciones o `.m3u8` casi siempre no. Para enlaces externos hace falta el intermediario `/relay` (Etapa 13-A.2).
 
-- **Antes de aplicar un parche que usa nombres de otra parte del código** (como `ServerPort` o `getLocalIpAddress()`), buscarlos con `grep` en el proyecto: un nombre mal escrito solo se descubre al compilar en Actions.
+- **Antes de aplicar un parche que usa nombres de otra parte del código** (como `ServerPort` o `getLocalIpAddress()`; el 17 nov el changelog decía `ServerState.port` y el nombre real era `ServerPort.port`: el código manda, no la memoria), buscarlos con `grep` en el proyecto: un nombre mal escrito solo se descubre al compilar en Actions.
+- Si `cp ~/storage/downloads/ARCHIVO` dice "No such file", el archivo **no está en Descargas** (no se descargó o tiene otro nombre): comprobar con `ls ~/storage/downloads | grep CHANGELOG`. Si ya había un changelog viejo, el `cp` anterior deja ese y no el nuevo (pasó con v18/v19 el 17 nov).
 - **Termux no deja escribir en `/tmp`** ("Permission denied"). Usar una carpeta propia, p. ej. `~/tmp-castv`. Por eso la primera vez no se copió nada y el commit decía "nothing to commit".
 - Si el commit dice **"nothing to commit, working tree clean"** justo después de copiar archivos nuevos, la copia **no ocurrió**: comprobar con `ls` que existe un archivo nuevo del cambio (p. ej. `Player.kt`) antes del commit.
 - Los zip de proyecto traen su propia carpeta `.git`; **no copiarla encima** del repo. El zip de la Etapa 12 ya sale sin `.git`.
@@ -100,17 +101,16 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
 
 ## Cambios pendientes de probar
 
-### 2026-11-17 · Etapa 13-A.2: intermediario `/relay` para que el TV reciba enlaces 🧪 (parche `etapa13a2_relay.patch` escrito y revisado; **falta aplicarlo, compilar y probar**)
+### 2026-11-17 · Etapa 13-A.2: intermediario `/relay` para que el TV reciba enlaces 🧪 (parche `etapa13a2_relay.patch` **aplicado y subido** el 17 nov 2026 como commit `11d93df`; falta ver el build de Actions y probar con el TV)
 
 - **Por qué:** con la Etapa 13-A el teléfono manda el enlace al TV y el TV lo **acepta** (`SetAVTransportURI` responde 200, también el `Play`), pero **nunca pide el video**: en `/log` no aparece ningún `GET`. Con archivos locales sí funciona porque la URL es `http://IP-del-teléfono:PUERTO/video/ID.mp4`. El enlace de Blender (`http://download.blender.org/...`) responde **301 → https** y el destino da 404; el JVC VIDAA casi nunca lee `https` por DLNA ni sigue redirecciones.
 - **Qué hace el parche:** para enlaces **mp4** (no `.m3u8`), la app ya no manda al TV la URL de internet, sino `http://IP-del-teléfono:PUERTO/relay/<enlace en base64>.mp4`. El TV pide eso al teléfono y el **teléfono baja el video** del enlace original: sigue redirecciones a mano (hasta 8, incluido http → https), reenvía la cabecera `Range` (así se puede adelantar), responde `HEAD`, copia el tipo MIME del origen (si no es video/audio usa `video/mp4`) y añade cabeceras DLNA. **HLS (`.m3u8`) sigue yendo directo** al TV; queda para después.
 - **Archivos tocados:** `MediaServer.kt` (ruta `/relay`, `serveRelay`, clase `RelayStream` que cierra la conexión al origen cuando el TV deja de leer) y `MainActivity.kt` (`playLink`: arma `sendUrl` y anota `ENLACE: original -> enviado` en `/log`). Comentarios `// [Etapa 13-A.2]` en el código. `/video/` y `/audio/` no se tocan.
-- **Revisión hecha el 17 nov 2026 (con `MediaServer.kt` y `TvController.kt` en mano):**
-  - ✅ La parte de `MediaServer.kt` pasa `git apply --check` sin problemas.
-  - ⚠️ **La parte de `MainActivity.kt` NO se pudo comprobar** (ese archivo no se subió a la conversación).
-  - ⚠️ **Posible error de compilación:** el parche usa `ServerPort.port`, pero según este changelog (13-A.1) el puerto real está en **`ServerState.port`** (`DebugLog.kt`). Si `ServerPort` no existe, el build falla con `Unresolved reference: ServerPort`. **Antes de aplicar, comprobar:** `grep -rn "ServerPort\|ServerState" app/src/main/java/`. Si solo existe `ServerState`, cambiar en la línea del parche `ServerPort.port` por `ServerState.port`.
-  - ⚠️ También se usa `getLocalIpAddress()` (con resultado `String?`): confirmar con `grep -rn "getLocalIpAddress" app/src/main/java/` que existe en `MainActivity.kt` y devuelve `String?` (si devuelve `String` no vacío, el `!= null` solo da un aviso).
-  - `TvController.setUriAndPlay(mediaUrl, title, mime, isMusic)` ya acepta cualquier URL: no hace falta cambiarlo.
+- **Revisión hecha el 17 nov 2026:**
+  - ✅ `git apply --check` y `git apply` pasaron sin errores en `~/castv-nuevo/castv-fresh` (HEAD `98bcf78`, Etapa 13-A.1). Los comentarios `[Etapa 13-A.2]` están en `MainActivity.kt` (línea ~1166) y `MediaServer.kt`.
+  - ✅ Los nombres que usa el parche **sí existen**: `ServerPort.port` (`DebugLog.kt` línea 34, `object ServerPort { @Volatile var port = 8000 }`) y `getLocalIpAddress(): String?` (`MainActivity.kt` línea 1279). No hace falta ninguna corrección.
+  - ⚠️ **Corrección a este changelog:** la Etapa 13-A.1 decía que el puerto real está en `ServerState.port`. Es **`ServerPort.port`**; `ServerState` solo guarda `error` (aviso de puerto ocupado). Corregido abajo.
+  - `TvController.setUriAndPlay(mediaUrl, title, mime, isMusic)` ya acepta cualquier URL: no se cambió.
 - **Probar:**
   1. Aplicar (ver pasos en la sección de arriba, "Cómo se trabaja", punto 3), compilar en Actions y esperar el APK en verde.
   2. Con CASTV abierto: ⋮ → Reproducir enlace… → pega el mp4 de MDN `flower.mp4` o el de samplelib → **📺 Al TV**.
@@ -120,14 +120,14 @@ cd ~/castv-nuevo/castv-fresh && git log --oneline -3 && git remote -v
   6. Probar un archivo local al TV: debe seguir igual que antes.
 - **Qué mirar si el TV sigue sin pedir nada:** si **sí** aparece `GET /relay` y el TV lo rechaza, el problema es el formato/MIME (sospecha 2); si **no** aparece ningún `GET`, el problema es la orden que mandamos (`protocolInfo`, DIDL) y habría que revisar `TvController`.
 - **Limitaciones:** el teléfono gasta datos y batería (hace de puente); sin barra de progreso para enlaces; si el origen no manda tamaño, se envía en trozos (`chunked`) y algunos TV no adelantan.
-- **Si falla:** `git revert` del commit "Etapa 13-A.2: relay".
+- **Si falla:** `git revert 11d93df` (y `git push origin main`). Punto bueno anterior: `98bcf78` (13-A.1).
 - **Riesgo:** medio. Añade una ruta nueva al servidor y hace conexiones a internet desde el teléfono; no debe tocar `/video/` ni `/audio/`.
 
 ### 2026-11-17 · Etapa 13-A.1: el servidor busca puerto libre (8000 a 8010) ✅ (probado: "Ya funciona")
 
 - **Qué pasaba:** al abrir CASTV salía "Puerto 8000 ocupado" y `curl http://127.0.0.1:8000/log` no devolvía nada (ni respuesta ni `Server: SimpleHTTP ... Python`). Eso indica que **nadie atendía el puerto 8000**: el servidor de CASTV no arrancaba (`ServerState.start()` fallaba con `EADDRINUSE`) y el aviso era cierto. No era el script de Python. Algo ajeno a CASTV (otra app o una ejecución anterior de CASTV, posiblemente en otro espacio de Android) tenía el 8000 agarrado, y Termux no lo ve.
-- **Arreglo:** el servidor prueba del **8000 al 8010** y usa el primer puerto libre; el puerto real queda en `ServerState.port` y **el enlace que se manda al TV usa ese puerto**. El 8000 solo aparecía en `CastvService.kt` (cerca de la línea 46) y `MainActivity.kt` (cerca de la línea 1265).
-- **Archivos:** `CastvService.kt` (arranque del servidor con bucle de puertos), `DebugLog.kt` (`ServerState.port`), `MainActivity.kt` (`mediaUrl` usa `ServerState.port`). Comentarios `// [Etapa 13-A.1]` en el código.
+- **Arreglo:** el servidor prueba del **8000 al 8010** y usa el primer puerto libre; el puerto real queda en `ServerPort.port` (objeto en `DebugLog.kt`; `ServerState` solo guarda `error`) y **el enlace que se manda al TV usa ese puerto**. El 8000 solo aparecía en `CastvService.kt` (cerca de la línea 46) y `MainActivity.kt` (cerca de la línea 1265).
+- **Archivos:** `CastvService.kt` (arranque del servidor con bucle de puertos), `DebugLog.kt` (`ServerPort.port`), `MainActivity.kt` (`mediaUrl` usa `ServerPort.port`). Comentarios `// [Etapa 13-A.1]` en el código.
 - **Resultado:** funciona. Si el 8000 sigue ocupado, el aviso ya no debería salir y el servidor queda en el 8001 o el siguiente libre; el registro ahora se consulta en ese puerto: `curl -s http://127.0.0.1:8001/log` (cambiar el número si hace falta).
 - **Pendiente:** averiguar **qué proceso ocupaba el 8000 en este móvil** (no es crítico, ya no estorba).
 - **Si falla:** `git revert` del commit "Etapa 13-A.1".
@@ -484,7 +484,7 @@ Si el TV rechaza algo, mirar la respuesta en `curl -s http://127.0.0.1:8000/log`
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v18). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v19). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -504,13 +504,13 @@ Actualizada: 17 de noviembre de 2026 (v18). Cuando una función se termine, se m
 - **Etapa 12** (segundo plano real, reanudar sesión, cola editable): subida como `2c37468` en `~/castv-app`. Falta ver el build de Actions y probar. **Antes, resolver cuál es la copia buena del proyecto** (ver aviso al inicio).
 - **Reproductor de video:** subtítulos ✅ probados por Ariel. Falta probar: siguiente video automático, ⏮ ⏭ y botón 📺 TV.
 - **README + Release** (`github_release.patch`): falta la etiqueta y ver que aparezca el Release.
-- **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` listo; falta aplicarlo, ver el build y probar con el TV.
+- **Etapa 13-A.2 (`/relay`):** parche `etapa13a2_relay.patch` subido como `11d93df`; falta ver el build y probar con el TV.
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
-- **Etapa 13: reproducir enlace y listas M3U** (**13-A subida; al móvil funciona, al TV no. 13-A.2 intermediario `/relay`: parche escrito, falta aplicar/compilar/probar (revisar `ServerPort` vs `ServerState`); después 13-B**) (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
+- **Etapa 13: reproducir enlace y listas M3U** (**13-A subida; al móvil funciona, al TV no. 13-A.2 intermediario `/relay`: subido como `11d93df`; falta ver el build y probar con el TV; después 13-B**) (decidido por Ariel el 17 nov 2026: "hagamos esto"). Requisitos antes de empezar: (1) confirmar la copia buena del proyecto, (2) ver el build de la Etapa 12. Orden: **A.** "Reproducir enlace…" (mp4 y HLS, al TV y al teléfono) → probar con las fuentes legales de la sección "Fuentes legales para probar" → **B.** listas M3U (por enlace o archivo) con pestaña de canales, búsqueda y favoritos → **C.** mejoras para varios TV (recordar último, nombre/modelo, modo de prueba). Detalles, pros y contras: sección "Ideas, recomendaciones, pros y contras".
 - **Pulir la app** (acordado con Ariel). Orden sugerido:
   1. Terminar de probar lo pendiente (puerto 8000 ocupado, color de acento, siguiente video y botón TV).
   2. Revisar fallos o detalles que Ariel note usando la app a diario (lista, mini reproductor, notificación).
