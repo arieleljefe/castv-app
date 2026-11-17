@@ -5,10 +5,15 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
 import java.io.FileInputStream
+import java.io.FilterInputStream
 import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 /** Servidor HTTP embebido. URLs de la forma /video/123.mp4 o /audio/45.mp3.
- *  Soporta Content-Length, HEAD y Range (206), que los TV (VIDAA/DLNA) exigen. */
+ *  Soporta Content-Length, HEAD y Range (206), que los TV (VIDAA/DLNA) exigen.
+ *  [Etapa 13-A.2] También /relay/<enlace en base64>.mp4: intermediario que baja un mp4 de internet
+ *  (https, redirecciones) y se lo sirve al TV por http desde el teléfono. */
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** Lee solo [length] bytes de un archivo y cierra el descriptor al terminar. */
@@ -39,6 +44,14 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
     }
 
+    /** [Etapa 13-A.2] Cierra también la conexión al origen cuando el TV deja de leer. */
+    private class RelayStream(private val conn: HttpURLConnection) : FilterInputStream(conn.inputStream) {
+        override fun close() {
+            try { super.close() } catch (_: Exception) {}
+            try { conn.disconnect() } catch (_: Exception) {}
+        }
+    }
+
     override fun serve(session: IHTTPSession): Response {
         if (session.uri == "/log") {
             if (session.parameters.containsKey("clear")) DebugLog.clear()
@@ -48,6 +61,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 "de ${session.headers["remote-addr"] ?: "?"} ua=${session.headers["user-agent"] ?: "-"}")
         try {
             val parts = session.uri.trim('/').split("/")
+            // [Etapa 13-A.2] /relay/<base64 del enlace>.mp4
+            if (parts.size == 2 && parts[0] == "relay") return serveRelay(session, parts[1].substringBeforeLast('.'))
             if (parts.size == 2) {
                 val kind = parts[0]
                 val id = parts[1].substringBeforeLast('.').toLongOrNull()
@@ -66,6 +81,90 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         DebugLog.add("404 ${session.uri}")
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
+    }
+
+    /** [Etapa 13-A.2] Baja el mp4 del enlace original y se lo pasa al TV. Sigue redirecciones
+     *  (incluido http -> https) y reenvía la cabecera Range para que el TV pueda adelantar. */
+    private fun serveRelay(session: IHTTPSession, token: String): Response {
+        val target = try {
+            String(android.util.Base64.decode(token,
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING), Charsets.UTF_8)
+        } catch (e: Exception) { null }
+        if (target == null || !(target.startsWith("http://") || target.startsWith("https://"))) {
+            DebugLog.add("  RELAY: enlace no válido")
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Enlace no válido")
+        }
+        val range = session.headers["range"]
+        var conn: HttpURLConnection? = null
+        try {
+            var current = target
+            var hops = 0
+            while (true) {
+                val c = URL(current).openConnection() as HttpURLConnection
+                c.instanceFollowRedirects = false
+                c.connectTimeout = 10000
+                c.readTimeout = 30000
+                c.requestMethod = "GET"
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CASTV")
+                c.setRequestProperty("Accept", "*/*")
+                if (range != null) c.setRequestProperty("Range", range)
+                val code = c.responseCode
+                if (code in 301..303 || code == 307 || code == 308) {
+                    val loc = c.getHeaderField("Location")
+                    c.disconnect()
+                    hops++
+                    if (loc == null || hops > 8) {
+                        DebugLog.add("  RELAY: demasiadas redirecciones o sin Location")
+                        return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Redirección inválida")
+                    }
+                    current = URL(URL(current), loc).toString()
+                    DebugLog.add("  RELAY redirige ($code) -> $current")
+                    continue
+                }
+                conn = c
+                break
+            }
+            val c = conn!!
+            val code = c.responseCode
+            if (code != 200 && code != 206) {
+                DebugLog.add("  RELAY: el origen respondió $code")
+                c.disconnect()
+                return newFixedLengthResponse(
+                    when (code) {
+                        404 -> Response.Status.NOT_FOUND
+                        416 -> Response.Status.RANGE_NOT_SATISFIABLE
+                        else -> Response.Status.INTERNAL_ERROR
+                    }, "text/plain", "El origen respondió $code")
+            }
+            val upMime = c.contentType?.substringBefore(';')?.trim()?.lowercase()
+            val mime = if (upMime != null && (upMime.startsWith("video/") || upMime.startsWith("audio/"))) upMime else "video/mp4"
+            val len = c.contentLengthLong            // -1 si el origen no dice el tamaño
+            val contentRange = c.getHeaderField("Content-Range")
+            val acceptRanges = if (code == 206 || c.getHeaderField("Accept-Ranges")?.contains("bytes") == true) "bytes" else "none"
+            val status = if (code == 206) Response.Status.PARTIAL_CONTENT else Response.Status.OK
+            DebugLog.add("  -> RELAY $code $mime longitud=$len ${if (contentRange != null) "range=$contentRange" else ""}")
+
+            val response: Response
+            if (session.method == Method.HEAD) {
+                c.disconnect()
+                response = newFixedLengthResponse(status, mime, "")
+                if (len >= 0) response.addHeader("Content-Length", len.toString())
+            } else {
+                val stream = RelayStream(c)
+                response = if (len >= 0) newFixedLengthResponse(status, mime, stream, len)
+                           else newChunkedResponse(status, mime, stream)
+            }
+            response.addHeader("Accept-Ranges", acceptRanges)
+            if (contentRange != null) response.addHeader("Content-Range", contentRange)
+            response.addHeader("transferMode.dlna.org", "Streaming")
+            response.addHeader("contentFeatures.dlna.org",
+                "DLNA.ORG_OP=${if (acceptRanges == "bytes") "01" else "00"};DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
+            return response
+        } catch (e: Exception) {
+            try { conn?.disconnect() } catch (_: Exception) {}
+            DebugLog.add("  RELAY ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
+        }
     }
 
     private fun serveFile(session: IHTTPSession, uri: Uri, mime: String): Response {
