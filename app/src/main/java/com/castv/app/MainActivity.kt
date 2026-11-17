@@ -592,20 +592,8 @@ class MainActivity : AppCompatActivity() {
         window.decorView.postDelayed({ warnIfPortBusy() }, 2000)
     }
 
-    /** Si el servidor interno no pudo abrir el puerto 8000, lo dice claramente. */
-    private fun warnIfPortBusy() {
-        val err = ServerState.error ?: return
-        if (isFinishing) return
-        AlertDialog.Builder(this)
-            .setTitle("⚠️ Puerto 8000 ocupado")
-            .setMessage(
-                "Otro programa está usando el puerto 8000, así que el TV no podrá leer tus archivos.\n\n" +
-                "Si usas Termux, ciérralo con:\npkill -f castv_app.py\n\n" +
-                "Luego fuerza la detención de CASTV y ábrelo de nuevo.\n\n($err)"
-            )
-            .setPositiveButton("Entendido", null)
-            .show()
-    }
+    /** [Etapa 14-C] El diálogo vive en PortDialog.kt. */
+    private fun warnIfPortBusy() = PortDialog.showIfBusy(this)
 
     private var loadGen = 0
 
@@ -1140,11 +1128,7 @@ class MainActivity : AppCompatActivity() {
             // [Etapa 13-A.3] HLS (.m3u8) también va por /relay: el teléfono reescribe la lista y sirve los
             // trozos, así el TV solo habla http con el teléfono. La extensión (.m3u8 o .mp4) le dice al relay qué es.
             val phoneIp = getLocalIpAddress()
-            val sendUrl = if (phoneIp != null) {
-                val token = android.util.Base64.encodeToString(url.toByteArray(Charsets.UTF_8),
-                    android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
-                "http://$phoneIp:${ServerPort.port}/relay/$token.${if (isHls(url)) "m3u8" else "mp4"}"
-            } else url
+            val sendUrl = if (phoneIp != null) TvSend.relayUrl(phoneIp, url, isHls(url)) else url   // [Etapa 14-C]
             DebugLog.add("ENLACE: $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
             runOnUiThread {
@@ -1245,7 +1229,7 @@ class MainActivity : AppCompatActivity() {
             val kind = if (item.isMusic) "audio" else "video"
             val ext = MediaScanner.extFor(item.name, item.isMusic)
             val mime = MediaScanner.mimeFor(item.name, item.isMusic)
-            val mediaUrl = "http://$phoneIp:${ServerPort.port}/$kind/${item.id}.$ext"
+            val mediaUrl = TvSend.mediaUrl(phoneIp, kind, item.id, ext)   // [Etapa 14-C]
             val ok = TvController.setUriAndPlay(mediaUrl, prettyTitle(item), mime, item.isMusic)
             playStartedAt = SystemClock.elapsedRealtime()
             runOnUiThread {
