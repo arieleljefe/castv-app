@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v6)
+# Registro de cambios y guía de continuidad – CASTV (v7)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -50,7 +50,8 @@ git push origin main
    git add -A && git commit -m "Mensaje" && git push origin main
    ```
    Siempre se excluye `CHANGELOG.md` del parche y se entrega el changelog completo aparte (evita conflictos).
-4. **Regla del changelog:** al terminar o integrar algo, se anota aquí con ✅. **Siempre se entrega primero el changelog actualizado**, antes que cualquier otra cosa, por si se acaban los tokens.
+4. **Regla del changelog (pedida por Ariel):** siempre se entrega **primero** el changelog completo y actualizado, con lo hecho y lo que falta, antes que cualquier parche o respuesta larga, por si se acaban los tokens.
+   **Regla anterior:** al terminar o integrar algo, se anota aquí con ✅. **Siempre se entrega primero el changelog actualizado**, antes que cualquier otra cosa, por si se acaban los tokens.
 5. Probar siempre que el parche aplica antes de entregarlo (`git apply --check`), y entregar pasos de prueba con cada cambio.
 
 ### Lecciones aprendidas (para no repetir errores)
@@ -59,6 +60,8 @@ git push origin main
 - `indexOf(speed)` con `speedValues` no compila; se usa `indexOfFirst { it == speed }`.
 - Si `git apply` dice "already exists" o "does not apply", normalmente el parche **ya estaba aplicado**: revisar con `git diff --stat` y `git log --oneline -5`.
 - Si `curl http://127.0.0.1:8000/log` responde `Server: SimpleHTTP ... Python`, es el script viejo: `pkill -f castv_app.py` y reiniciar CASTV.
+- Siempre confirmar con `pwd` y `git log` que se está dentro de `~/castv-nuevo/castv-fresh` antes de aplicar un parche; en `~` hay otros repos y se mezclan. Tras `git apply`, verificar con un `grep` de algo del parche antes de hacer commit.
+- Nunca subir `.gradle/` ni `build/` a git (pasan de 100 MB y GitHub rechaza el push); `.gitignore` ya los excluye.
 - En Termux, `ps` no siempre muestra procesos de otras sesiones; buscar por `python`.
 
 ### Texto para pegarle a otro asistente
@@ -68,23 +71,6 @@ git push origin main
 ---
 
 ## Cambios pendientes de probar
-
-### 2026-11-17 · Eliminar música y videos (selección múltiple) 🧪 (subido; falta confirmar el build y probar)
-
-- **Qué:** mantén pulsada una fila para entrar en modo selección; toca más filas para marcarlas (se ven con ✓). Arriba salen el contador y los botones **Todo** y **🗑 Borrar**. Pide confirmación y borra del teléfono. También hay **🗑 Eliminar del teléfono…** en el menú ⋮ de cada fila (para uno solo). Funciona en **música y videos**. Al borrar se quitan de la lista, la cola, favoritos, listas, puntos guardados y estadísticas. Si suena lo que se borra, se detiene.
-- **Archivos:** `MainActivity.kt` (selección, `deleteItems`, `afterDeleted`, `onActivityResult`), `Store.kt` (`forget`).
-- **Android:** 11 o superior = una sola confirmación del sistema para todo el grupo (`MediaStore.createDeleteRequest`). Android 10 = confirmación archivo por archivo. Android 9 o anterior: intenta borrar directo y, si no hay permiso, lo cuenta como "sin permiso" (no se pide permiso de escritura).
-- **Cambio de comportamiento:** la pulsación larga ya no abre el menú; ahora inicia la selección. El menú sigue en el botón ⋮.
-- **Probar:**
-  1. Pulsación larga en una canción de prueba: sale la barra con "1 seleccionado".
-  2. Toca otras dos: contador 3 y ✓ en cada una. Botón **Todo** las marca todas. Atrás cancela la selección.
-  3. Borrar 1 canción desde ⋮ → Eliminar: sale el aviso del sistema, confirma y desaparece de la lista.
-  4. Selecciona 3 y bórralas (una sola confirmación del sistema).
-  5. Borra la que está sonando en el TV: debe detenerse.
-  6. Borra una que estaba en favoritos o en una lista: ya no debe aparecer ahí.
-  7. Repite con un video.
-- **Si falla:** `git revert` del commit "Eliminar archivos con selección múltiple".
-- **Riesgo:** medio. **Borra archivos de verdad y no se puede deshacer.** Probar primero con archivos que no importen. No toca el envío al TV.
 
 ### 2026-11-16 · Estabilidad (tanda 1) 🧪 (parcial)
 
@@ -115,6 +101,24 @@ git push origin main
 ---
 
 ## Historial
+
+### 2026-11-17 · Eliminar música y videos (selección múltiple) ✅
+
+- **Qué:** mantén pulsada una fila para entrar en modo selección; toca más filas para marcarlas (se ven con ✓). Arriba salen el contador y los botones **Todo** y **🗑 Borrar**. Pide confirmación y borra del teléfono. También hay **🗑 Eliminar del teléfono…** en el menú ⋮ de cada fila (para uno solo). Funciona en **música y videos**. Al borrar se quitan de la lista, la cola, favoritos, listas, puntos guardados y estadísticas. Si suena lo que se borra, se detiene.
+- **Archivos:** `MainActivity.kt` (selección, `deleteItems`, `afterDeleted`, `onActivityResult`), `Store.kt` (`forget`).
+- **Android:** 11 o superior = una sola confirmación del sistema para todo el grupo (`MediaStore.createDeleteRequest`). Android 10 = confirmación archivo por archivo. Android 9 o anterior: intenta borrar directo y, si no hay permiso, lo cuenta como "sin permiso" (no se pide permiso de escritura).
+- **Cambio de comportamiento:** la pulsación larga ya no abre el menú; ahora inicia la selección. El menú sigue en el botón ⋮.
+- **Probar:**
+  1. Pulsación larga en una canción de prueba: sale la barra con "1 seleccionado".
+  2. Toca otras dos: contador 3 y ✓ en cada una. Botón **Todo** las marca todas. Atrás cancela la selección.
+  3. Borrar 1 canción desde ⋮ → Eliminar: sale el aviso del sistema, confirma y desaparece de la lista.
+  4. Selecciona 3 y bórralas (una sola confirmación del sistema).
+  5. Borra la que está sonando en el TV: debe detenerse.
+  6. Borra una que estaba en favoritos o en una lista: ya no debe aparecer ahí.
+  7. Repite con un video.
+- **Si falla:** `git revert` del commit "Eliminar archivos con selección múltiple".
+- **Riesgo:** medio. **Borra archivos de verdad y no se puede deshacer.** Probar primero con archivos que no importen. No toca el envío al TV.
+- **Resultado:** probado en el teléfono, funciona bien (confirmado por Ariel el 17 nov 2026).
 
 ### 2026-11-16 · Lista: nombres legibles, búsqueda y carga más fluida (tanda 2) ✅
 
@@ -200,7 +204,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v6). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v7). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -211,17 +215,21 @@ Actualizada: 17 de noviembre de 2026 (v6). Cuando una función se termine, se mu
 - Tema Sistema / Claro / Oscuro.
 - Lista: nombres legibles, búsqueda por ellos y carga en segundo plano.
 - Estabilidad: bloqueos de energía con la pantalla apagada y registro "Servidor iniciado".
+- Eliminar música y videos con selección múltiple (borrado permanente).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
 
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
-- **Eliminar música y videos (selección múltiple).** Parche `borrar_archivos.patch`. Falta build verde y probar.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 
 ### ➡️ Próxima función
 
-- Por decidir. Candidatas: subir README/Release (ver lista de abajo), subtítulos para videos, o integrar piezas de la Etapa 12 (reproducción en el teléfono con cola editable y retomar sesión, guardadas en el zip `castv-backup-20261116-1723.zip`).
+- Por decidir con Ariel. Candidatas:
+  1. **Papelera en vez de borrado permanente** (cambio chico: `createTrashRequest`), si se quiere poder recuperar.
+  2. **Integrar piezas de la Etapa 12** (reproducir música en el teléfono con cola editable, retomar la sesión). Está en el zip `castv-backup-20261116-1723.zip`, en otra línea de código (`Player.kt`). Esa línea **no compiló** en GitHub (error de Kotlin sin ver las líneas `e: file://`), así que hay que traerla por partes.
+  3. Subir `README.md`, copia de seguridad + etiqueta `v2.1-estable` y Release del APK (ver lista de abajo).
+  4. Subtítulos para videos.
 
 ### ⬜ Por agregar (en este orden)
 
