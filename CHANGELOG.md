@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v8)
+# Registro de cambios y guía de continuidad – CASTV (v9)
 
 Este archivo es **la memoria del proyecto**. Si hay que seguir con otro asistente (otro bot), se le pasa este archivo completo y con eso puede continuar.
 
@@ -72,19 +72,22 @@ git push origin main
 
 ## Cambios pendientes de probar
 
-### 2026-11-17 · Videos en el teléfono (salida Teléfono/TV para video y música) 🧪 (subiendo; falta confirmar el build y probar)
+### 2026-11-17 · Reproductor de video: siguiente video, botón TV y subtítulos 🧪 (subiendo; falta confirmar el build y probar)
 
-- **Qué:** el botón de salida (icono TV/teléfono, o ⋮ → Salida) ahora controla **música y videos**. Con "Teléfono", al tocar un video se abre un reproductor a pantalla completa en el teléfono (nueva `VideoPlayerActivity`) con controles, gira con el teléfono, mantiene la pantalla encendida y **recuerda el punto donde lo dejaste** (aparece en "Continuar"). Con "TV" todo sigue igual que antes. Si algo suena en el TV o en el teléfono, se detiene al pasar el video al teléfono.
-- **Archivos:** `VideoPlayerActivity.kt` (nuevo), `AndroidManifest.xml` (nueva actividad), `MainActivity.kt` (`startPlayback`, texto del menú y avisos), `Store.kt` sin cambios.
+- **Qué:** en el reproductor de video del teléfono:
+  1. **Siguiente video automático:** al terminar pasa solo al siguiente de la lista; los botones ⏮ ⏭ de los controles saltan al anterior/siguiente. Si un video no se puede reproducir, avisa y sigue con el siguiente.
+  2. **Botón 📺 TV:** manda el video actual al TV desde el mismo punto y cambia la salida a TV. El TV solo lee mp4/m4v; con otro formato avisa y no lo manda.
+  3. **Subtítulos (💬):** elige un archivo `.srt` o `.vtt` (selector de archivos del sistema), se muestran abajo en pantalla. Se **recuerda el archivo por video** y se carga solo la próxima vez. Opciones para adelantar o retrasar 0,5 s si van desfasados, y para quitarlos. Lee UTF-8 y también Latin-1 (acentos en español).
+- **Archivos:** `VideoPlayerActivity.kt` (reescrito), `MainActivity.kt` (`playVideoOnPhone`, resultado del reproductor).
 - **Probar:**
-  1. Pon la salida en Teléfono (icono cian). Toca un video: debe abrirse a pantalla completa y reproducirse con sonido.
-  2. Toca la pantalla: salen los controles (play/pausa, barra para adelantar). Gira el teléfono: no debe reiniciarse.
-  3. Atrás: vuelve a la lista. El video debe aparecer en "Continuar" con el tiempo guardado; al tocarlo ofrece "Continuar desde…".
-  4. Pon la salida en TV y reproduce el mismo video: debe ir al TV como siempre.
-  5. Con música sonando en el TV, pasa un video al teléfono: la música debe detenerse y no saltar a otra canción.
-- **Limitaciones conocidas:** no avanza solo al siguiente video; no pasa a TV desde ese reproductor (hay que volver y cambiar la salida); sin subtítulos.
-- **Si falla:** `git revert` del commit "Videos en el teléfono".
-- **Riesgo:** bajo-medio. No toca el envío al TV con la salida en TV. Los videos que el teléfono no pueda decodificar muestran un aviso y se cierra el reproductor.
+  1. Salida en Teléfono, abre un video con varios después en la lista: al terminar debe pasar al siguiente. Prueba ⏭ y ⏮.
+  2. Toca la pantalla: arriba aparecen el título y los botones 💬 y 📺. En un mp4, toca 📺: vuelve a la app y el TV empieza desde ese punto (icono de salida en TV).
+  3. Con un video que no sea mp4 (ej. mkv), 📺 debe avisar "El TV solo lee mp4".
+  4. 💬 → Elegir archivo… → un `.srt`. Deben verse las líneas. Cierra y abre el mismo video: deben cargarse solos.
+  5. 💬 → Retrasar / Adelantar 0,5 s: la sincronía debe cambiar.
+- **Limitaciones:** no lee subtítulos incrustados dentro del mkv/mp4 (solo archivos .srt/.vtt); los subtítulos son solo para el teléfono (al TV no se mandan); estilo fijo (texto blanco con fondo oscuro).
+- **Si falla:** `git revert` del commit "Reproductor: siguiente video, botón TV y subtítulos".
+- **Riesgo:** medio-bajo. Solo toca el reproductor del teléfono y el retorno a la lista; con la salida en TV todo sigue igual.
 
 ### 2026-11-16 · Estabilidad (tanda 1) 🧪 (parcial)
 
@@ -115,6 +118,21 @@ git push origin main
 ---
 
 ## Historial
+
+### 2026-11-17 · Videos en el teléfono (salida Teléfono/TV para video y música) ✅
+
+- **Qué:** el botón de salida (icono TV/teléfono, o ⋮ → Salida) ahora controla **música y videos**. Con "Teléfono", al tocar un video se abre un reproductor a pantalla completa en el teléfono (nueva `VideoPlayerActivity`) con controles, gira con el teléfono, mantiene la pantalla encendida y **recuerda el punto donde lo dejaste** (aparece en "Continuar"). Con "TV" todo sigue igual que antes. Si algo suena en el TV o en el teléfono, se detiene al pasar el video al teléfono.
+- **Archivos:** `VideoPlayerActivity.kt` (nuevo), `AndroidManifest.xml` (nueva actividad), `MainActivity.kt` (`startPlayback`, texto del menú y avisos), `Store.kt` sin cambios.
+- **Probar:**
+  1. Pon la salida en Teléfono (icono cian). Toca un video: debe abrirse a pantalla completa y reproducirse con sonido.
+  2. Toca la pantalla: salen los controles (play/pausa, barra para adelantar). Gira el teléfono: no debe reiniciarse.
+  3. Atrás: vuelve a la lista. El video debe aparecer en "Continuar" con el tiempo guardado; al tocarlo ofrece "Continuar desde…".
+  4. Pon la salida en TV y reproduce el mismo video: debe ir al TV como siempre.
+  5. Con música sonando en el TV, pasa un video al teléfono: la música debe detenerse y no saltar a otra canción.
+- **Limitaciones que tenía (ahora en la entrada de arriba):** no avanzaba al siguiente video, no había botón para pasar al TV, sin subtítulos.
+- **Si falla:** `git revert` del commit "Videos en el teléfono".
+- **Riesgo:** bajo-medio. No toca el envío al TV con la salida en TV. Los videos que el teléfono no pueda decodificar muestran un aviso y se cierra el reproductor.
+- **Resultado:** probado en el teléfono, todo bien (confirmado por Ariel el 17 nov 2026).
 
 ### 2026-11-17 · Eliminar música y videos (selección múltiple) ✅
 
@@ -218,7 +236,7 @@ git push origin main
 
 ## Hoja de ruta (dónde vamos y qué falta)
 
-Actualizada: 17 de noviembre de 2026 (v8). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
+Actualizada: 17 de noviembre de 2026 (v9). Cuando una función se termine, se mueve de columna y se anota arriba en el historial.
 
 ### ✅ Hecho y probado
 
@@ -230,11 +248,12 @@ Actualizada: 17 de noviembre de 2026 (v8). Cuando una función se termine, se mu
 - Lista: nombres legibles, búsqueda por ellos y carga en segundo plano.
 - Estabilidad: bloqueos de energía con la pantalla apagada y registro "Servidor iniciado".
 - Eliminar música y videos con selección múltiple (borrado permanente).
+- Videos en el teléfono (salida Teléfono/TV para video y música, con punto guardado).
 - Guía de problemas y soluciones (documento aparte).
 
 ### 🧪 Hecho, falta probar
 
-- **Videos en el teléfono.** Parche `video_telefono.patch`. Falta build verde y probar.
+- **Reproductor de video: siguiente video, botón TV y subtítulos.** Parche `video_extras.patch`. Falta build verde y probar.
 - **Aviso de puerto 8000 ocupado.** Prueba: con `python castv_app.py` corriendo, forzar detención de CASTV, abrirlo y esperar 2 segundos. Debe salir el aviso. Cerrar el script con `pkill -f castv_app.py`.
 - **Color de acento a elegir** (Cian, Verde, Naranja, Morado). Parche `acento_color.patch` + corrección de nombres de estilos. Falta que el build salga verde y probarlo.
 

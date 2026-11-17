@@ -1100,13 +1100,26 @@ class MainActivity : AppCompatActivity() {
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene en el TV o en el teléfono
         adapter.playingId = -1
         adapter.notifyDataSetChanged()
+        // Lista de videos desde éste en adelante (con algunos anteriores para el botón ⏮)
+        val pl = playlist.filter { !it.isMusic }
+        var idx = pl.indexOfFirst { it.id == item.id }
+        val list: List<MediaItem>
+        if (idx < 0) {
+            list = listOf(item)
+            idx = 0
+        } else {
+            val from = maxOf(0, idx - 100)
+            list = pl.subList(from, minOf(pl.size, idx + 400))
+            idx -= from
+        }
         val i = Intent(this, VideoPlayerActivity::class.java)
-            .putExtra("uri", item.uriString)
-            .putExtra("id", item.id)
-            .putExtra("name", item.name)
-            .putExtra("dur", item.durationSec)
+            .putExtra("ids", LongArray(list.size) { list[it].id })
+            .putExtra("names", Array(list.size) { list[it].name })
+            .putExtra("durs", IntArray(list.size) { list[it].durationSec })
+            .putExtra("index", idx)
             .putExtra("start", resumeAt)
-        startActivity(i)
+        @Suppress("DEPRECATION")
+        startActivityForResult(i, reqVideo)
     }
 
     override fun onResume() {
@@ -1712,6 +1725,7 @@ class MainActivity : AppCompatActivity() {
 
     private val reqDelete = 4711
     private val reqDeleteOne = 4712
+    private val reqVideo = 4713
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null
@@ -1854,6 +1868,22 @@ class MainActivity : AppCompatActivity() {
                 if (resultCode == RESULT_OK) deletedItems.addAll(pendingDelete)
                 pendingDelete = emptyList()
                 finishDelete()
+            }
+            reqVideo -> {
+                // 📺 TV desde el reproductor del teléfono: se manda ese video al TV desde el mismo punto
+                if (resultCode == RESULT_OK && data != null && data.hasExtra("tvId")) {
+                    val id = data.getLongExtra("tvId", 0L)
+                    val base = MediaItem(
+                        id = id, name = data.getStringExtra("tvName") ?: "", uriString = "",
+                        isMusic = false, durationSec = data.getIntExtra("tvDur", 0))
+                    val item = playlist.firstOrNull { it.id == id && !it.isMusic }
+                        ?: base.copy(uriString = uriOf(base).toString())
+                    outPhone = false
+                    getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("outPhone", false).apply()
+                    updateOutputButton()
+                    playIndex = playlist.indexOfFirst { it.id == id && !it.isMusic }
+                    startPlayback(item, data.getIntExtra("tvPos", 0))
+                }
             }
             reqDeleteOne -> {
                 val item = deleteQueue.firstOrNull()
