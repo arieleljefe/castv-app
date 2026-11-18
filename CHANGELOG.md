@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v38)
+# Registro de cambios y guía de continuidad – CASTV (v39)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -18,10 +18,11 @@
 2. **Changelog PRIMERO con detalle del parche:** Antes de pasar código o un parche nuevo, se entrega el changelog con estado **🧪** detallando **exactamente qué parche se aplicará, qué código modifica, qué archivos toca y cómo probarlo**.
 3. **PROHIBIDO marcar ✅ sin confirmación (Regla 7):** Nada se marca ✅ hasta que Ariel confirme que compiló en verde en GitHub Actions y diga *"ya funciona"* tras probarlo. Solo entonces se entrega el changelog actualizado a ✅.
 4. **Un cambio a la vez:** No acumular parches grandes. Entorno del usuario: teléfono Android con **Termux** (comandos cortos uno por uno, cambios en `.patch` excluyendo `CHANGELOG.md`).
+5. **VLC solo como inspiración (licencia GPLv2+):** NO copiar código, recursos, iconos, textos largos, nombre ni logo (cono) de VLC. Las ideas y la organización de pantallas se reimplementan con código propio (Material Icons u otros propios). Copiar código haría que CASTV tuviera que ser GPL con fuentes publicadas. Referencia local: `vlc-android-master.zip` (solo consulta).
 
 ---
 
-## 📍 Estado Actual (v38)
+## 📍 Estado Actual (v39)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
@@ -60,7 +61,8 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
    - *Pros:* Evita botones aplastados y aprovecha mejor la pantalla.
    - *Contras:* Requiere cuidar atributos `?attr/castvAccent` en XML para no romper temas.
 
-**Descartado (no implementar):** Chromecast/AirPlay, contenido con DRM, ffmpeg integrado o subtítulos por IA local (engordan el APK y saturan el dispositivo).
+**Descartado (no implementar):** Chromecast/AirPlay y contenido con DRM.
+**Tamaño del APK (decisión de Ariel, 17 nov 2026):** ya **no es un impedimento** si la app engorda un poco. Por eso `libvlc`, `ffmpeg` y subtítulos con IA local pasan de "descartado" a **⏳ por evaluar** (se decidirá caso por caso, siempre un cambio a la vez).
 
 ---
 
@@ -95,11 +97,68 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **Respaldo Exportar/Importar (JSON)** de favoritos (incluye `chfav`), listas M3U, historial y ajustes. `Store.kt` + `MainActivity.kt` (recomendado: protege datos al reinstalar APKs).
-2. **Pulido visual** (títulos largos con desplazamiento, mini reproductor más compacto).
-3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
-4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
+1. **🧪 Respaldo Exportar/Importar JSON** — plan detallado, **parche aún no entregado**. Decisión tomada: importar **reemplaza** lo actual (con confirmación).
+   - Archivos: `Backup.kt` (nuevo), `Store.kt` (`reload()`), `MainActivity.kt` (menú id 17, diálogo, códigos 4716/4717, `ACTION_CREATE_DOCUMENT`/`OPEN_DOCUMENT`, `recreate()` tras importar). Sin permisos ni cambios en el manifest.
+   - Incluye: favoritos, listas de reproducción, historial y favoritos de enlaces, listas M3U, favoritos de canales, ajustes (tema, color, orden, repetir, salida, papelera, ecualizador). No incluye: IP del TV, puntos de reanudación, estadísticas.
+   - Valida que sea respaldo de CASTV (versión 1) antes de tocar nada. **Si falla:** `git revert` del commit "Respaldo exportar/importar (v39)".
+2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno): primer candidato del banco de ideas VLC (ver abajo).
+3. **Pulido visual / interfaz estilo VLC** (ver "Visión de interfaz").
+4. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
+5. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
+
+---
+
+## 🎨 Visión de interfaz: parecida a VLC, sin plagio (⬜ por hacer, por fases)
+
+Meta de Ariel: que CASTV tenga una interfaz con la **misma comodidad y organización que VLC**, pero con **identidad propia** (código, iconos, colores y nombres propios; ver Regla 5). Estructura observada en el zip de VLC, para tomar como guía:
+- **Navegación inferior de 5 pestañas:** Vídeo · Audio · Explorar · Listas · Más.
+- **Reproductor de video:** barra inferior con tiempo, barra de progreso y duración; botones anterior / retroceder / play / adelantar / siguiente; botones de tamaño de pantalla, rotación y opciones; **bloqueo con "deslizar para desbloquear"**; avisos en pantalla de brillo, volumen y salto; marcadores A-B y de capítulos sobre la barra.
+- **Reproductor de audio:** mini reproductor abajo que se expande a pantalla completa.
+- **Pestaña "Más":** historial, ajustes, acerca de (sustituiría parte del menú ⋮ actual).
+
+Fases propuestas (una por parche, cada una con su 🧪 antes del código):
+- ⬜ **UI-1:** navegación inferior (Películas · Música · Canales/Enlaces · Listas · Más) reorganizando el menú ⋮ sin quitar funciones.
+- ⬜ **UI-2:** HUD del reproductor de video (barra propia con anterior/retroceder/play/adelantar/siguiente, tamaño de pantalla, rotación, 🔒 bloqueo).
+- ⬜ **UI-3:** mini reproductor expandible para audio y video.
+- ⬜ **UI-4:** pestaña "Más" (historial, ajustes, respaldo, acerca de).
+- Mantener los 4 colores de acento y tema Claro/Oscuro propios (no usar el naranja/cono de VLC como identidad).
+
+---
+
+## 💡 Banco de ideas futuras (inspiradas en VLC; todo ⬜ por hacer, sin copiar código)
+
+**Reproductor de video (`VideoPlayerActivity.kt`)**
+1. ⬜ **Estilo de subtítulos:** tamaño, negrita, color, fondo, sombra, contorno, codificación del texto, autocarga y idioma preferido (encaja con `subText`).
+2. ⬜ **Deslizar horizontal** para adelantar/retroceder.
+3. ⬜ **Mantener pulsado** para velocidad rápida.
+4. ⬜ **Doble toque al centro** para pausar/reanudar.
+5. ⬜ **Bloqueo de controles** contra toques accidentales.
+6. ⬜ **Temporizador de apagado** en el reproductor de video.
+7. ⬜ **Repetición A-B, marcadores, saltar a un tiempo y capítulos.**
+8. ⬜ **Guardar el brillo** y **confirmar antes de reanudar**.
+9. ⬜ **Zoom con pellizco y modos de tamaño** de pantalla.
+10. ⬜ **Estadísticas de video** (útil para diagnóstico).
+11. ⬜ **Picture-in-picture.**
+12. ⏳ **Pistas de audio/subtítulos embebidos:** solo con libvlc.
+
+**App en general**
+13. ⬜ **"Qué hay de nuevo"** al actualizar y **consejos de gestos** la primera vez.
+14. ⬜ **Ecualizador:** presets guardados por el usuario.
+15. ⬜ **Control remoto web** (aprovechar el servidor del puerto 8000): controlar/subir archivos desde un navegador.
+16. ⬜ **Widgets, atajos, Android Auto y canales de Android TV.**
+17. ⬜ **Control parental con PIN.**
+18. ⬜ **Manejo del foco de audio** (pausa en llamadas o al abrir otra app de sonido).
+19. ⬜ **Vocabulario en español** de referencia (`values-es` de VLC) para mantener textos coherentes, escritos con palabras propias.
+
+**⏳ Por evaluar (el tamaño ya no frena, pero cambia la arquitectura)**
+- **libvlc** (LGPL): reproduce casi todo (mkv, avi, HLS, pistas embebidas) y podría resolver mejor HLS/códecs en el móvil. Implica rehacer la reproducción; usarlo exige cumplir su licencia LGPL (aviso y enlace al código de la biblioteca).
+- **Explorador de red (SMB/FTP/UPnP):** depende de libvlc o de bibliotecas extra.
+- **Renderers/cast vía libvlc:** relacionado con Chromecast, que sigue descartado.
+
+**No hay nada reutilizable de VLC para M3U** (lo resuelve libvlc); se mantiene `M3uParser.kt`.
+
+---
 
 ### Notas de este día
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
