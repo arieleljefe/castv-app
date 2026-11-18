@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v46)
+# Registro de cambios y guía de continuidad – CASTV (v47)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -24,13 +24,13 @@
 
 ---
 
-## 📍 Estado Actual (v46)
+## 📍 Estado Actual (v47)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
 - ✅ **UI-1 pestaña "Más" (18 nov 2026):** aplicada, compiló y Ariel la probó en el teléfono ("todo bello"). Commit "UI-1 aplicado: pestaña Más".
-- 🧪 **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`):** Ariel eligió "Pantalla de Ajustes con categorías (como VLC)"; Ariel dijo "todo bien" el 18 nov 2026, pero falta que confirme explícitamente la pantalla Ajustes (y el build en verde) para pasarla a ✅ (ver "Siguiente" punto 1).
-- ⬜ **Idea de Ariel (18 nov 2026): canales en vivo que SÍ se vean en el TV** (convertir o retransmitir el video desde la app); ver "Siguiente" punto 6.
+- ✅ **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (18 nov 2026):** aplicada (commit `074af2b`), compiló y Ariel confirmó **"ya funciona"** con captura de la pantalla Ajustes; **Versión** muestra CASTV 2.1, igual que el encabezado.
+- ⬜ **Idea de Ariel (18 nov 2026): canales en vivo que SÍ se vean en el TV** (convertir o retransmitir el video desde la app); ver "Siguiente" punto 5.
 - ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
@@ -74,10 +74,31 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
+### ✅ UI-1b — Pantalla de Ajustes en el ⋮ — confirmado por Ariel el 18 nov 2026 ("ya funciona")
+
+- **Por qué:** tras UI-1, el ⋮ y Más muestran las mismas opciones. Ariel quiere que el ⋮ sea para los **ajustes de la app**, como en VLC.
+- **Qué:** el ⋮ abre una pantalla **Ajustes** con categorías:
+  - **Interfaz:** Tema · Color de acento.
+  - **Almacenamiento:** Borrado (papelera / permanente; solo Android 11+, igual que ahora).
+  - **Respaldo:** Exportar · Importar.
+  - **Acerca de:** Mis redes y contacto · versión de la app.
+- **Más** queda solo con herramientas: Reproducir enlace, Listas M3U, Elegir TV, Salida, Ordenar, Duplicados, Mis listas, filtros de artista/álbum, Temporizador, Velocidad y Ecualizador. Se quitan de Más los ids 11, 12, 13, 14 y 17 (las funciones siguen en `MainActivity.kt`).
+- **Futuro dentro de Ajustes (⬜, NO en este parche):** idioma de la app y ajustes de notificaciones. La pantalla se arma por categorías para poder sumarlos sin rehacerla.
+- **Detalle exacto del parche entregado (verificado contra el `AndroidManifest.xml`, `M3uActivity.kt` y `MainActivity.kt` reales):**
+  - `SettingsActivity.kt` (nuevo, construida en código como `M3uActivity`): encabezado "← Ajustes" y categorías Interfaz (Tema, Color de acento) · Almacenamiento (Borrado; solo Android 11+) · Respaldo · Acerca de (Mis redes y contacto, Versión). Aplica tema y color guardados al abrir (igual que `MainActivity`) y ajusta los iconos de la barra de estado a Claro/Oscuro.
+  - `AndroidManifest.xml`: registra `.SettingsActivity` (`exported=false`).
+  - `MainActivity.kt`: el ⋮ lanza `SettingsActivity` (`reqSettings = 4718`); **Respaldo** y **Mis redes** cierran Ajustes y `onActivityResult` abre `showBackupMenu()` / `showSocials()` (se reutiliza lo que ya funciona); si cambió el color, `onResume` recrea la pantalla (`accentAtStart`); se elimina `showMainMenu()` (ya nadie lo usa); `showMoreSheet()` deja fuera los ids 11, 12, 13, 14 y 17 y ya no tiene los grupos Apariencia, Datos y Acerca. `fillMainMenu` y `runMenuAction` se conservan.
+  - El tema se cambia con `AppCompatDelegate` (recrea las pantallas solo, igual que antes); Borrado usa la misma preferencia `trash`.
+  - Aplicar (Termux, uno por uno): `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/ui1b_ajustes.patch` → `git status --short` (deben salir 3 archivos) → `git add -A` → `git commit -m "UI-1b pantalla de Ajustes"` → `git push origin main`.
+- **Riesgos:** una pantalla nueva mal registrada cierra la app (el manifest se armó con el real); recrear pantallas al cambiar tema/color; Respaldo y Redes cierran Ajustes antes de abrir su diálogo (v1, a propósito, para no duplicar código); si se cambia el color y se toca Respaldo en la misma visita, el diálogo puede perderse al redibujar (se vuelve a tocar).
+- **Cómo probar:** (1) el ⋮ abre Ajustes y atrás vuelve; (2) Tema y Color cambian y se ven al volver; (3) Borrado cambia y el aviso sale bien; (4) Exportar e Importar respaldo funcionan; (5) Redes y contacto abre los enlaces; (6) Más ya no repite nada de Ajustes; (7) Claro/Oscuro y girar el teléfono; (8) **Versión** dice lo mismo que el "2.1" del encabezado (si no, se ajusta `build.gradle` o el texto).
+- **Si falla:** `git revert` del commit de UI-1b.
+- **Resultado:** el ⋮ abre Ajustes con Interfaz, Almacenamiento, Respaldo y Acerca de; Más ya no repite nada. Parche: `ui1b_ajustes.patch`, commit `074af2b`. Pendiente a futuro: idioma y notificaciones dentro de Ajustes.
+
 ### ✅ UI-1 — Pestaña "Más" — confirmado por Ariel el 18 nov 2026
 
 - Hecho y probado: barra inferior de 5 botones (Vídeo · Audio · Carpetas · Cola · **Más**); Más abre una hoja (`BottomSheetDialog`) con las opciones agrupadas. Archivos: `activity_main.xml` (`navMore`), `res/drawable/ic_nav_more.xml` (nuevo), `MainActivity.kt` (`fillMainMenu`, `runMenuAction`, `showMoreSheet`). Parche: `ui1_mas.patch`.
-- **Problema detectado por Ariel:** el ⋮ y Más muestran las mismas opciones. Se corrige en UI-1b.
+- **Problema detectado por Ariel:** el ⋮ y Más muestran las mismas opciones. Corregido en UI-1b (✅).
 
 ### ✅ Respaldo Exportar/Importar JSON — confirmado por Ariel el 17 nov 2026
 
@@ -116,29 +137,11 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **🧪 UI-1b — Pantalla de Ajustes en el ⋮ y Más sin repetidos** (**parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`**; Ariel eligió el formato; pendiente de build verde y prueba).
-   - **Por qué:** tras UI-1, el ⋮ y Más muestran las mismas opciones. Ariel quiere que el ⋮ sea para los **ajustes de la app**, como en VLC.
-   - **Qué:** el ⋮ abre una pantalla **Ajustes** con categorías:
-     - **Interfaz:** Tema · Color de acento.
-     - **Almacenamiento:** Borrado (papelera / permanente; solo Android 11+, igual que ahora).
-     - **Respaldo:** Exportar · Importar.
-     - **Acerca de:** Mis redes y contacto · versión de la app.
-   - **Más** queda solo con herramientas: Reproducir enlace, Listas M3U, Elegir TV, Salida, Ordenar, Duplicados, Mis listas, filtros de artista/álbum, Temporizador, Velocidad y Ecualizador. Se quitan de Más los ids 11, 12, 13, 14 y 17 (las funciones siguen en `MainActivity.kt`).
-   - **Futuro dentro de Ajustes (⬜, NO en este parche):** idioma de la app y ajustes de notificaciones. La pantalla se arma por categorías para poder sumarlos sin rehacerla.
-   - **Detalle exacto del parche entregado (verificado contra el `AndroidManifest.xml`, `M3uActivity.kt` y `MainActivity.kt` reales):**
-     - `SettingsActivity.kt` (nuevo, construida en código como `M3uActivity`): encabezado "← Ajustes" y categorías Interfaz (Tema, Color de acento) · Almacenamiento (Borrado; solo Android 11+) · Respaldo · Acerca de (Mis redes y contacto, Versión). Aplica tema y color guardados al abrir (igual que `MainActivity`) y ajusta los iconos de la barra de estado a Claro/Oscuro.
-     - `AndroidManifest.xml`: registra `.SettingsActivity` (`exported=false`).
-     - `MainActivity.kt`: el ⋮ lanza `SettingsActivity` (`reqSettings = 4718`); **Respaldo** y **Mis redes** cierran Ajustes y `onActivityResult` abre `showBackupMenu()` / `showSocials()` (se reutiliza lo que ya funciona); si cambió el color, `onResume` recrea la pantalla (`accentAtStart`); se elimina `showMainMenu()` (ya nadie lo usa); `showMoreSheet()` deja fuera los ids 11, 12, 13, 14 y 17 y ya no tiene los grupos Apariencia, Datos y Acerca. `fillMainMenu` y `runMenuAction` se conservan.
-     - El tema se cambia con `AppCompatDelegate` (recrea las pantallas solo, igual que antes); Borrado usa la misma preferencia `trash`.
-     - Aplicar (Termux, uno por uno): `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/ui1b_ajustes.patch` → `git status --short` (deben salir 3 archivos) → `git add -A` → `git commit -m "UI-1b pantalla de Ajustes"` → `git push origin main`.
-   - **Riesgos:** una pantalla nueva mal registrada cierra la app (el manifest se armó con el real); recrear pantallas al cambiar tema/color; Respaldo y Redes cierran Ajustes antes de abrir su diálogo (v1, a propósito, para no duplicar código); si se cambia el color y se toca Respaldo en la misma visita, el diálogo puede perderse al redibujar (se vuelve a tocar).
-   - **Cómo probar:** (1) el ⋮ abre Ajustes y atrás vuelve; (2) Tema y Color cambian y se ven al volver; (3) Borrado cambia y el aviso sale bien; (4) Exportar e Importar respaldo funcionan; (5) Redes y contacto abre los enlaces; (6) Más ya no repite nada de Ajustes; (7) Claro/Oscuro y girar el teléfono; (8) **Versión** dice lo mismo que el "2.1" del encabezado (si no, se ajusta `build.gradle` o el texto).
-   - **Si falla:** `git revert` del commit de UI-1b.
-2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
-3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
-4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
-5. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"). Necesita `.github/workflows/*.yml`.
-6. ⬜ **Canales en vivo que funcionen de verdad en el TV** (idea de Ariel, 18 nov 2026; a pulir en el futuro; **sin parche ni plan aprobado todavía**). Hoy el diálogo de un canal dice "📺 Al TV (HLS: puede no funcionar)": el Hisense no sigue muchos canales HLS (`.m3u8`). Ariel quiere que la app los convierta o los prepare para que se reproduzcan bien en la TV. Este punto reemplaza al punto 3 (solo avisar) si se logra.
+1. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
+2. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
+3. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
+4. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"). Necesita `.github/workflows/*.yml`.
+5. ⬜ **Canales en vivo que funcionen de verdad en el TV** (idea de Ariel, 18 nov 2026; a pulir en el futuro; **sin parche ni plan aprobado todavía**). Hoy el diálogo de un canal dice "📺 Al TV (HLS: puede no funcionar)": el Hisense no sigue muchos canales HLS (`.m3u8`). Ariel quiere que la app los convierta o los prepare para que se reproduzcan bien en la TV. Este punto reemplaza al punto 2 (solo avisar) si se logra.
    - **Paso 0, diagnosticar antes de construir:** descubrir por qué falla el Hisense con HLS (¿no acepta `.m3u8`?, ¿códec de video/audio?, ¿tipo de contenido?, ¿segmentos cifrados?). Se usa el log de `/log` y un canal de prueba. Sin esto no se sabe qué arreglar. No está comprobado que el Hisense llegue a reproducirlo con ninguna de las opciones de abajo.
    - **Opción A, retransmitir sin convertir (la más ligera, probar primero):** el teléfono baja la lista `.m3u8`, junta los segmentos (normalmente MPEG-TS) y los sirve como una sola transmisión continua por el servidor `/relay` que ya existe, para que el TV la vea como un video normal. *Pros:* sin librerías nuevas, sin cambiar licencia, poco gasto de batería. *Contras:* solo sirve si el TV acepta el códec original (H.264/AAC) y el formato TS en vivo; no sirve con canales cifrados o en otros formatos de segmento; el teléfono debe quedarse encendido, en la misma Wi-Fi y con la app abierta.
    - **Opción B, convertir de verdad (transcodificar):** el teléfono recodifica el video a un formato que el TV acepte, con una librería tipo FFmpeg. *Pros:* funciona con más canales. *Contras:* gasta mucha batería y calor, puede ir con retraso, aumenta mucho el tamaño de la app y su **licencia (GPL/LGPL) podría obligar a cambiar la de CASTV** (ver regla 7); por eso va al final y solo si la Opción A no alcanza.
@@ -166,7 +169,7 @@ Meta de Ariel: que CASTV tenga una interfaz con la **misma comodidad y organizac
 
 Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - ✅ **UI-1:** pestaña **Más** (hoja con opciones en grupos), confirmada el 18 nov 2026. Opcional después: cambiar Cola por una pestaña Listas.
-- 🧪 **UI-1b:** el ⋮ pasa a ser la pantalla **Ajustes** (tema, color, borrado, respaldo, acerca de; idioma y notificaciones a futuro) y Más queda solo con herramientas; parche entregado, detalle en "Siguiente" punto 1.
+- ✅ **UI-1b:** el ⋮ es la pantalla **Ajustes** (tema, color, borrado, respaldo, acerca de), confirmada el 18 nov 2026. Falta a futuro: idioma y notificaciones.
 - ⬜ **UI-2:** HUD del reproductor de video (barra propia con anterior/retroceder/play/adelantar/siguiente, tamaño de pantalla, rotación, 🔒 bloqueo).
 - ⬜ **UI-3:** mini reproductor expandible para audio y video.
 - ⬜ **UI-4:** pestaña "Más" (historial, ajustes, respaldo, acerca de).
@@ -200,7 +203,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 19. ⬜ **Vocabulario en español** de referencia (`values-es` de VLC) para mantener textos coherentes, escritos con palabras propias.
 
 **Canales en vivo**
-20. ⬜ **Canales HLS que se vean en el TV** (retransmitir o convertir desde la app): detalle y opciones en "Siguiente" punto 6.
+20. ⬜ **Canales HLS que se vean en el TV** (retransmitir o convertir desde la app): detalle y opciones en "Siguiente" punto 5.
 
 **⏳ Por evaluar (el tamaño ya no frena, pero cambia la arquitectura)**
 - **libvlc** (LGPL): reproduce casi todo (mkv, avi, HLS, pistas embebidas) y podría resolver mejor HLS/códecs en el móvil. Implica rehacer la reproducción; usarlo exige cumplir su licencia LGPL (aviso y enlace al código de la biblioteca).
@@ -221,7 +224,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ### Notas de este día
 
-- **Pedido de Ariel (18 nov 2026, antes de dormir):** que al poner un canal "todo se reproduzca efectivamente en la tv"; la app debería convertir o preparar el video en vivo. Guardado como "Siguiente" punto 6 para pulir más adelante.
+- **Pedido de Ariel (18 nov 2026, antes de dormir):** que al poner un canal "todo se reproduzca efectivamente en la tv"; la app debería convertir o preparar el video en vivo. Guardado como "Siguiente" punto 5 para pulir más adelante.
 - **Observación (18 nov 2026, ⬜ pequeño):** `M3uActivity` no aplica el color de acento guardado (no hace `theme.applyStyle` como `MainActivity`), así que su ★ sale siempre cian. `SettingsActivity` sí lo aplica.
 - **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
@@ -230,6 +233,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **UI-1b pantalla de Ajustes (18 nov 2026):** `SettingsActivity.kt` nuevo, registro en el manifest, ⋮ abre Ajustes, Más sin repetidos.
 - **UI-1 pestaña Más (18 nov 2026):** `navMore`, `ic_nav_more.xml`, `showMoreSheet()` en `MainActivity.kt`.
 - **Respaldo Exportar/Importar JSON (17 nov 2026):** `Backup.kt`, `Store.reload()`, menú id 17 en `MainActivity.kt`.
 - **Gestos en el reproductor (17 nov 2026):** brillo, volumen y doble toque ±10 s (`VideoPlayerActivity.kt`).
