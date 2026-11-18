@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v102)
+# Registro de cambios y guía de continuidad – CASTV (v105)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -37,12 +37,13 @@
 
 ---
 
-## 📍 Estado Actual (v102)
+## 📍 Estado Actual (v105)
 
 - ✅ **CATALOGO-1 Canales preinstalados de iptv-org (18 nov 2026):** parche `catalogo_listas.patch` (`Catalog.kt` nuevo, `Store.kt`, `M3uActivity.kt`), aplicado, compiló y **Ariel confirmó: "Ya está ✅… acabo de probar todo y todo está muy bien y organizado"** (18 nov 2026). Quedan 30 listas nuevas (20 países de Latinoamérica, EE.UU., España y 8 categorías) además de Free-TV. **Sin anotar (pedir solo si Ariel lo ve raro):** cuántos repetidos quitó el `/log`. Detalle en "Parche en Curso".
+- ⬜ **NOW-1 (dato nuevo v104, Ariel, 18 nov 2026, 7:22 p.m., con captura):** cerró y abrió la app, fue directo a Listas M3U y mandó un canal al TV. El canal se ve en la TV y desde el reproductor **sí se puede controlar** (pausar, volumen, etc.), pero la barra dice **"Ningún archivo seleccionado"**, con 0:00 / --:-- y la barra de progreso quieta. Descarta que sea solo "la canción vieja que se queda": con la app recién abierta no hay nada previo y el título sigue sin el nombre del canal. Conclusión: el control del TV ya funciona; **solo falta escribir el nombre del canal en `tvNowPlaying` y mostrar "En vivo"** (hipótesis, sin verificar hasta leer `MainActivity.kt`). **Dato extra v105 (Ariel, 7:25 p.m., captura de la notificación):** la notificación "CASTV activo · Listo para transmitir al TV" tampoco refleja el canal (viendo CARTOON NETWORK en la TV, el texto no cambia). **NOW-1 pasa a cubrir dos sitios:** (1) la barra del reproductor (mini y expandida) y (2) el texto de la notificación. Hipótesis: ambos se arman desde `playingItem`/`tvNowPlaying` en `MainActivity.kt` y `CastvService`, y ningún camino les pasa el nombre del canal. Para el parche se necesitará, además de `MainActivity.kt`, el servicio que arma la notificación (`CastvService.kt`; se confirma al leer el código). Sigue sin código.
 - ⬜ **NOW-1 El mini reproductor no muestra el canal que está en el TV (Ariel, 18 nov 2026, con captura):** al poner un canal de Listas M3U, la barra de abajo (y la expandida) sigue mostrando la última música o video **local**, con su tiempo, y no el canal. Solo plan; sin código. Detalle en "Parche en Curso".
 - ⬜ **REGIONES-1 Listas M3U con apartados por región y categoría (pedido de Ariel, 18 nov 2026):** cada región/país con su propio apartado. Depende de CATALOGO-1. Plan en "Parche en Curso".
-- 🧪 **ICONO-1 Nuevo icono de la app (18 nov 2026):** Ariel dijo "Dale" (aprobó el recorte) y **el parche está entregado: `icono_nuevo.patch`** (3 archivos: `ic_launcher_tv.jpg` nuevo + una línea en `ic_launcher.xml` e `ic_launcher_round.xml` de `mipmap-anydpi-v26`; 93 230 bytes). Comprobado con `git apply --check` sobre los XML reales y aplicado en una copia limpia (2 `M` + carpeta nueva `??`). **No compilado aquí.** Nada se marca ✅ sin que Ariel diga "ya funciona".
+- ✅ **ICONO-1 Nuevo icono de la app (18 nov 2026, ~7:16 p.m.):** parche `icono_nuevo.patch` (`ic_launcher_tv.jpg` nuevo + una línea en `ic_launcher.xml` e `ic_launcher_round.xml` de `mipmap-anydpi-v26`), aplicado, compiló e instalado. **Ariel confirmó: "Todo está bien de bien ✅"** con dos capturas: el icono nuevo (TV con ▶ sobre la bandera) en la pantalla de inicio y en la notificación "CASTV activo · Listo para transmitir al TV". **Sin anotar:** cómo se ve con iconos temáticos de Android 13+ (silueta del vector); pedir solo si Ariel lo ve raro.
 
 - ✅ **MUS-1 Canales con el audio en una lista aparte: video y audio unidos (18 nov 2026, 17:30):** parche `mus1_audio_video.patch` (solo `MediaServer.kt`), aplicado, compiló e instalado. **Ariel probó DELUXE MUSIC DANCE BY KONTOR en la TV y dijo: "Todo va muy bien 👍"** (log 17:30-17:31 sin `ERROR` ni `LIVE mezcla falló`; llegó al fragmento 40). Incluye la corrección del orden de fragmentos al arrancar un canal en vivo. **Nota:** el `/log` pegado empieza con el canal ya en marcha (buffer de 10 MB al primer pedido), así que no trae las líneas `LIVE audio aparte` / `LIVE audio+video`; no hace falta repetirlo salvo que Ariel note desfase o cortes. Detalle en "Parche en Curso" (MUS-1).
 - ✅ **Adelantar un video en el TV (Ariel, 18 nov 2026):** probado, **funciona**.
@@ -165,7 +166,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 - **Riesgos:** pantalla ya algo cargada en vertical; se prueba que no se aplasten las pestañas.
 - **Lo que ya se sabe del código real (v98):** `M3uParser.kt` hoy solo lee `group-title` y el nombre tras la coma (hay que añadir `tvg-logo` y `tvg-name` si se quieren logos); `M3uActivity` maneja una sola lista a la vez, así que mezclar por región implicará descargar varias listas y **unirlas sin repetidos por enlace de stream** (aquí se resuelve el repetido entre país y categoría y contra Free-TV).
 
-### 🧪 ICONO-1 — Nuevo icono de la app (parche `icono_nuevo.patch` entregado en v102; falta aplicar, compilar y probar)
+### ✅ ICONO-1 — Nuevo icono de la app — confirmado por Ariel el 18 nov 2026 ("Todo está bien de bien")
 
 - **Decisión (v99):** recorte cuadrado de la TV cian con ▶ sobre los colores de la bandera dominicana, **sin el texto CASTV**. La vista previa (`icono_vista_previa.png`, `icono_recorte.png`) se entregó en v100 y **Ariel aprobó el recorte con su "Dale" (v102)**.
 - **Lo que se vio en los XML reales (v101):** `mipmap-anydpi-v26/ic_launcher.xml` y `ic_launcher_round.xml` son idénticos: `<background>` = `@color/ic_launcher_bg`, `<foreground>` = `@drawable/ic_launcher_foreground` y `<monochrome>` = `@drawable/ic_launcher_foreground`. El vector `ic_launcher_foreground.xml` (108×108) dibuja una TV cian de trazo con soporte y un ▶ blanco.
@@ -451,17 +452,19 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-**Lista ordenada v100 (18 nov 2026), recomendada de arriba abajo (ninguno urgente):**
-1. 🧪 **ICONO-1:** nuevo icono (recorte de la TV con ▶); parche `icono_nuevo.patch` entregado en v102; falta aplicar, compilar y probar.
-2. ⬜ **NOW-1:** que el mini reproductor y el expandido muestren el canal que va al TV (hoy muestran la música/video local). Pedido de Ariel con captura, 18 nov 2026.
-3. ⬜ **REGIONES-1:** apartados por región y categoría en Listas M3U (une varias listas sin repetidos; ver su plan).
-4. ⬜ **ACENTO-1:** `M3uActivity` no aplica el color de acento (su ★ sale siempre cian); justo después de REGIONES-1 (mismo archivo, parche aparte).
-5. ⬜ **CANAL-BG:** que el canal siga en la TV con la app cerrada. **Nota v100:** el manifest ya declara `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS` y un `CastvService` de tipo `mediaPlayback`; se revisará si se puede reutilizar para mantener vivo el servidor `/live`.
-6. ⬜ **AVISO-HLS:** mensaje claro cuando un canal no se pueda preparar, con "📱 En el móvil" (más útil con tantos canales nuevos).
-7. ⬜ **SEL-2:** ▶ Reproducir selección y Compartir en la selección múltiple.
-8. ⬜ **UI-2 / UI-3:** HUD del reproductor de video y mini reproductor expandible (NOW-1 toca la misma barra).
-9. ⬜ **Caché de Gradle:** solo si vuelve el error 429.
-10. ⬜ **Banco de ideas (VLC):** el resto de la sección "Banco de ideas futuras".
+**Lista ordenada v103 (18 nov 2026, cierre del día), recomendada de arriba abajo (ninguno urgente; todo lo anterior está ✅ y probado):**
+1. ⬜ **NOW-1:** que el mini reproductor y el expandido muestren el canal que va al TV (hoy muestran la música o el video local). **Recomendado para empezar.** Falta `MainActivity_actual.kt` (comando en la nota v103). Plan e hipótesis en "Parche en Curso".
+2. ⬜ **REGIONES-1:** apartados por región y categoría en Listas M3U (une varias listas sin repetidos; el parser aún no lee `tvg-logo` ni `tvg-name`).
+3. ⬜ **ACENTO-1:** `M3uActivity` no aplica el color de acento (su ★ sale siempre cian); justo después de REGIONES-1 (mismo archivo, parche aparte).
+4. ⬜ **CANAL-BG:** que el canal siga en la TV con la app cerrada. El manifest ya declara `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS` y un `CastvService` de tipo `mediaPlayback` (la notificación "CASTV activo" ya existe); se revisará si se reutiliza para mantener vivo el servidor `/live`. Se necesitan `MediaServer.kt`, `MainActivity.kt` y el servicio (`CastvService.kt`).
+5. ⬜ **AVISO-HLS:** mensaje claro cuando un canal no se pueda preparar, con "📱 En el móvil" (más útil con tantos canales nuevos).
+6. ⬜ **SEL-2:** ▶ Reproducir selección y Compartir en la selección múltiple.
+7. ⬜ **UI-2 / UI-3:** HUD del reproductor de video y mini reproductor expandible (NOW-1 toca la misma barra).
+8. ⬜ **Caché de Gradle:** solo si vuelve el error 429.
+9. ⬜ **Banco de ideas (VLC):** el resto de la sección "Banco de ideas futuras".
+10. ⬜ **CATALOGO-2 (opcional, a decisión de Ariel):** sumar más países del Anexo (por ejemplo Reino Unido, Canadá y Australia, ya que Ariel habla inglés, u otros) subiendo `Catalog.VERSION` a 2; la app solo añade lo nuevo y no repite lo que Ariel quitó.
+
+**Lista de v100 (superada por la de arriba; historial):** 1. ICONO-1 (ahora ✅), 2. NOW-1, 3. REGIONES-1, 4. ACENTO-1, 5. CANAL-BG, 6. AVISO-HLS, 7. SEL-2, 8. UI-2/UI-3, 9. Caché de Gradle, 10. Banco de ideas.
 
 **Lista de v97/v99 (superada por la de arriba; se conserva como historial):**
 1. ✅ **CATALOGO-1** (confirmado v100), 2. REGIONES-1, 3. ACENTO-1, 4. CANAL-BG, 5. AVISO-HLS, 6. SEL-2, 7. ICONO-1, 8. UI-2/UI-3, 9. Caché de Gradle, 10. Banco de ideas.
@@ -556,7 +559,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 **Canales en vivo**
 20. ✅ **Canales HLS que se vean en el TV:** hecho con LIVE-1, LIVE-2 y MUS-1 (ver "Siguiente" punto 5).
 22. ⬜ **Catálogo de canales preinstalado sin repetidos** (CATALOGO-1) y **apartados por región** (REGIONES-1): ver "Parche en Curso".
-23. 🧪 **Nuevo icono de la app** (ICONO-1): plan detallado; ver "Parche en Curso".
+23. ✅ **Nuevo icono de la app** (ICONO-1): hecho y confirmado el 18 nov 2026.
 24. ⬜ **El reproductor muestra el canal que va al TV** (NOW-1): ver "Parche en Curso".
 
 **Selección múltiple**
@@ -580,6 +583,16 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v105 (18 nov 2026, 19:27):** Ariel añadió que la notificación "CASTV activo" tampoco muestra el canal (ver NOW-1). **Sin parche nuevo.** **Siguiente:** Ariel pasa `MainActivity_actual.kt` y `CastvService_actual.kt` (`cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt` → `cp app/src/main/java/com/castv/app/CastvService.kt ~/storage/downloads/CastvService_actual.kt`; si el segundo no existe, `grep -rl "CASTV activo" app/src`). **Cómo retomar:** pasar solo `CHANGELOG_v105.md`; subir con `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v105.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v105 (NOW-1 incluye notificación)"` → `git push origin main`.
+
+- **v104 (18 nov 2026, 19:25):** Ariel reportó con captura que con un canal de Listas M3U en el TV (app recién abierta) el reproductor controla el TV pero muestra "Ningún archivo seleccionado" (detalle en NOW-1, Estado Actual). **Sin parche nuevo.** **Siguiente:** Ariel pasa `MainActivity_actual.kt` (`cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt`); con eso se entrega el changelog 🧪 con el detalle exacto y recién después el `.patch`. **Cómo retomar:** pasar solo `CHANGELOG_v104.md`; subir con `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v104.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v104 (NOW-1 dato nuevo)"` → `git push origin main`.
+
+- **v103 (18 nov 2026, ~7:16 p.m., CIERRE DEL DÍA, punto de continuidad para la próxima sesión):** Ariel confirmó **ICONO-1 ✅** ("Todo está bien de bien") con capturas del icono nuevo en la pantalla de inicio y en la notificación, y pidió dejar todo anotado para seguir más tarde. **Hoy quedó ✅ y probado:** CATALOGO-1 (30 listas de iptv-org + Free-TV, sin repetidos dentro de cada lista) e ICONO-1; antes, LIVE-2, MUS-1, GZIP-1, SEL-1, UI-S1 y lo del TV. **No queda nada por probar.**
+  - **Pendientes (⬜), en orden:** ver "Lista ordenada v103" en "Siguiente". **El 1 es NOW-1** (el reproductor no muestra el canal que va al TV).
+  - **Para arrancar NOW-1 se necesita un solo archivo** (Termux, uno por uno): `cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt`; y subirlo. `M3uActivity.kt` ya se vio (cambió solo con CATALOGO-1). Antes del parche se entrega el changelog 🧪 con el detalle exacto y se espera el "Dale" de Ariel.
+  - **Datos útiles descubiertos hoy:** (1) `firstRun` no existe; el catálogo usa `Store.installCatalog()` con `catV` y `catSeen` en `castv_lib`; (2) `M3uActivity` carga una sola lista a la vez; (3) el icono es solo adaptable (XML `-v26`); los `mipmap-anydpi/` sin `-v26` no se han visto y no se tocaron; (4) el manifest ya trae `CastvService` y permisos de primer plano (para CANAL-BG).
+  - **Cómo retomar:** pasar solo este archivo (`CHANGELOG_v103.md`). Datos fijos al inicio (IP del teléfono 192.168.100.43, puerto 8001, TV 192.168.100.14). Se sube al repo con: `cd ~/castv-nuevo/castv-fresh` → `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v103.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v103 (icono confirmado, cierre del día)"` → `git push origin main`.
 
 - **v102 (18 nov 2026):** Ariel dijo **"Dale"** a ICONO-1 (aprueba el recorte). **Entregado `icono_nuevo.patch`** (3 archivos), verificado otra vez con `git apply --check` sobre una copia limpia con los XML reales; sigue 🧪 hasta que compile en verde y Ariel diga "ya funciona". **Siguiente:** Ariel sube este changelog, aplica el parche, espera el build, instala y mira el icono (cajón de apps, pantalla de inicio y, si lo usa, iconos temáticos). Si el icono no cambia, reiniciar el lanzador o reinstalar antes de dar por fallido. Después, **NOW-1** (se pedirá `MainActivity.kt`; comando abajo). **Cómo retomar:** pasar solo `CHANGELOG_v102.md`; subir con `cd ~/castv-nuevo/castv-fresh` → `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v102.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v102 (icono entregado)"` → `git push origin main`. **Para NOW-1:** `cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt`.
 
@@ -749,6 +762,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **ICONO-1 nuevo icono (18 nov 2026):** `drawable-nodpi/ic_launcher_tv.jpg` (512×512) como `foreground` en `mipmap-anydpi-v26/ic_launcher.xml` e `ic_launcher_round.xml`; el `monochrome` sigue con el vector.
 - **CATALOGO-1 listas preinstaladas de iptv-org (18 nov 2026):** `Catalog.kt` (nuevo), `Store.installCatalog()` y `distinctBy` en `M3uActivity.loadList()`; 30 listas más Free-TV, una sola vez por versión.
 - **MUS-1 video + audio unidos en canales con audio aparte (18 nov 2026):** `joinAudio()`, `refreshAudio()` y la clase `TsMux` en `MediaServer.kt`; más la corrección de fragmentos viejos al arrancar un canal en vivo.
 - **LIVE-2 un flujo por canal con buffer y `Range` (18 nov 2026):** `hubs`/`LiveHub`/`HubStream`/`NullTsStream` y `serveLive()` con 206 en `MediaServer.kt`; canales en vivo fluidos en la TV.
