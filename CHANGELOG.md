@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v33)
+# Registro de cambios y guía de continuidad – CASTV (v34)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -21,10 +21,11 @@
 
 ---
 
-## 📍 Estado Actual (v33)
+## 📍 Estado Actual (v34)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
+- ✅ **Historial de enlaces y favoritos sueltos (17 nov 2026):** confirmado por Ariel.
 - ✅ **Reproducción base:** Archivos locales (mp3/mp4) y enlaces externos mp4 por `/relay` (incluye redirección 302) funcionan en TV Hisense HL1 y en móvil (`VideoPlayerActivity` con subtítulos `.srt/.vtt`, siguiente automático y botón 📺 TV).
 - ❌ **HLS (`.m3u8`) al TV:** El TV Hisense no sigue los enlaces de listas HLS; HLS queda solo para el móvil.
 - ⏳ **Pendiente en TV:** Diagnóstico de adelantar (*seek*) en enlaces por `/relay`, pausa/detener enlaces y salir con enlace activo.
@@ -62,41 +63,19 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
-### 🧪 Historial de enlaces y favoritos sueltos (`historial_enlaces.patch`) — pendiente de aplicar y probar
+### ✅ Historial de enlaces y favoritos sueltos — confirmado por Ariel el 17 nov 2026
 
-- **Estado:** 🧪 entregado el 17 nov 2026; **no se marca ✅ hasta que Ariel confirme que compiló en verde y diga "ya funciona"**.
-- **Qué hace:**
-  1. Cada enlace que se reproduce desde ⋮ → "Reproducir enlace…" (al TV o al móvil) se guarda en un historial: los **20 más recientes** (los repetidos suben al principio).
-  2. En el diálogo "Reproducir enlace", el botón de la izquierda (antes "Cancelar") ahora es **🕘 Historial** (se cancela tocando fuera del diálogo o con atrás).
-  3. En el historial se ve cada enlace con `★` si es favorito, título y dominio. Al tocar uno salen: **📺 Al TV**, **📱 En el móvil**, **★ Marcar / ☆ Quitar favorito**, **🗑 Quitar del historial**.
-  4. Los **favoritos no se borran nunca** por antigüedad; el botón **Borrar historial** quita solo los que no son favoritos. Los favoritos salen primero.
-- **Archivos que toca (solo 2, cambios aditivos):**
-  - `Store.kt`: nueva clase `SavedLink(url, title, fav, t)` y funciones `links()`, `addLink()`, `toggleLinkFav()`, `removeLink()`, `clearRecentLinks()`. Guarda en el `SharedPreferences` existente (`castv_lib`, clave `links`, JSON). No cambia nada de lo anterior.
-  - `MainActivity.kt`: `askLinkAndPlay()` (botón neutral), dos funciones nuevas `showLinkHistory()` y `showLinkActions()`, y una línea `Store.addLink(url, title)` en `playLink()` tras validar el enlace.
-- **No toca:** servidor, `/relay`, `TvController`, reproductor de video, layouts XML ni el manifiesto.
-- **Verificado antes de entregar:** el parche aplica limpio (`git apply --check`) sobre los `MainActivity.kt` y `Store.kt` que Ariel adjuntó el 17 nov 2026; nombres reales usados: `playLink`, `linkTitle`, `askLinkAndPlay`, `toast`, `AlertDialog` (androidx), `Uri`. No se pudo compilar aquí; el build de GitHub es la primera prueba.
-- **Probar:**
-  1. ⋮ → Reproducir enlace… → pega un mp4 y toca "📱 En el móvil". Cierra el reproductor.
-  2. Abre otra vez ⋮ → Reproducir enlace… → **🕘 Historial**: debe estar el enlace con su dominio.
-  3. Tócalo → **★ Marcar favorito**: vuelve a la lista y sale con ★ arriba.
-  4. Reproduce 3 enlaces más: los más nuevos van arriba (después de los favoritos).
-  5. **Borrar historial**: quedan solo los favoritos.
-  6. Tócalo → **📺 Al TV** y **🗑 Quitar del historial** funcionan.
-  7. Cierra la app y ábrela: el historial se conserva.
+- Hecho y probado: historial de los últimos 20 enlaces, botón **🕘 Historial** en "Reproducir enlace", ★ favoritos que no se borran, **📺 Al TV** / **📱 En el móvil** / **Quitar** desde el historial, **Borrar historial**.
+- Archivos: `Store.kt` (`SavedLink`, `links()`, `addLink()`, `toggleLinkFav()`, `removeLink()`, `clearRecentLinks()`) y `MainActivity.kt` (`showLinkHistory()`, `showLinkActions()`, `Store.addLink` en `playLink`). Parche: `historial_enlaces.patch`.
 - **Si falla:** `git revert` del commit "Historial de enlaces y favoritos sueltos".
-- **Riesgo:** bajo. Es aditivo y no cambia cómo se reproduce nada.
-- **Pasos en Termux:**
-  ```bash
-  cd ~/castv-nuevo/castv-fresh && pwd
-  git apply --exclude=CHANGELOG.md ~/storage/downloads/historial_enlaces.patch
-  grep -c "showLinkHistory" app/src/main/java/com/castv/app/MainActivity.kt
-  cp ~/storage/downloads/CHANGELOG_v33.md CHANGELOG.md
-  git add -A && git commit -m "Historial de enlaces y favoritos sueltos" && git push origin main
-  ```
-  (el `grep` debe dar un número mayor que 0).
 
-### Siguiente después de este
-- **Etapa 13-B.1 Parser M3U** (`M3uParser.kt`), reutilizando el historial de enlaces para guardar las listas.
+### ⏭️ Siguiente (por elegir): Etapa 13-B.1 — Parser M3U
+
+- **Idea:** pantalla nueva (`M3uActivity`, creada por código, sin XML) para cargar listas `.m3u/.m3u8` por enlace, con buscador y filtro por `group-title`; tocar un canal lo manda al móvil o al TV con el mismo `playLink`. Parser en `M3uParser.kt` (modular, lectura en segundo plano). Listas guardadas en `Store.kt`.
+- **Archivos nuevos/tocados previstos:** `M3uParser.kt` (nuevo), `M3uActivity.kt` (nuevo), `AndroidManifest.xml` (registrar la actividad), `Store.kt` (listas guardadas), `MainActivity.kt` (entrada en ⋮ y llamada a `playLink`).
+- **Falta pedir a Ariel:** `AndroidManifest.xml` actual. Este plan se detalla en 🧪 en el siguiente changelog antes de entregar cualquier código.
+- **Recordatorio:** HLS al TV no funciona en el Hisense; los canales en vivo `.m3u8` irán al móvil.
+- **Listas para probar (legales):** `https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8` (canales gratuitos de emisión abierta) y la página por país en https://github.com/Free-TV/IPTV.
 
 ### Notas de este día
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
@@ -105,6 +84,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **Historial de enlaces + favoritos sueltos (17 nov 2026):** `SavedLink` en `Store.kt`, 🕘 Historial en "Reproducir enlace".
 - **Etapa 14-C:** Extracción de `PortDialog.kt` y `TvSend.kt`.
 - **Etapa 14-A / 14-B (`ac51ab7`):** `CastvUtils.kt` (texto/red) y mensajes de error claros.
 - **Etapa 13-A.1 / 13-A.2 (`98bcf78`, `11d93df`):** Búsqueda de puerto libre (8000-8010) y servidor `/relay` para enlaces externos mp4 al TV.
