@@ -1,0 +1,278 @@
+diff --git a/app/src/main/java/com/castv/app/Backup.kt b/app/src/main/java/com/castv/app/Backup.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/main/java/com/castv/app/Backup.kt
+@@ -0,0 +1,132 @@
++package com.castv.app
++
++import android.content.Context
++import org.json.JSONArray
++import org.json.JSONObject
++import java.io.ByteArrayOutputStream
++import java.io.InputStream
++
++/**
++ * Respaldo de los datos del usuario en un archivo JSON (favoritos, listas, historial de enlaces,
++ * listas M3U, favoritos de canales y ajustes). No incluye la IP del TV, ni los puntos de
++ * reanudación ni las estadísticas de uso.
++ *
++ * Importar REEMPLAZA los datos actuales. Antes de tocar nada, todo el archivo se lee y se valida.
++ */
++object Backup {
++    private const val APP = "castv"
++    private const val VERSION = 1
++    private val FILES = listOf("castv_lib", "castv")
++    private val SKIP = setOf("tvIp")   // dato propio de cada red/TV: no se respalda
++
++    /** Arma el JSON con las preferencias de la app. */
++    fun build(ctx: Context): String {
++        val root = JSONObject()
++        root.put("app", APP)
++        root.put("v", VERSION)
++        root.put("time", System.currentTimeMillis())
++        val prefsObj = JSONObject()
++        for (name in FILES) {
++            val sp = ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
++            val o = JSONObject()
++            loop@ for ((k, v) in sp.all) {
++                if (name == "castv" && k in SKIP) continue@loop
++                val e = JSONObject()
++                when (v) {
++                    is String -> e.put("t", "s").put("v", v)
++                    is Int -> e.put("t", "i").put("v", v)
++                    is Long -> e.put("t", "l").put("v", v)
++                    is Float -> e.put("t", "f").put("v", v.toDouble())
++                    is Boolean -> e.put("t", "b").put("v", v)
++                    is Set<*> -> e.put("t", "ss").put("v", JSONArray(v.map { it.toString() }))
++                    else -> continue@loop
++                }
++                o.put(k, e)
++            }
++            prefsObj.put(name, o)
++        }
++        root.put("prefs", prefsObj)
++        return root.toString(2)
++    }
++
++    /** Lee un archivo como texto UTF-8; devuelve null si pasa del límite (evita archivos gigantes por error). */
++    fun readLimited(ins: InputStream, max: Int = 5_000_000): String? {
++        val out = ByteArrayOutputStream()
++        val chunk = ByteArray(8192)
++        var total = 0
++        while (true) {
++            val n = ins.read(chunk)
++            if (n < 0) break
++            total += n
++            if (total > max) return null
++            out.write(chunk, 0, n)
++        }
++        return out.toString("UTF-8")
++    }
++
++    /** Devuelve null si todo salió bien, o un mensaje de error (y en ese caso no se cambió nada). */
++    fun restore(ctx: Context, text: String): String? {
++        val root = try { JSONObject(text) } catch (e: Exception) { return "El archivo no es un respaldo válido." }
++        if (root.optString("app") != APP) return "Este archivo no es un respaldo de CASTV."
++        val ver = root.optInt("v", 0)
++        if (ver < 1) return "El respaldo no tiene una versión válida."
++        if (ver > VERSION) return "El respaldo es de una versión más nueva de CASTV. Actualiza la app."
++        val prefs = root.optJSONObject("prefs") ?: return "El respaldo está vacío."
++
++        // 1) Leer y validar todo en memoria
++        val staged = LinkedHashMap<String, Map<String, Any>>()
++        try {
++            for (name in FILES) {
++                val o = prefs.optJSONObject(name) ?: continue
++                val m = LinkedHashMap<String, Any>()
++                val keys = o.keys()
++                while (keys.hasNext()) {
++                    val k = keys.next()
++                    if (name == "castv" && k in SKIP) continue
++                    val e = o.getJSONObject(k)
++                    val v: Any = when (e.getString("t")) {
++                        "s" -> e.getString("v")
++                        "i" -> e.getInt("v")
++                        "l" -> e.getLong("v")
++                        "f" -> e.getDouble("v").toFloat()
++                        "b" -> e.getBoolean("v")
++                        "ss" -> {
++                            val a = e.getJSONArray("v")
++                            val set = HashSet<String>()
++                            for (i in 0 until a.length()) set.add(a.getString(i))
++                            set
++                        }
++                        else -> throw IllegalArgumentException("tipo desconocido")
++                    }
++                    m[k] = v
++                }
++                staged[name] = m
++            }
++        } catch (e: Exception) {
++            return "El respaldo está dañado."
++        }
++        if (staged.isEmpty()) return "El respaldo está vacío."
++
++        // 2) Aplicar: reemplaza lo actual (salvo lo que no se respalda)
++        for ((name, m) in staged) {
++            val sp = ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
++            val ed = sp.edit()
++            for (k in sp.all.keys) {
++                if (name == "castv" && k in SKIP) continue
++                ed.remove(k)
++            }
++            for ((k, v) in m) {
++                when (v) {
++                    is String -> ed.putString(k, v)
++                    is Int -> ed.putInt(k, v)
++                    is Long -> ed.putLong(k, v)
++                    is Float -> ed.putFloat(k, v)
++                    is Boolean -> ed.putBoolean(k, v)
++                    is Set<*> -> ed.putStringSet(k, v.map { it.toString() }.toSet())
++                }
++            }
++            ed.commit()
++        }
++        return null
++    }
++}
+diff --git a/app/src/main/java/com/castv/app/MainActivity.kt b/app/src/main/java/com/castv/app/MainActivity.kt
+--- a/app/src/main/java/com/castv/app/MainActivity.kt
++++ b/app/src/main/java/com/castv/app/MainActivity.kt
+@@ -910,6 +910,7 @@
+         }
+         pm.menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
+         pm.menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
++        pm.menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
+         pm.menu.add(0, 11, 12, "Mis redes y contacto")
+         pm.setOnMenuItemClickListener { mi ->
+             when (mi.itemId) {
+@@ -932,12 +933,88 @@
+                 14 -> toggleTrash()
+                 15 -> askLinkAndPlay()
+                 16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
++                17 -> showBackupMenu()
+             }
+             true
+         }
+         pm.show()
+     }
+ 
++    // ------------------------------------------- Respaldo (exportar / importar)
++
++    @Suppress("DEPRECATION")
++    private fun showBackupMenu() {
++        AlertDialog.Builder(this)
++            .setTitle("Respaldo")
++            .setItems(arrayOf("📤 Exportar respaldo", "📥 Importar respaldo")) { _, which ->
++                try {
++                    if (which == 0) {
++                        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
++                            .format(java.util.Date())
++                        val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
++                            .addCategory(Intent.CATEGORY_OPENABLE)
++                            .setType("application/json")
++                            .putExtra(Intent.EXTRA_TITLE, "castv_respaldo_$day.json")
++                        startActivityForResult(i, reqBackupOut)
++                    } else {
++                        val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
++                            .addCategory(Intent.CATEGORY_OPENABLE)
++                            .setType("*/*")
++                        startActivityForResult(i, reqBackupIn)
++                    }
++                } catch (e: Exception) {
++                    toast("No se pudo abrir el selector de archivos")
++                }
++            }
++            .setNegativeButton("Cerrar", null)
++            .show()
++    }
++
++    private fun doExport(uri: Uri) {
++        thread {
++            val ok = try {
++                val json = Backup.build(this)
++                contentResolver.openOutputStream(uri, "wt")?.use { it.write(json.toByteArray(Charsets.UTF_8)) } != null
++            } catch (e: Exception) {
++                DebugLog.add("RESPALDO: error al exportar: ${e.javaClass.simpleName}: ${e.message}")
++                false
++            }
++            runOnUiThread { toast(if (ok) "✅ Respaldo guardado" else "❌ No se pudo guardar el respaldo") }
++        }
++    }
++
++    private fun confirmImport(uri: Uri) {
++        AlertDialog.Builder(this)
++            .setTitle("¿Importar respaldo?")
++            .setMessage("Esto REEMPLAZA tus favoritos, listas, historial de enlaces, listas M3U y ajustes actuales por los del archivo. Los puntos de reanudación, las estadísticas y el TV elegido no cambian. Si suena algo en el teléfono, se detendrá.")
++            .setNegativeButton("Cancelar", null)
++            .setPositiveButton("Importar") { _, _ -> doImport(uri) }
++            .show()
++    }
++
++    private fun doImport(uri: Uri) {
++        thread {
++            var err: String? = null
++            try {
++                val text = contentResolver.openInputStream(uri)?.use { Backup.readLimited(it) }
++                err = if (text == null) "No se pudo leer el archivo (o es demasiado grande)." else Backup.restore(this, text)
++            } catch (e: Exception) {
++                DebugLog.add("RESPALDO: error al importar: ${e.javaClass.simpleName}: ${e.message}")
++                err = "No se pudo leer el archivo."
++            }
++            val msg = err
++            runOnUiThread {
++                if (msg != null) {
++                    toast("❌ $msg")
++                } else {
++                    Store.reload()
++                    toast("✅ Respaldo importado")
++                    recreate()   // aplica tema, color, orden y demás ajustes
++                }
++            }
++        }
++    }
++
+     private fun openWhatsapp() {
+         val url = "https://wa.me/18094480441?text=" +
+                 Uri.encode("Hola Ariel, vi tu app CASTV 2.0 y está excelente!")
+@@ -1789,6 +1866,8 @@
+     private val reqDeleteOne = 4712
+     private val reqVideo = 4713
+     private val reqM3u = 4714   // [Etapa 13-B] listas M3U
++    private val reqBackupOut = 4716   // [Respaldo JSON] exportar
++    private val reqBackupIn = 4717    // [Respaldo JSON] importar
+     private var selecting = false
+     private val selectedIds = HashSet<Long>()
+     private var actionMode: ActionMode? = null
+@@ -1951,6 +2030,14 @@
+                 pendingDelete = emptyList()
+                 finishDelete()
+             }
++            reqBackupOut -> {
++                val u = data?.data
++                if (resultCode == RESULT_OK && u != null) doExport(u)
++            }
++            reqBackupIn -> {
++                val u = data?.data
++                if (resultCode == RESULT_OK && u != null) confirmImport(u)
++            }
+             reqM3u -> {
+                 // [Etapa 13-B] canal elegido en Listas M3U: se reproduce con "Reproducir enlace"
+                 if (resultCode == RESULT_OK && data != null && data.hasExtra("m3uUrl")) {
+diff --git a/app/src/main/java/com/castv/app/Store.kt b/app/src/main/java/com/castv/app/Store.kt
+--- a/app/src/main/java/com/castv/app/Store.kt
++++ b/app/src/main/java/com/castv/app/Store.kt
+@@ -35,6 +35,13 @@
+         loadLists()
+     }
+ 
++    /** Vuelve a leer favoritos y listas desde las preferencias (se usa tras importar un respaldo). */
++    fun reload() {
++        if (!::prefs.isInitialized) return
++        favs = HashSet(prefs.getStringSet("fav", emptySet()) ?: emptySet())
++        loadLists()
++    }
++
+     fun key(item: MediaItem): String =
+         (if (item.isMusic) "a" else "v") + "|" + item.name.lowercase() + "|" + item.durationSec
+ 
