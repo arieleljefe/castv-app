@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v39)
+# Registro de cambios y guía de continuidad – CASTV (v40)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -22,10 +22,11 @@
 
 ---
 
-## 📍 Estado Actual (v39)
+## 📍 Estado Actual (v40)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
+- ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
 - ✅ **Historial de enlaces y favoritos sueltos (17 nov 2026):** confirmado por Ariel.
@@ -52,7 +53,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
    - *Qué:* Deslizar derecha (brillo), izquierda (volumen) y doble toque lateral (±10s).
    - *Pros:* Comodidad moderna sin botones físicos; 100% testable en móvil.
    - *Contras:* Riesgo de toques accidentales si no se dejan márgenes seguros en los bordes.
-4. **Respaldo Exportar/Importar (Backup JSON) — Beneficio: Alto (8/10)**
+4. **Respaldo Exportar/Importar (Backup JSON) ✅ — Beneficio: Alto (8/10)**
    - *Qué:* Guardar/restaurar favoritos, listas M3U y ajustes usando `Intent.ACTION_CREATE_DOCUMENT` / `OPEN_DOCUMENT`.
    - *Pros:* Protege configuraciones al reinstalar APKs de prueba; cero librerías extra.
    - *Contras:* Referencias a archivos locales pueden variar si se cambia de teléfono.
@@ -67,6 +68,14 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 ---
 
 ## 🛠️ Parche en Curso / Próximo Paso
+
+### ✅ Respaldo Exportar/Importar JSON — confirmado por Ariel el 17 nov 2026
+
+- Hecho y probado: ⋮ → **Respaldo (exportar/importar)…** → 📤 Exportar (guarda `castv_respaldo_AAAA-MM-DD.json` donde se elija) y 📥 Importar (pide confirmación, **reemplaza** lo actual, valida el archivo antes de tocar nada y reinicia la pantalla con `recreate()` para aplicar tema/color/orden).
+- Incluye: favoritos, listas de reproducción, historial y favoritos de enlaces, listas M3U, favoritos de canales y ajustes. **No incluye:** IP del TV, puntos de reanudación ni estadísticas. Límite de lectura: 5 MB.
+- Archivos: `Backup.kt` (nuevo: `build()`, `restore()`, `readLimited()`), `Store.kt` (`reload()`), `MainActivity.kt` (menú id 17, `showBackupMenu()`, `doExport()`, `confirmImport()`, `doImport()`, códigos 4716/4717). Parche: `respaldo_json.patch`. Sin permisos ni cambios en el manifest.
+- Nota: si suena algo local en el teléfono, se detiene al importar (por el `recreate()`).
+- **Si falla:** `git revert` del commit "Respaldo exportar/importar (v39)".
 
 ### ✅ Gestos en el reproductor de video — confirmado por Ariel el 17 nov 2026
 
@@ -97,14 +106,11 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **🧪 Respaldo Exportar/Importar JSON** — plan detallado, **parche aún no entregado**. Decisión tomada: importar **reemplaza** lo actual (con confirmación).
-   - Archivos: `Backup.kt` (nuevo), `Store.kt` (`reload()`), `MainActivity.kt` (menú id 17, diálogo, códigos 4716/4717, `ACTION_CREATE_DOCUMENT`/`OPEN_DOCUMENT`, `recreate()` tras importar). Sin permisos ni cambios en el manifest.
-   - Incluye: favoritos, listas de reproducción, historial y favoritos de enlaces, listas M3U, favoritos de canales, ajustes (tema, color, orden, repetir, salida, papelera, ecualizador). No incluye: IP del TV, puntos de reanudación, estadísticas.
-   - Valida que sea respaldo de CASTV (versión 1) antes de tocar nada. **Si falla:** `git revert` del commit "Respaldo exportar/importar (v39)".
-2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno): primer candidato del banco de ideas VLC (ver abajo).
-3. **Pulido visual / interfaz estilo VLC** (ver "Visión de interfaz").
-4. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
-5. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
+1. **Interfaz estilo VLC, fase UI-1: navegación inferior** (ver "Visión de interfaz"). Necesita `MainActivity.kt` actual; se detalla en 🧪 antes del código.
+2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
+3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
+4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
+5. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"; ver notas). Necesita el archivo `.github/workflows/*.yml`.
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
 
 ---
@@ -161,12 +167,14 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 ---
 
 ### Notas de este día
+- **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
 
 ---
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **Respaldo Exportar/Importar JSON (17 nov 2026):** `Backup.kt`, `Store.reload()`, menú id 17 en `MainActivity.kt`.
 - **Gestos en el reproductor (17 nov 2026):** brillo, volumen y doble toque ±10 s (`VideoPlayerActivity.kt`).
 - **Etapa 13-B.2 (17 nov 2026):** Canales más cómodos y ★ favoritos de canales (`M3uActivity.kt`, `Store.kt`).
 - **Etapa 13-B.1 (17 nov 2026):** Listas M3U (`M3uParser.kt`, `M3uActivity.kt`, `Store.kt`).
