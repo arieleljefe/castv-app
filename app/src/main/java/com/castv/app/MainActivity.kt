@@ -177,6 +177,8 @@ class MainActivity : AppCompatActivity() {
     private var unsupportedSkips = 0
     @Volatile private var playingItem: MediaItem? = null
     @Volatile private var linkOnTv = false   // [PAUSA-1] hay un enlace de video sonando en el TV (playingItem sigue en null)
+    @Volatile private var linkDurSec = 0     // [PROG-1d] duración del enlace en el TV, leída por el teléfono (el TV siempre manda 0)
+    @Volatile private var linkGen = 0        // [PROG-1d] número del enlace actual, para descartar lecturas viejas
     private var showingMusic = false
     private var repeatMode = Repeat.OFF
     private var selectedArtist: String? = null
@@ -432,7 +434,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 thread { TvController.stop() }
                 resetProgress()
-                linkOnTv = false   // [PAUSA-1] tras Detener ya no hay enlace que pausar
+                linkOnTv = false; linkDurSec = 0   // [PAUSA-1] tras Detener ya no hay enlace que pausar
             }
             adapter.notifyDataSetChanged()
         }
@@ -1302,6 +1304,7 @@ class MainActivity : AppCompatActivity() {
         val title = titleOverride?.takeIf { it.isNotBlank() } ?: linkTitle(url)
         Store.addLink(url, title)   // historial de enlaces
         linkOnTv = false   // [PAUSA-1] se vuelve a marcar solo si el TV acepta este enlace
+        linkDurSec = 0; val gen = ++linkGen   // [PROG-1d] enlace nuevo: duración en cero
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
         stopLocal()
         adapter.playingId = -1
@@ -1332,12 +1335,34 @@ class MainActivity : AppCompatActivity() {
             DebugLog.add("ENLACE: $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
             if (ok) linkOnTv = true   // [PAUSA-1] ⏸/▶ ahora controlan el enlace del TV
+            if (ok) readLinkDuration(sendUrl, gen)   // [PROG-1d] el TV no informa la duración: la lee el teléfono
             runOnUiThread {
                 if (ok) tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
                     else "❌ El TV no aceptó el enlace. ¿Está encendido y en el mismo Wi-Fi? Prueba otro enlace mp4.")
             }
+        }
+    }
+
+    // [PROG-1d] El TV Hisense informa siempre 00:00:00 para los enlaces; el teléfono lee la duración
+    // del mismo video (por el relay, que ya maneja redirecciones y rangos) sin librerías extra.
+    private fun readLinkDuration(src: String, gen: Int) {
+        thread {
+            var secs = 0
+            val mmr = android.media.MediaMetadataRetriever()
+            try {
+                mmr.setDataSource(src, HashMap<String, String>())
+                val ms = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                secs = (ms / 1000).toInt()
+            } catch (e: Exception) {
+                DebugLog.add("DURACION enlace EXCEPCION ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                try { mmr.release() } catch (e: Exception) { }
+            }
+            if (gen != linkGen) return@thread   // ya hay otro enlace: se descarta
+            DebugLog.add(if (secs > 0) "DURACION enlace: $secs s" else "DURACION enlace: no se pudo leer")
+            if (secs > 0) linkDurSec = secs
         }
     }
 
@@ -1380,7 +1405,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         playingItem = item
-        linkOnTv = false   // [PAUSA-1] lo nuevo reemplaza al enlace
+        linkOnTv = false; linkDurSec = 0   // [PAUSA-1] lo nuevo reemplaza al enlace
         Store.registerPlay(item)
         pendingResume = resumeAt
         resumeTries = 0
@@ -1512,7 +1537,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { updateOutputButton() }
             }
             val (pos, rawDur) = info
-            val dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: 0)
+            val dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: (if (linkOnTv) linkDurSec else 0))   // [PROG-1d]
             lastPos = pos
             lastDur = dur
             runOnUiThread {
@@ -2133,7 +2158,7 @@ class MainActivity : AppCompatActivity() {
         manualStop = true
         if (localActive) stopLocal() else thread { TvController.stop() }
         playingItem = null
-        linkOnTv = false   // [PAUSA-1]
+        linkOnTv = false; linkDurSec = 0   // [PAUSA-1]
         resetProgress()
         lastNotifKey = ""
         postDefaultNotification()
