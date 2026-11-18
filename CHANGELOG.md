@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v56)
+# Registro de cambios y guía de continuidad – CASTV (v64)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -25,11 +25,12 @@
 
 ---
 
-## 📍 Estado Actual (v55)
+## 📍 Estado Actual (v64)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **SEL-1 Acciones en la selección múltiple (18 nov 2026):** aplicada y probada en el teléfono; Ariel confirmó que **va bien**. El menú ⋮ de la barra de selección suma ➕ A la cola, ★/☆ Favoritos y 📃 A una lista; ver "Parche en Curso".
-- 🧪 **PAUSA-1 El botón ⏸/▶ no pausa el enlace que va al TV (18 nov 2026):** plan aprobado por Ariel; **parche entregado** (`pausa_enlace_tv.patch`, 1 archivo, 8 líneas nuevas y 2 cambiadas, comprobado con `git apply --check` contra el `MainActivity.kt` real). **Falta que Ariel lo aplique, compile en verde y diga "ya funciona"**; ver "Parche en Curso".
+- ✅ **PAUSA-1 El botón ⏸/▶ ahora pausa y reanuda el enlace que va al TV (18 nov 2026):** aplicada, compiló y Ariel confirmó: "se puede bien ya y la app no se cierra… todo salió bien". Parche `pausa_enlace_tv.patch` (`MainActivity.kt`, campo `linkOnTv`). **Sin reportar aún:** adelantar con video largo y qué pasa al cerrar la app con el video en el TV (siguen ⏳ en la línea de pruebas en TV).
+- 🧪 **PROG-1 Progreso y duración del video cuando va al TV (18 nov 2026):** aplicado y compiló; **resultado parcial de Ariel con captura (12:09):** ✅ el título del enlace aparece y el **tiempo transcurrido corre** (0:08); ❌ **la duración sigue en `--:--` y el puntito de la barra no avanza**. Con música local todo va bien. Causa probable: el TV no informa la duración del enlace (la app recibe 0 y deshabilita la barra). **No se marca ✅.** El diagnóstico PROG-1c mostró que el TV manda siempre `00:00:00`; **PROG-1d (el teléfono lee la duración con `MediaMetadataRetriever`) entregado; Ariel aún NO lo instalaba al 18 nov 2026 (nueva sesión): comandos de instalación re-entregados, pendiente de aplicar y probar.**
 - 🧪 **DOC-1 Limpieza de inconsistencias del changelog (18 nov 2026):** solo texto de este archivo (sin cambios en la app); esperando que Ariel lo revise y confirme; ver "Parche en Curso".
 - ✅ **UI-S1 Estilo de subtítulos (18 nov 2026):** aplicada, compiló en verde y Ariel confirmó **"ya funciona"**. Opción 🎨 en el menú 💬 del reproductor: tamaño, negrita, color y fondo.
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
@@ -45,7 +46,7 @@
 - ✅ **Reproducción base:** Archivos locales (mp3/mp4) y enlaces externos mp4 por `/relay` (incluye redirección 302) funcionan en TV Hisense HL1 y en móvil (`VideoPlayerActivity` con subtítulos `.srt/.vtt`, siguiente automático y botón 📺 TV).
 - ❌ **HLS (`.m3u8`) al TV:** El TV Hisense no sigue los enlaces de listas HLS; HLS queda solo para el móvil.
 - ✅ **Prueba en TV (18 nov 2026, 1.º enlace del conejo, el del Historial):** adelantar y detener funcionaron bien (confirmado por Ariel).
-- ⏳ **Prueba en TV (18 nov 2026, 2.º enlace, 1080p 60 fps):** el lag era por el peso del video (el 360p corre fluido, confirmado por Ariel). **Causa de que "al pausar se cierra el video" encontrada: ver PAUSA-1** (el botón ⏸ manda la siguiente canción al TV, no una pausa). El log mostró el relay sano (`RELAY 206/200`, 991017 bytes completos) y ningún `SOAP Pause`. Sigue ⏳ hasta que Ariel pruebe el parche. Falta aún: adelantar con un video largo y liviano (30 fps) y confirmar si al cerrar la app el video sigue en el TV.
+- ⏳ **Prueba en TV (18 nov 2026, 2.º enlace, 1080p 60 fps):** el lag era por el peso del video (el 360p corre fluido, confirmado por Ariel). **Causa de que "al pausar se cierra el video" encontrada: ver PAUSA-1** (el botón ⏸ manda la siguiente canción al TV, no una pausa). El log mostró el relay sano (`RELAY 206/200`, 991017 bytes completos) y ningún `SOAP Pause`. PAUSA-1 ya quedó ✅ (pausa/reanuda bien). Sigue ⏳ lo demás. Falta aún: adelantar con un video largo y liviano (30 fps) y confirmar si al cerrar la app el video sigue en el TV.
 - ⬜ **Mejora anotada (18 nov 2026):** el reproductor de la app no muestra progreso ni duración cuando el video va al TV (ver "Siguiente" punto 7).
 
 ---
@@ -59,8 +60,9 @@
 | ✅ | El conejo que ya funcionó antes | El enlace exacto no está anotado; está en 🕘 Historial de "Reproducir enlace". **Pendiente: pegarlo aquí.** |
 | ❌ | `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4` | El TV no lo soporta (Ariel, 18 nov 2026). |
 | ⚠️ | `http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_60fps_normal.mp4` | 1080p a 60 fps. Mucho lag (Ariel, 18 nov 2026); falta confirmar que fue este el enlace probado. El log del relay muestra que lo pidió completo, con los mismos rangos repetidos (el TV no daba abasto). |
-| ✅ | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4` | Se ve fluido en el TV (Ariel, 18 nov 2026). Dura 10 s, no sirve para probar adelantar. Al pausar el TV cambiaba a una canción (ver PAUSA-1). |
-| 🧪 | `http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4` | Se mandó al TV (log 11:03:28) y el relay respondió bien, pero **Ariel no ha confirmado cómo se vio**. 1080p a 30 fps, unos 10 min; más liviano que la versión de 60 fps. Sirve para probar adelantar y pausar. |
+| ✅ | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4` | Se ve fluido en el TV (Ariel, 18 nov 2026). Dura 10 s, no sirve para probar adelantar. Con PAUSA-1 la pausa funciona bien (Ariel, 18 nov 2026). |
+| ⚠️ | `http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4` | **Sigue con lag en el TV** (Ariel, 18 nov 2026, confirmado otra vez a las 12:09). 1080p a 30 fps, unos 10 min. Pausa funciona. Con PROG-1 muestra el tiempo pero no la duración. No sirve para probar adelantar por el lag. |
+| 🧪 | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4` | Sin probar. 720p, 10 s. Sirve para ver si el TV informa la duración (debería salir 0:10). Para probar adelantar aún falta un enlace largo y liviano. |
 
 Evitar: versiones AV1 (la mayoría de los TV no las reproducen) y 4K.
 
@@ -98,7 +100,44 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
-### 🧪 PAUSA-1 — El botón ⏸/▶ debe pausar el enlace que está en el TV — parche entregado, pendiente de aplicar y probar
+### 🧪 PROG-1b — Duración y barra con enlaces en el TV — ✅ diagnóstico hecho; **PROG-1d entregado (parche `duracion_enlace_tv.patch`), pendiente de aplicar y probar**
+
+- **Lo que se ve (Ariel, captura 12:09, 18 nov 2026):** con un enlace en el TV: título correcto, tiempo transcurrido corriendo, duración `--:--` y el puntito de la barra pegado al inicio. Con música local todo va bien.
+- **Resultado del diagnóstico PROG-1c (log `/log` de Ariel, 12:21-12:23, 18 nov 2026):** el TV manda `TrackDuration = 00:00:00` durante toda la reproducción (con los enlaces de 720p y 360p, de 10 s). El log solo imprime cuando el valor cambia y salió **una única línea** `POS crudo` (`dur='00:00:00'`), o sea que nunca cambió. El `TrackMetaData` solo repite el encabezado DIDL (primeros 200 caracteres, sin duración). **Conclusión: el TV Hisense HL1 no informa la duración de los enlaces; no es un problema de lectura → opción A descartada, se pasa a la opción B.** También se vio que el TV hace dos pedidos al relay por enlace (uno con `range=bytes=0-` y otro con `ua=curl`, `range=-`), ambos bien respondidos (206 y 200 con la longitud completa); no es un fallo.
+- **PROG-1d = opción B (el teléfono averigua la duración). Ariel aprobó con "Dale" y pasó `MainActivity_actual.kt` (2728 líneas); parche `duracion_enlace_tv.patch`, verificado con `git apply --check` (29 líneas nuevas, 4 cambiadas, solo `MainActivity.kt`):**
+  - **Idea:** cuando el TV acepta un enlace, la app lee la duración del mismo video en segundo plano con `MediaMetadataRetriever` (de Android, sin librerías ni licencias nuevas) y la usa cuando el TV informe 0.
+  - **Archivo que toca (solo uno):** `app/src/main/java/com/castv/app/MainActivity.kt`. No se tocan `TvController.kt`, `Store.kt`, el relay, manifest ni layouts (el permiso de internet ya existe).
+  - **Código (aditivo, verificado contra el `MainActivity.kt` real):**
+    1. Campo nuevo `@Volatile private var linkDurSec = 0` junto a `linkOnTv`, y un contador `linkGen` para descartar lecturas de un enlace anterior.
+    2. En `playLink` (modo TV): `linkDurSec = 0` al empezar; si el TV acepta (`ok`), un `thread {}` que abre la URL del relay (`http://IP:8001/relay/...`, la misma que lee el TV, así se reutiliza la redirección 302 y los rangos) con `MediaMetadataRetriever`, lee `METADATA_KEY_DURATION`, la pasa a segundos y la guarda en `linkDurSec` solo si `linkGen` sigue igual. Todo en `try/catch`; se anota en el log `DURACION enlace: N s` o `DURACION enlace: no se pudo leer`.
+    3. En `poll()`: la duración pasa a `dur = if (rawDur > 0) rawDur else (playingItem?.durationSec ?: if (linkOnTv) linkDurSec else 0)`.
+    4. `linkDurSec = 0` en los mismos lugares donde ya se limpia `linkOnTv` (inicio de `playLink`, `startPlayback`, `stopCurrentPlayback`, botón Detener).
+  - **Riesgos / límites (v1):** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba; (2) la duración aparece unos segundos después de empezar (lo que tarde en leerse); (3) mp4 con el índice al final o enlaces https raros pueden tardar o fallar → queda `--:--` como ahora; (4) canales en vivo (HLS) no tienen duración: seguirán en `--:--`; (5) la lectura pide un poco de datos al relay mientras el TV también lo usa (con el 1080p, que ya tiene lag, se vigila en la prueba).
+  - **Cómo probar:** (1) enlace de 720p/10 s: tras 1-3 s debe salir la duración `0:10` y el puntito avanzar; (2) enlace de 360p igual; (3) enlace 1080p/30 fps (unos 10 min): sale la duración y la barra avanza; (4) arrastrar la barra: el TV salta y sigue; (5) ⏸/▶ y ±10 s siguen bien; (6) música local al TV sin cambios; (7) un canal en vivo: sigue `--:--` sin errores; (8) mirar `/log`: línea `DURACION enlace`.
+  - **Aplicar (Termux, uno por uno):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/duracion_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PROG-1d duración del enlace en el TV leída por el teléfono"` → `git push origin main`. **Si falla:** `git revert` de ese commit.
+  - **Nota de implementación:** la lectura usa la URL del relay (`http://IP-DEL-TELEFONO:8001/relay/...`); funciona si Android permite http en la app (el relay ya baja enlaces http, como el de 1080p, así que se espera que sí). Si en el log sale `DURACION enlace EXCEPCION`, se pasa esa línea y se prueba con la URL original.
+- **C (último recurso, solo si B falla):** dejar solo el tiempo transcurrido y avisar "duración desconocida".
+
+### ✅ PROG-1c — Log de la duración cruda del TV (parche `log_duracion_tv.patch`) — aplicado; sirvió para el diagnóstico de arriba
+
+### 🧪 PROG-1 — Mostrar progreso y duración cuando un enlace va al TV — aplicado; resultado parcial, pendiente de PROG-1b
+
+- **Síntoma (Ariel, 18 nov 2026):** con un enlace en el TV, la barra de progreso no se mueve y no se ve cuánto lleva ni cuánto dura.
+- **Causa (verificada leyendo `MainActivity.kt` real):** el sondeo del TV `poll()` **sí pide** posición y duración (`TvController.getPositionInfo()`), pero solo las pinta si `playingItem != null` (línea ~1517). Un enlace deja `playingItem == null`, así que el dato llega y se descarta. El título tampoco se escribe en `tvNowPlaying` (solo `startPlayback` lo hace).
+- **Lo que ya sirve (no tocar):** el listener de la barra (`onStopTrackingTouch`) ya manda `TvController.seek()` al TV; los botones ±10 s ya usan `lastPos`/`lastDur`; `poll()` ya los actualiza.
+- **Cambio propuesto (aditivo, un solo archivo: `MainActivity.kt`):**
+  1. En `poll()`: la condición `if (!userSeeking && playingItem != null)` pasa a `if (!userSeeking && (playingItem != null || linkOnTv))`.
+  2. En `playLink` (modo TV), cuando el TV acepta (`ok`): escribir el título del enlace en `tvNowPlaying` y `resetProgress()` antes, para no mostrar el valor del video anterior.
+  - **Código exacto (3 líneas nuevas, 1 cambiada, solo `MainActivity.kt`):** en `poll()` la condición pasa a `(playingItem != null || linkOnTv)`; en `playLink`, `resetProgress()` justo antes del bloque "Directo al TV por DLNA" (corre en el hilo de la interfaz, antes del `thread {}`); y `if (ok) tvNowPlaying.text = title` dentro del `runOnUiThread` que ya existe. Nota: `resetProgress()` va antes de enviar (no solo si el TV acepta) para no dejar la barra del enlace anterior; si el TV rechaza, queda en 0:00.
+  - La duración sale de lo que informe el TV; si el TV informa 0 (algunos relays sin tamaño), se ve `--:--` pero el tiempo transcurrido sí corre.
+  - No se tocan `Store.kt`, `TvController`, el relay, el manifest ni layouts.
+- **Riesgos / límites (v1):** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba final; (2) no he visto `activity_main.xml` en esta sesión: si la barra del reproductor está oculta cuando `playingItem == null`, haría falta tocar la visibilidad y se pediría ese archivo antes de entregar; (3) mientras el relay vuelve a pedir rangos, la posición del TV puede saltar un poco; (4) al terminar el enlace la barra queda en el final hasta iniciar otra cosa (igual que el límite 2 de PAUSA-1).
+- **Cómo probar:** (1) mandar el enlace de 360p al TV: debe verse el tiempo corriendo y la duración (0:10); (2) mandar uno largo y liviano (720p/480p): la barra avanza, el tiempo y la duración se ven; (3) arrastrar la barra: el TV salta y la barra sigue desde ahí; (4) ⏪/⏩ ±10 s siguen igual; (5) ⏸/▶ de PAUSA-1 siguen bien; (6) con música local al TV, la barra funciona como antes; (7) ⏹ Detener deja la barra en 0:00.
+- **Aplicar (Termux, uno por uno; el `.patch` va en `~/storage/downloads/progreso_enlace_tv.patch`):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/progreso_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PROG-1 progreso del enlace en el TV"` → `git push origin main`.
+- **Resultado (Ariel, 18 nov 2026, captura 12:09):** compiló y se aplicó. Funciona: título del enlace en el reproductor y tiempo transcurrido corriendo. **No funciona:** duración (`--:--`) y avance del puntito. Música local sin cambios (bien). Se mantiene 🧪 hasta resolver PROG-1b.
+- **Si falla:** `git revert` del commit "PROG-1 progreso del enlace en el TV".
+
+### ✅ PAUSA-1 — El botón ⏸/▶ pausa el enlace que está en el TV — confirmado por Ariel el 18 nov 2026 ("se puede bien ya y la app no se cierra")
 
 - **Síntoma (Ariel, 18 nov 2026):** con un enlace de video en el TV, al tocar ⏸ el video "se cierra" y suena una canción del teléfono.
 - **Causa (verificada leyendo `MainActivity.kt` real, `castv_tv.txt`):** `playLink(..., toTv = true)` manda el enlace por DLNA pero **no fija `playingItem`** (queda `null`). Los dos botones ⏸/▶ (`btnQuick`, mini reproductor, y `btnPlay`, barra expandida) hacen `if (playingItem == null) step(+1) else togglePlayPause()`. Con `playingItem == null`, el toque cuenta como "siguiente" y se envía `/audio/NNNNNN.mp3` al TV, que reemplaza el video. El log lo confirma: 8 veces aparece `ENVIANDO ... /audio/...mp3` a los 4-8 s de un video, y **nunca** `SOAP Pause`.
@@ -113,7 +152,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
   - No se tocan `Store.kt`, `TvController`, el relay, el manifest ni layouts.
 - **Riesgos / límites (v1):** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba final; (2) cuando el enlace **termina** en el TV, `linkOnTv` sigue en `true` hasta que se inicie otra cosa, así que un ▶ después del final llamará a `play()` del TV en vez de pasar a la siguiente canción (se afina en otro parche si molesta); (3) no incluye barra de progreso/duración para enlaces en el TV (eso es el punto 7 de "Siguiente"); (4) hay que comprobar en la prueba que el icono ⏸/▶ cambie bien, porque con `playingItem == null` la notificación puede no refrescarlo igual.
 - **Cómo probar (con el enlace ✅ de 360p y el de 1080p a 30 fps):** (1) mandar el enlace al TV, tocar ⏸ del mini reproductor: el video **se queda en pausa** (no cambia a una canción) y el icono pasa a ▶; (2) tocar ▶: sigue desde donde estaba; (3) repetir con el ⏸ de la barra expandida; (4) con el de 1080p a 30 fps probar también adelantar, y mirar `/log`: debe salir `SOAP Pause`/`Play` y **ningún** `/audio/...mp3` nuevo; (5) con música local al TV, ⏸/▶ siguen igual que antes; (6) sin nada sonando, ▶ sigue arrancando la siguiente canción; (7) cerrar la app con el video en el TV y anotar si sigue sonando (pendiente de diagnóstico).
-- **Aplicar (Termux, uno por uno; el `.patch` va en `~/storage/downloads/pausa_enlace_tv.patch`):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/pausa_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PAUSA-1 pausa del enlace en el TV"` → `git push origin main`.
+- **Resultado:** aplicada y probada en el teléfono con el TV; ⏸/▶ pausan y reanudan el enlace sin cambiar a una canción y la app no se cierra. Pendiente de anotar (⏳): cerrar la app con el video en el TV. **Aplicar (Termux, uno por uno; el `.patch` va en `~/storage/downloads/pausa_enlace_tv.patch`):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/pausa_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PAUSA-1 pausa del enlace en el TV"` → `git push origin main`.
 - **Si falla:** `git revert` del commit "PAUSA-1 pausa del enlace en el TV".
 
 ### ✅ SEL-1 — Acciones en la selección múltiple — confirmado por Ariel el 18 nov 2026 ("lo acabo de probar y va bien")
@@ -230,7 +269,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-0. 🧪 **PAUSA-1: pausar/reanudar el enlace que está en el TV** (parche `pausa_enlace_tv.patch` entregado; **siguiente paso: Ariel lo aplica, espera el build verde y prueba con el enlace de 360p y el de 1080p a 30 fps**). Si sale bien: ✅ y se sigue con el punto 3 (detener reproducción local al enviar un canal M3U) o el diagnóstico de canales en vivo (punto 5, paso 0), a elección de Ariel.
+0. ✅ **PAUSA-1: pausar/reanudar el enlace que está en el TV** (confirmado 18 nov 2026). **Siguiente: probar PROG-1d (ver "Parche en Curso", PROG-1b) y pasar el resultado.** Después, a elección de Ariel: punto 3 (detener reproducción local al enviar un canal M3U) o diagnóstico de canales en vivo (punto 5, paso 0).
 1. ✅ **Estilo de subtítulos** (UI-S1, confirmado 18 nov 2026). Falta a futuro ⬜: contorno, codificación, idioma preferido, estilo por video y respaldo del estilo.
 2. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 3. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
@@ -249,7 +288,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
    - **Riesgos:** toca la barra de selección y el adaptador de `MainActivity.kt`; el cambio es aditivo y reutiliza las funciones que ya existen para un solo archivo (cola, favoritos, listas).
    - **Cómo probar (cuando exista):** seleccionar 5 pistas y mandarlas a la cola, a favoritos y a una lista; hacerlo igual con videos; "Todo" + acción; salir de la selección con atrás; ver que la insignia de Cola muestra el total correcto.
    - **Para empezar se necesitará:** `MainActivity.kt` actual (barra de selección y `showItemMenu`) y, si hace falta, `Store.kt` (se pedirán antes de entregar nada).
-7. ⬜ **Progreso y duración en el reproductor cuando el video va al TV** (observación de Ariel, 18 nov 2026; **sin parche ni plan aprobado todavía**). Hoy no se ve la barra de progreso ni lo que dura el video. Falta saber si el TV informa su posición o si la app tendrá que calcularla. Se decide después del diagnóstico de pausa/adelantar.
+7. 🧪 **Progreso y duración en el reproductor cuando el video va al TV** (observación de Ariel, 18 nov 2026; **PROG-1 aplicado con resultado parcial (tiempo sí, duración y barra no); ver PROG-1b**). La app ya recibe posición y duración del TV en cada sondeo; solo las descartaba cuando `playingItem == null`.
    - **Para empezar se necesitará:** `TvSend.kt`, el servidor `/relay` de `MainActivity.kt` y `VideoPlayerActivity.kt` (se pedirán antes de entregar nada).
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
 
@@ -330,6 +369,20 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ### Notas de este día
 
+- **PROG-1d re-entregado (18 nov 2026, nueva sesión):** Ariel dijo que todavía no instala `duracion_enlace_tv.patch`. Se revisó el parche contra el changelog v63: coincide (solo `MainActivity.kt`; campos `linkDurSec`/`linkGen`, `readLinkDuration()`, `poll()`, y limpieza en Detener/`playLink`/`startPlayback`/`stopCurrentPlayback`). Siguiente paso: aplicar, esperar build verde, probar el enlace de 720p/10 s (debe salir 0:10) y pasar la línea `DURACION enlace` del `/log` (puerto 8001). Nada se marca ✅ hasta que Ariel diga "ya funciona".
+
+- **PROG-1d entregado (18 nov 2026):** Ariel aprobó ("Dale") y pasó `MainActivity_actual.kt`. Parche `duracion_enlace_tv.patch`: campos `linkDurSec` y `linkGen`, función `readLinkDuration()`, `poll()` usa la duración leída cuando el TV informa 0. Nada se marca ✅ hasta que Ariel diga "ya funciona".
+
+- **PROG-1c resultado (18 nov 2026):** Ariel aplicó el parche y pasó el log: el TV manda `TrackDuration = 00:00:00` siempre (una sola línea `POS crudo`, nunca cambió). Se descarta la opción A y se propone PROG-1d (opción B). Esperando "Dale" y `MainActivity_actual.kt`.
+
+- **PROG-1b revisado (18 nov 2026):** Ariel pasó `TvController_actual.kt`. Se vio que la duración se lee de `TrackDuration` y que cualquier valor que no sea `H:MM:SS` se vuelve 0; el DIDL tampoco lleva duración. No se sabe qué manda el TV, así que se propone PROG-1c (solo log). Ariel aprobó ("Dale") y se entregó el parche `log_duracion_tv.patch`. Falta: aplicar, esperar build verde, mandar el enlace de 720p y el de 360p al TV y pasar las líneas `POS crudo` del `/log`.
+
+- **PROG-1 resultado parcial (18 nov 2026):** Ariel aplicó el parche y mandó captura: título y tiempo corren, duración `--:--` y puntito quieto. Se abre PROG-1b para diagnosticar. El lag del enlace 1080p/30 fps sigue siendo el peso del video, no un fallo de la app.
+
+- **PROG-1 entregado (18 nov 2026):** Ariel aprobó el plan ("Dale"). Verificado en el código real que `tvNowPlaying` es un `TextView` ya enlazado y que el listener de la barra y los botones ±10 s ya sirven para el TV. Riesgo abierto: no se ha visto `activity_main.xml`; si la barra no aparece en la prueba, se pide ese archivo.
+
+- **PAUSA-1 confirmado (18 nov 2026):** Ariel probó con el TV: la pausa funciona y la app no se cierra. El enlace 1080p a 30 fps sigue con lag (es el peso del video, no la app); el 360p va fluido. Ariel volvió a pedir el progreso/duración en el reproductor (ahora PROG-1, solo plan).
+
 - **PAUSA-1 entregado (18 nov 2026):** Ariel aprobó el plan ("Pausa-1 primero") y pasó `MainActivity_actual.kt`. Se confirmó en el código real que los dos botones usaban `playingItem == null` y que `playLink` nunca fija `playingItem`; el parche agrega la marca `linkOnTv`. Se añadió el reinicio en Detener (punto 5 del plan). Nada se marca ✅ hasta la confirmación de Ariel.
 
 - **Diagnóstico de la pausa (18 nov 2026):** el log de `/log` (puerto **8001**, no 8000; la IP del teléfono era 192.168.100.43) mostró que el relay y el enlace funcionan y que al "pausar" la app manda una canción al TV. La lectura del código lo confirma (ver PAUSA-1). Aprendizaje de proceso: `castv_log.txt` salió vacío (0 bytes) cuando se consultó desde Termux por la IP equivocada; se resolvió abriendo `http://192.168.100.43:8001/log` en el navegador. `castv_tv.txt` contiene el código (`TvSend.kt` y `MainActivity.kt`), no un log.
@@ -345,6 +398,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **PAUSA-1 pausa del enlace en el TV (18 nov 2026):** campo `linkOnTv` en `MainActivity.kt`; ⏸/▶ controlan el enlace del TV y Detener lo limpia.
 - **SEL-1 acciones en la selección múltiple (18 nov 2026):** ➕ A la cola, ★/☆ Favoritos y 📃 A una lista en el ⋮ de la barra de selección (`MainActivity.kt`).
 - **UI-S1 estilo de subtítulos (18 nov 2026):** 🎨 en el menú 💬; tamaño, negrita, color y fondo guardados en `castv_subs` (`VideoPlayerActivity.kt`).
 - **UI-1b pantalla de Ajustes (18 nov 2026):** `SettingsActivity.kt` nuevo, registro en el manifest, ⋮ abre Ajustes, Más sin repetidos.
