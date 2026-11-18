@@ -152,6 +152,8 @@ class M3uActivity : AppCompatActivity() {
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
 
+        val added = Store.installCatalog(Catalog.VERSION, Catalog.items)   // [CATALOGO-1] listas de fábrica, una sola vez
+        if (added > 0) toast("📡 Se añadieron $added listas de canales")
         val saved = Store.m3uLists()
         val last = Store.lastM3u
         val start = saved.firstOrNull { it.url == last } ?: saved.firstOrNull()
@@ -192,7 +194,9 @@ class M3uActivity : AppCompatActivity() {
                 }
             }
             val body = text
-            val list = if (body != null) M3uParser.parse(body) else emptyList()
+            val parsed = if (body != null) M3uParser.parse(body) else emptyList()
+            val list = parsed.distinctBy { it.url }   // [CATALOGO-1] sin enlaces repetidos
+            if (list.size != parsed.size) DebugLog.add("M3U: ${l.name}: ${parsed.size - list.size} repetidos quitados")
             val names = list.map { norm(it.name) }
             runOnUiThread {
                 if (isFinishing || gen != loadGen) return@runOnUiThread

@@ -199,6 +199,44 @@ object Store {
         get() = prefs.getString("m3uLast", null)
         set(v) { prefs.edit().putString("m3uLast", v).apply() }
 
+    // ------------------------------------------------- Catálogo preinstalado (CATALOGO-1)
+
+    /**
+     * Añade, una sola vez por versión, las listas del catálogo que no estén ya guardadas.
+     * No toca las listas del usuario y no vuelve a poner las que el usuario quitó después.
+     * Devuelve cuántas listas añadió.
+     */
+    fun installCatalog(version: Int, items: List<M3uList>): Int {
+        if (prefs.getInt("catV", 0) >= version) return 0
+        val seen = HashSet<String>()
+        try {
+            val raw = prefs.getString("catSeen", null)
+            if (raw != null) {
+                val arr = JSONArray(raw)
+                for (i in 0 until arr.length()) seen.add(arr.getString(i))
+            }
+        } catch (e: Exception) { }
+        val cur = m3uLists().toMutableList()
+        val have = HashSet<String>()
+        for (x in cur) have.add(x.url)
+        var added = 0
+        for (x in items) {
+            if (!seen.contains(x.url) && !have.contains(x.url)) {
+                cur.add(x)
+                have.add(x.url)
+                added++
+            }
+            seen.add(x.url)
+        }
+        if (added > 0) writeM3u(cur)
+        try {
+            val arr = JSONArray()
+            for (u in seen) arr.put(u)
+            prefs.edit().putInt("catV", version).putString("catSeen", arr.toString()).apply()
+        } catch (e: Exception) { }
+        return added
+    }
+
     // ------------------------------------------------- Canales favoritos (M3U)
 
     /** Enlaces de los canales marcados con ★ en Listas M3U. */
