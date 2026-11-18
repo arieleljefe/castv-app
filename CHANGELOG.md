@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v45)
+# Registro de cambios y guía de continuidad – CASTV (v46)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -24,12 +24,13 @@
 
 ---
 
-## 📍 Estado Actual (v45)
+## 📍 Estado Actual (v46)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
 - ✅ **UI-1 pestaña "Más" (18 nov 2026):** aplicada, compiló y Ariel la probó en el teléfono ("todo bello"). Commit "UI-1 aplicado: pestaña Más".
-- 🧪 **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`):** Ariel eligió "Pantalla de Ajustes con categorías (como VLC)"; falta que compile en verde y que Ariel confirme "ya funciona" (ver "Siguiente" punto 1).
+- 🧪 **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`):** Ariel eligió "Pantalla de Ajustes con categorías (como VLC)"; Ariel dijo "todo bien" el 18 nov 2026, pero falta que confirme explícitamente la pantalla Ajustes (y el build en verde) para pasarla a ✅ (ver "Siguiente" punto 1).
+- ⬜ **Idea de Ariel (18 nov 2026): canales en vivo que SÍ se vean en el TV** (convertir o retransmitir el video desde la app); ver "Siguiente" punto 6.
 - ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
@@ -137,6 +138,13 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
 5. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"). Necesita `.github/workflows/*.yml`.
+6. ⬜ **Canales en vivo que funcionen de verdad en el TV** (idea de Ariel, 18 nov 2026; a pulir en el futuro; **sin parche ni plan aprobado todavía**). Hoy el diálogo de un canal dice "📺 Al TV (HLS: puede no funcionar)": el Hisense no sigue muchos canales HLS (`.m3u8`). Ariel quiere que la app los convierta o los prepare para que se reproduzcan bien en la TV. Este punto reemplaza al punto 3 (solo avisar) si se logra.
+   - **Paso 0, diagnosticar antes de construir:** descubrir por qué falla el Hisense con HLS (¿no acepta `.m3u8`?, ¿códec de video/audio?, ¿tipo de contenido?, ¿segmentos cifrados?). Se usa el log de `/log` y un canal de prueba. Sin esto no se sabe qué arreglar. No está comprobado que el Hisense llegue a reproducirlo con ninguna de las opciones de abajo.
+   - **Opción A, retransmitir sin convertir (la más ligera, probar primero):** el teléfono baja la lista `.m3u8`, junta los segmentos (normalmente MPEG-TS) y los sirve como una sola transmisión continua por el servidor `/relay` que ya existe, para que el TV la vea como un video normal. *Pros:* sin librerías nuevas, sin cambiar licencia, poco gasto de batería. *Contras:* solo sirve si el TV acepta el códec original (H.264/AAC) y el formato TS en vivo; no sirve con canales cifrados o en otros formatos de segmento; el teléfono debe quedarse encendido, en la misma Wi-Fi y con la app abierta.
+   - **Opción B, convertir de verdad (transcodificar):** el teléfono recodifica el video a un formato que el TV acepte, con una librería tipo FFmpeg. *Pros:* funciona con más canales. *Contras:* gasta mucha batería y calor, puede ir con retraso, aumenta mucho el tamaño de la app y su **licencia (GPL/LGPL) podría obligar a cambiar la de CASTV** (ver regla 7); por eso va al final y solo si la Opción A no alcanza.
+   - **Siempre:** si un canal no se puede preparar, se avisa con un mensaje claro (como en 14-B) y se ofrece "📱 En el móvil".
+   - **Cómo probar (cuando exista):** un canal HLS en abierto de la lista Free-TV al TV; que arranque, que no se corte en 10 minutos y que "Detener" funcione.
+   - **Para empezar se necesitará:** `TvController`/`TvSend.kt`, el servidor `/relay` de `MainActivity.kt` y `M3uActivity.kt` (se pedirán antes de entregar nada).
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
 
 **Cómo pasar los archivos de interfaz** (Termux, un solo comando; luego adjuntar `castv_interfaz.txt` desde Descargas):
@@ -191,6 +199,9 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 18. ⬜ **Manejo del foco de audio** (pausa en llamadas o al abrir otra app de sonido).
 19. ⬜ **Vocabulario en español** de referencia (`values-es` de VLC) para mantener textos coherentes, escritos con palabras propias.
 
+**Canales en vivo**
+20. ⬜ **Canales HLS que se vean en el TV** (retransmitir o convertir desde la app): detalle y opciones en "Siguiente" punto 6.
+
 **⏳ Por evaluar (el tamaño ya no frena, pero cambia la arquitectura)**
 - **libvlc** (LGPL): reproduce casi todo (mkv, avi, HLS, pistas embebidas) y podría resolver mejor HLS/códecs en el móvil. Implica rehacer la reproducción; usarlo exige cumplir su licencia LGPL (aviso y enlace al código de la biblioteca).
 - **Explorador de red (SMB/FTP/UPnP):** depende de libvlc o de bibliotecas extra.
@@ -210,6 +221,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ### Notas de este día
 
+- **Pedido de Ariel (18 nov 2026, antes de dormir):** que al poner un canal "todo se reproduzca efectivamente en la tv"; la app debería convertir o preparar el video en vivo. Guardado como "Siguiente" punto 6 para pulir más adelante.
 - **Observación (18 nov 2026, ⬜ pequeño):** `M3uActivity` no aplica el color de acento guardado (no hace `theme.applyStyle` como `MainActivity`), así que su ★ sale siempre cian. `SettingsActivity` sí lo aplica.
 - **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
