@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v36)
+# Registro de cambios y guía de continuidad – CASTV (v38)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -21,10 +21,12 @@
 
 ---
 
-## 📍 Estado Actual (v36)
+## 📍 Estado Actual (v38)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
+- ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
+- ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
 - ✅ **Historial de enlaces y favoritos sueltos (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.1 Listas M3U (17 nov 2026):** confirmado por Ariel.
 - ✅ **Reproducción base:** Archivos locales (mp3/mp4) y enlaces externos mp4 por `/relay` (incluye redirección 302) funcionan en TV Hisense HL1 y en móvil (`VideoPlayerActivity` con subtítulos `.srt/.vtt`, siguiente automático y botón 📺 TV).
@@ -37,7 +39,7 @@
 
 Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia sin depender del TV.
 
-1. **Gestión de Listas M3U (Etapa 13-B) — Beneficio: Muy Alto (9.5/10)**
+1. **Gestión de Listas M3U (Etapa 13-B) ✅ — Beneficio: Muy Alto (9.5/10)**
    - *Qué:* Cargar listas `.m3u/.m3u8` (enlace o archivo) en segundo plano (`M3uParser.kt`), filtrar por `group-title` y buscar canales.
    - *Pros:* Convierte a CASTV en reproductor multimedia + IPTV completo; código modular.
    - *Contras:* Listas gigantes requieren carga paginada/segundo plano; canales en vivo HLS solo van al móvil.
@@ -45,7 +47,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
    - *Qué:* Guardar últimos 15-20 enlaces en `Store.kt` y marcar enlaces individuales con estrella.
    - *Pros:* Evita reescribir URLs; reutiliza `Store.kt` sin inflar el APK.
    - *Contras:* Enlaces temporales caducan (requiere botón de limpiar).
-3. **Gestos en Reproductor de Video (`VideoPlayerActivity.kt`) — Beneficio: Alto (8.5/10)**
+3. **Gestos en Reproductor de Video (`VideoPlayerActivity.kt`) ✅ — Beneficio: Alto (8.5/10)**
    - *Qué:* Deslizar derecha (brillo), izquierda (volumen) y doble toque lateral (±10s).
    - *Pros:* Comodidad moderna sin botones físicos; 100% testable en móvil.
    - *Contras:* Riesgo de toques accidentales si no se dejan márgenes seguros en los bordes.
@@ -64,6 +66,20 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
+### ✅ Gestos en el reproductor de video — confirmado por Ariel el 17 nov 2026
+
+- Hecho y probado: deslizar vertical en la mitad **derecha** = brillo, en la mitad **izquierda** = volumen; **doble toque** en el tercio izquierdo/derecho = −10 s/+10 s (el centro no hace nada); cartelito (HUD) con el valor; toque simple muestra/oculta controles; márgenes seguros de 32 dp en los bordes.
+- Archivo: `VideoPlayerActivity.kt` (`setupGestures()`, `inEdge()`, `seekBy()`, `showHud()`, `currentBrightness()`; el `VideoView` usa `setOnTouchListener` con un `GestureDetector`, y el toque simple se maneja a mano). Parche: `gestos_video.patch`.
+- Notas: el brillo solo afecta a esa ventana (vuelve al normal al salir); el volumen es el del sistema (`STREAM_MUSIC`) y se queda donde se deje; en canales en vivo (sin duración) el doble toque no hace nada.
+- **Si falla:** `git revert` del commit "Gestos en el reproductor (v37)".
+
+### ✅ Etapa 13-B.2 — Canales más cómodos — confirmado por Ariel el 17 nov 2026
+
+- Hecho y probado: la pantalla de canales **sigue abierta** al reproducir (📺 Al TV / 📱 En el móvil) y se puede cambiar de canal sin reabrirla; **★ favoritos de canales** (estrella en cada fila, favoritos primero al abrir/filtrar, chip **☆ Favs** para ver solo favoritos); los canales reproducidos quedan en el 🕘 Historial; el botón 📺 del reproductor del móvil manda el canal al TV.
+- Archivos: `M3uActivity.kt` (`playChannel()`, `playOnPhone()`, `sendToTv()`, `onActivityResult`, `toggleFav()`, `toggleFavOnly()`, adaptador con ★) y `Store.kt` (`chFavs()`, `toggleChFav()`, clave JSON `chfav`). Parche: `canales_comodos.patch`. `MainActivity.kt` y `VideoPlayerActivity.kt` no se tocaron.
+- **Si falla:** `git revert` del commit "Canales más cómodos (13-B.2)".
+- **Limitación conocida:** `M3uActivity` no llama a `playLink` de `MainActivity`, así que **no detiene la música/video local** que estuviera sonando en el teléfono antes de enviar un canal (puede solaparse). Se arreglaría en un parche aparte.
+
 ### ✅ Historial de enlaces y favoritos sueltos — confirmado por Ariel el 17 nov 2026
 
 - Hecho y probado: historial de los últimos 20 enlaces, botón **🕘 Historial** en "Reproducir enlace", ★ favoritos que no se borran, **📺 Al TV** / **📱 En el móvil** / **Quitar** desde el historial, **Borrar historial**.
@@ -79,12 +95,11 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **13-B.2 — Canales más cómodos (recomendado, beneficio alto):** que la pantalla de canales **siga abierta** al reproducir (cambiar de canal sin reabrir), y **★ favoritos de canales**. Toca `M3uActivity.kt`, `Store.kt` y probablemente `MainActivity.kt`/`VideoPlayerActivity.kt` (hay que decidir cómo se devuelve el control; se detalla en 🧪 antes del código).
-2. **Gestos en el reproductor de video** (brillo, volumen, doble toque ±10 s). Solo `VideoPlayerActivity.kt`.
-3. **Respaldo Exportar/Importar (JSON)** de favoritos, listas M3U, historial y ajustes. `Store.kt` + `MainActivity.kt`.
-4. **Pulido visual** (títulos largos con desplazamiento, mini reproductor más compacto).
-5. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
-- Para el 1 hará falta `VideoPlayerActivity.kt` actual; para el 2 también. Se pedirá antes de entregar nada.
+1. **Respaldo Exportar/Importar (JSON)** de favoritos (incluye `chfav`), listas M3U, historial y ajustes. `Store.kt` + `MainActivity.kt` (recomendado: protege datos al reinstalar APKs).
+2. **Pulido visual** (títulos largos con desplazamiento, mini reproductor más compacto).
+3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
+4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
+- Se pedirán los archivos actuales necesarios antes de entregar nada.
 
 ### Notas de este día
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
@@ -93,6 +108,8 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **Gestos en el reproductor (17 nov 2026):** brillo, volumen y doble toque ±10 s (`VideoPlayerActivity.kt`).
+- **Etapa 13-B.2 (17 nov 2026):** Canales más cómodos y ★ favoritos de canales (`M3uActivity.kt`, `Store.kt`).
 - **Etapa 13-B.1 (17 nov 2026):** Listas M3U (`M3uParser.kt`, `M3uActivity.kt`, `Store.kt`).
 - **Historial de enlaces + favoritos sueltos (17 nov 2026):** `SavedLink` en `Store.kt`, 🕘 Historial en "Reproducir enlace".
 - **Etapa 14-C:** Extracción de `PortDialog.kt` y `TvSend.kt`.
