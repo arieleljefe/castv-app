@@ -268,6 +268,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 c.requestMethod = "GET"
                 c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CASTV")
                 c.setRequestProperty("Accept", "*/*")
+                // [GZIP-1] sin compresión: evita el error "ISIZE ... 0xffffffff" del GZIP automático de Android
+                c.setRequestProperty("Accept-Encoding", "identity")
                 val code = c.responseCode
                 if (code in 301..303 || code == 307 || code == 308) {
                     val loc = c.getHeaderField("Location")
@@ -292,7 +294,10 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             try {
                 val out = ByteArrayOutputStream()
                 val buf = ByteArray(8192)
-                c.inputStream.use { ins ->
+                // [GZIP-1] si el servidor comprime aunque se pidió identity, se descomprime a mano
+                val src: InputStream = if (c.contentEncoding.equals("gzip", ignoreCase = true))
+                    java.util.zip.GZIPInputStream(c.inputStream) else c.inputStream
+                src.use { ins ->
                     while (true) {
                         val n = ins.read(buf)
                         if (n < 0) break
@@ -582,9 +587,20 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             addLiveHeaders(r)
             return r
         }
-        val stream = LiveHlsStream(target)
+        var stream = LiveHlsStream(target)
         try {
-            stream.prepare()
+            try {
+                stream.prepare()
+            } catch (e: LiveUnsupported) {
+                throw e
+            } catch (e: Exception) {
+                // [GZIP-1] un fallo pasajero al leer la lista: se reintenta una sola vez con un flujo nuevo
+                DebugLog.add("  LIVE falló al preparar (${e.javaClass.simpleName}: ${e.message}): se reintenta una vez")
+                stream.close()
+                try { Thread.sleep(500) } catch (_: InterruptedException) {}
+                stream = LiveHlsStream(target)
+                stream.prepare()
+            }
         } catch (e: LiveUnsupported) {
             DebugLog.add("  LIVE no soportado: ${e.message}")
             stream.close()
