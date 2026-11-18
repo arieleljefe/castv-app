@@ -1968,6 +1968,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         updateSelectionTitle()
+        actionMode?.invalidate()   // [SEL-1] actualiza el texto ★/☆ de la barra
         adapter.notifyDataSetChanged()
     }
 
@@ -1979,20 +1980,34 @@ class MainActivity : AppCompatActivity() {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 menu.add(0, 1, 0, "Todo").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 menu.add(0, 2, 1, "🗑 Borrar").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                // [SEL-1] acciones en bloque (van al menú ⋮ de la barra)
+                menu.add(0, 3, 2, "➕ Añadir a la cola").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                menu.add(0, 4, 3, "★ Añadir a favoritos").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                menu.add(0, 5, 4, "📃 Añadir a lista…").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 mode.title = "1 seleccionado"
                 return true
             }
 
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                // [SEL-1] ★ si falta alguno por marcar; ☆ solo cuando todos ya son favoritos
+                val sel = selectedItems()
+                val allFav = sel.isNotEmpty() && sel.all { Store.isFav(it) }
+                menu.findItem(4)?.title = if (allFav) "☆ Quitar de favoritos" else "★ Añadir a favoritos"
+                return true
+            }
 
             override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
                 when (item.itemId) {
                     1 -> {
                         for (m in currentList) selectedIds.add(m.id)
                         updateSelectionTitle()
+                        actionMode?.invalidate()
                         adapter.notifyDataSetChanged()
                     }
                     2 -> confirmDelete(currentList.filter { it.id in selectedIds })
+                    3 -> bulkToQueue()   // [SEL-1]
+                    4 -> bulkFav()       // [SEL-1]
+                    5 -> bulkToList()    // [SEL-1]
                 }
                 return true
             }
@@ -2005,6 +2020,74 @@ class MainActivity : AppCompatActivity() {
             }
         })
         adapter.notifyDataSetChanged()
+    }
+
+    // ------------------------------------------- [SEL-1] Acciones en bloque
+
+    /** Los seleccionados, en el orden en que se ven en la lista. */
+    private fun selectedItems(): List<MediaItem> = currentList.filter { it.id in selectedIds }
+
+    private fun countText(n: Int, one: String, many: String): String =
+        if (n == 1) "1 $one" else "$n $many"
+
+    private fun bulkToQueue() {
+        val sel = selectedItems()
+        if (sel.isEmpty()) return
+        var added = 0
+        for (m in sel) {
+            if (queue.none { it.id == m.id && it.isMusic == m.isMusic }) {
+                queue.add(m)
+                added++
+            }
+        }
+        val skipped = sel.size - added
+        updateQueueBadge()
+        actionMode?.finish()
+        toast("➕ " + countText(added, "añadida", "añadidas") + " a la cola" +
+            (if (skipped > 0) " · $skipped ya estaban" else ""))
+    }
+
+    private fun bulkFav() {
+        val sel = selectedItems()
+        if (sel.isEmpty()) return
+        val remove = sel.all { Store.isFav(it) }   // todos ya son favoritos -> se quitan
+        var n = 0
+        for (m in sel) {
+            if (Store.isFav(m) == remove) {
+                Store.toggleFav(m)
+                n++
+            }
+        }
+        actionMode?.finish()
+        updateNowFav()
+        if (viewMode == ViewMode.FAVS) applyFilters() else adapter.notifyDataSetChanged()
+        toast(if (remove) "☆ " + countText(n, "quitada", "quitadas") + " de favoritos"
+              else "★ " + countText(n, "añadida", "añadidas") + " a favoritos")
+    }
+
+    private fun bulkToList() {
+        val sel = selectedItems()
+        if (sel.isEmpty()) return
+        fun addAllTo(listName: String) {
+            var added = 0
+            for (m in sel) if (Store.addToList(listName, m)) added++
+            val skipped = sel.size - added
+            actionMode?.finish()
+            toast("➕ " + countText(added, "añadida", "añadidas") + " a «$listName»" +
+                (if (skipped > 0) " · $skipped ya estaban" else ""))
+        }
+        val names = Store.listNames()
+        val labels = ArrayList<String>()
+        labels.addAll(names)
+        labels.add("➕ Nueva lista…")
+        AlertDialog.Builder(this)
+            .setTitle("Añadir ${sel.size} a lista")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == names.size) promptNewList { n -> addAllTo(n) }
+                else addAllTo(names[which])
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun uriOf(item: MediaItem): Uri {
