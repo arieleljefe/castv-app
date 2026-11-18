@@ -372,9 +372,10 @@ class M3uActivity : AppCompatActivity() {
                 return@thread
             }
             val hls = isHls(url)
-            val mime = if (hls) "application/vnd.apple.mpegurl" else "video/mp4"
             val phoneIp = CastvNet.localIpAddress(TvController.tvIp)
-            val sendUrl = if (phoneIp != null) TvSend.relayUrl(phoneIp, url, hls) else url
+            val live = hls && phoneIp != null
+            val mime = if (live) "video/mp2t" else if (hls) "application/vnd.apple.mpegurl" else "video/mp4"
+            val sendUrl = if (phoneIp == null) url else if (live) TvSend.liveUrl(phoneIp, url) else TvSend.relayUrl(phoneIp, url, hls)
             DebugLog.add("ENLACE (M3U): $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
             runOnUiThread {
