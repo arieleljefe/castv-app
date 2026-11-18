@@ -383,6 +383,7 @@ class M3uActivity : AppCompatActivity() {
             val sendUrl = if (phoneIp == null) url else if (live) TvSend.liveUrl(phoneIp, url) else TvSend.relayUrl(phoneIp, url, hls)
             DebugLog.add("ENLACE (M3U): $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
+            if (ok) sendBroadcast(Intent(MainActivity.ACT_CHANNEL_ON_TV).setPackage(packageName).putExtra("title", title).putExtra("live", live))   // [NOW-1] la barra y la notificación muestran el canal
             runOnUiThread {
                 toast(if (ok) "✅ Canal en el TV" else "❌ El TV no aceptó el canal")
             }

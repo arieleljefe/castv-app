@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
         const val ACT_TOGGLE = "com.castv.app.ACT_TOGGLE"
         const val ACT_NEXT = "com.castv.app.ACT_NEXT"
         const val ACT_STOP_LOCAL = "com.castv.app.ACT_STOP_LOCAL"   // [LOCAL-1]
+        const val ACT_CHANNEL_ON_TV = "com.castv.app.ACT_CHANNEL_ON_TV"   // [NOW-1]
         const val CHANNEL_ID = "castv_channel"
         const val FB_URL = "https://www.facebook.com/share/19x6GMsWUM/"
         const val IG_URL = "https://www.instagram.com/arieldejesusbuen"
@@ -159,6 +160,22 @@ class MainActivity : AppCompatActivity() {
                 ACT_NEXT -> step(+1)
                 ACT_TOGGLE -> togglePlayPause()
                 ACT_STOP_LOCAL -> if (localActive) stopCurrentPlayback()   // [LOCAL-1]
+                ACT_CHANNEL_ON_TV -> {   // [NOW-1] un canal de Listas M3U acaba de empezar en el TV
+                    if (playingItem != null) {   // había algo propio en el TV: el canal lo reemplaza (sin TvController.stop())
+                        playingItem = null
+                        manualStop = true
+                        adapter.playingId = -1
+                        adapter.notifyDataSetChanged()
+                    }
+                    val t = intent?.getStringExtra("title") ?: "Canal"
+                    linkOnTv = true; linkDurSec = 0; linkGen++
+                    linkTitleNow = t
+                    linkIsLive = intent?.getBooleanExtra("live", false) ?: false
+                    resetProgress()
+                    tvNowPlaying.text = t
+                    lastNotifKey = ""
+                    refreshNotification()
+                }
             }
         }
     }
@@ -181,6 +198,8 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var linkOnTv = false   // [PAUSA-1] hay un enlace de video sonando en el TV (playingItem sigue en null)
     @Volatile private var linkDurSec = 0     // [PROG-1d] duración del enlace en el TV, leída por el teléfono (el TV siempre manda 0)
     @Volatile private var linkGen = 0        // [PROG-1d] número del enlace actual, para descartar lecturas viejas
+    @Volatile private var linkTitleNow: String? = null   // [NOW-1] título del canal/enlace que está en el TV
+    @Volatile private var linkIsLive = false             // [NOW-1] ese enlace es un canal en vivo (HLS)
     private var showingMusic = false
     private var repeatMode = Repeat.OFF
     private var selectedArtist: String? = null
@@ -1340,7 +1359,10 @@ class MainActivity : AppCompatActivity() {
             if (ok) linkOnTv = true   // [PAUSA-1] ⏸/▶ ahora controlan el enlace del TV
             if (ok && !live) readLinkDuration(sendUrl, gen)   // [PROG-1d] (en vivo no hay duración: se evita abrir un segundo flujo)
             runOnUiThread {
-                if (ok) tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
+                if (ok) {
+                    tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
+                    linkTitleNow = title; linkIsLive = live; lastNotifKey = ""   // [NOW-1] la notificación también lo muestra
+                }
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
                     else "❌ El TV no aceptó el enlace. ¿Está encendido y en el mismo Wi-Fi? Prueba otro enlace mp4.")
@@ -1552,7 +1574,7 @@ class MainActivity : AppCompatActivity() {
                         tvDuration.text = fmt(dur)
                     } else {
                         seekBar.isEnabled = false
-                        tvDuration.text = "--:--"
+                        tvDuration.text = if (linkOnTv && linkIsLive) "En vivo" else "--:--"   // [NOW-1]
                     }
                     tvElapsed.text = fmt(pos)
                 }
@@ -1684,7 +1706,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshNotification() {
-        val item = playingItem ?: return
+        val item = playingItem
+        if (item == null) {   // [NOW-1] canal o enlace en el TV: no hay MediaItem, pero la notificación debe mostrarlo
+            if (linkOnTv) refreshLinkNotification()
+            return
+        }
         val playing = currentlyPlaying()
         updateQuickIcon(playing)
         updateSessionState(playing)
@@ -1734,6 +1760,53 @@ class MainActivity : AppCompatActivity() {
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
                     .setShowActionsInCompactView(0, 1, 2)
+            )
+            .build()
+        try {
+            getSystemService(NotificationManager::class.java).notify(1, n)
+        } catch (e: Exception) { }
+    }
+
+    /** [NOW-1] Notificación de un canal o enlace que está en el TV (sin carátula; solo Pausa/Reproducir). */
+    private fun refreshLinkNotification() {
+        val playing = tvPlaying
+        updateQuickIcon(playing)
+        updateSessionState(playing)
+        val title = linkTitleNow ?: "Enlace en el TV"
+        val key = "link|$title|$playing|$linkIsLive"
+        if (key == lastNotifKey) return
+        lastNotifKey = key
+        try {
+            val md = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "CASTV · TV")
+            mediaSession?.setMetadata(md.build())
+            mediaSession?.isActive = true
+        } catch (e: Exception) { }
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val toggle = PendingIntent.getBroadcast(this, 2, Intent(ACT_TOGGLE).setPackage(packageName), flags)
+        val open = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            flags
+        )
+        val n = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(title)
+            .setContentText(if (playing) (if (linkIsLive) "En vivo en el TV" else "Sonando en el TV") else "En pausa · TV")
+            .setContentIntent(open)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(
+                if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                if (playing) "Pausa" else "Reproducir", toggle
+            )
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    .setShowActionsInCompactView(0)
             )
             .build()
         try {
