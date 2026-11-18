@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v40)
+# Registro de cambios y guía de continuidad – CASTV (v41)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -22,10 +22,11 @@
 
 ---
 
-## 📍 Estado Actual (v40)
+## 📍 Estado Actual (v41)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
+- 🧪 **UI-1 pestaña "Más" (plan detallado, parche NO entregado):** esperando decisión de Ariel (ver "Siguiente" punto 1).
 - ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
@@ -106,12 +107,25 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **Interfaz estilo VLC, fase UI-1: navegación inferior** (ver "Visión de interfaz"). Necesita `MainActivity.kt` actual; se detalla en 🧪 antes del código.
+1. **🧪 UI-1 — Pestaña "Más" en la barra inferior** (plan detallado; **parche aún no entregado**; falta que Ariel diga "va").
+   - **Qué:** barra inferior de 4 a **5 botones: Vídeo · Audio · Carpetas · Cola · Más**. "Más" abre una hoja (`BottomSheetDialog`) que sube desde abajo con las opciones del menú ⋮ ordenadas en grupos. Cada fila hace lo mismo que su opción del ⋮, y el **⋮ se queda como está** (no se quita nada).
+   - **Grupos propuestos (ids del menú actual):** Reproducir y canales (15 enlace, 16 listas M3U, 10 elegir TV, 3 salida) · Biblioteca (1 ordenar, 2 duplicados, 4 mis listas, 5 artista, 6 álbum) · Reproductor (7 temporizador, 8 velocidad, 9 ecualizador) · Apariencia (12 tema, 13 color) · Datos (17 respaldo, 14 borrado) · Acerca (11 redes y contacto). Cualquier id nuevo cae en un grupo "Más".
+   - **Cómo:** `activity_main.xml` (nuevo `navMore`, mismo estilo que los otros 4), `res/drawable/ic_nav_more.xml` (nuevo, icono propio de 4 puntos) y `MainActivity.kt`: las opciones del menú se mueven a `fillMainMenu(menu)` y las acciones a `runMenuAction(id)` (los usan el ⋮ y la hoja), más `showMoreSheet()` que lee las opciones de un `PopupMenu` auxiliar sin mostrarlo para no duplicar textos. Respeta Claro/Oscuro y los 4 colores de acento. No toca reproductor, `Store`, manifest ni permisos. Parche: `ui1_mas.patch`.
+   - **Cómo probar:** (1) 5 botones sin recortes y la insignia de Cola sigue funcionando; (2) Más abre la hoja con scroll; (3) probar varias filas (enlace, M3U, tema, color, respaldo); (4) el ⋮ sigue igual; (5) Claro/Oscuro y otro color de acento; (6) girar el teléfono.
+   - **Si falla:** `git revert` del commit "UI-1 pestaña Más (v40)".
+   - **Riesgo:** al mover el menú a funciones nuevas, un error afectaría al ⋮ y a Más a la vez; por eso el parche cambia solo eso.
+   - **Decisión pendiente de Ariel:** mantener **Cola** en la barra y dejar "Mis listas" dentro de Más (propuesta, no se pierde ningún acceso) **o** cambiar Cola por una pestaña **Listas** como VLC (parche aparte, después).
+   - **Para retomar:** pasar `MainActivity.kt` actual y `activity_main.xml` (comando de abajo, "Cómo pasar los archivos de interfaz").
 2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
 3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
-5. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"; ver notas). Necesita el archivo `.github/workflows/*.yml`.
+5. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"). Necesita `.github/workflows/*.yml`.
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
+
+**Cómo pasar los archivos de interfaz** (Termux, un solo comando; luego adjuntar `castv_interfaz.txt` desde Descargas):
+```
+cd ~/castv-nuevo/castv-fresh && { for f in app/src/main/java/com/castv/app/MainActivity.kt app/src/main/res/layout/activity_main.xml app/src/main/res/layout/item_file.xml app/src/main/res/values/*.xml; do echo "=== $f ==="; cat "$f"; echo; done; echo "=== LISTA DE RECURSOS ==="; ls app/src/main/res/drawable* app/src/main/res/layout; } > ~/storage/downloads/castv_interfaz.txt && ls -l ~/storage/downloads/castv_interfaz.txt
+```
 
 ---
 
@@ -123,8 +137,10 @@ Meta de Ariel: que CASTV tenga una interfaz con la **misma comodidad y organizac
 - **Reproductor de audio:** mini reproductor abajo que se expande a pantalla completa.
 - **Pestaña "Más":** historial, ajustes, acerca de (sustituiría parte del menú ⋮ actual).
 
+**Corrección (18 nov 2026):** CASTV **ya tiene** barra inferior (Vídeo · Audio · Carpetas · Cola), pestañas superiores (PISTAS/VIDEOS · FAVORITOS · CONTINUAR) y mini reproductor (`player_bar`). Por eso UI-1 no crea la navegación: la acerca a la de VLC añadiendo "Más".
+
 Fases propuestas (una por parche, cada una con su 🧪 antes del código):
-- ⬜ **UI-1:** navegación inferior (Películas · Música · Canales/Enlaces · Listas · Más) reorganizando el menú ⋮ sin quitar funciones.
+- 🧪 **UI-1:** pestaña **Más** (hoja con las opciones del ⋮ en grupos); detalle completo en "Siguiente" punto 1. Opcional después: cambiar Cola por una pestaña Listas.
 - ⬜ **UI-2:** HUD del reproductor de video (barra propia con anterior/retroceder/play/adelantar/siguiente, tamaño de pantalla, rotación, 🔒 bloqueo).
 - ⬜ **UI-3:** mini reproductor expandible para audio y video.
 - ⬜ **UI-4:** pestaña "Más" (historial, ajustes, respaldo, acerca de).
@@ -165,6 +181,14 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 **No hay nada reutilizable de VLC para M3U** (lo resuelve libvlc); se mantiene `M3uParser.kt`.
 
 ---
+
+### Notas técnicas de la interfaz actual (para continuar sin volver a pedir todo)
+- La interfaz principal está en **`res/layout/activity_main.xml`** (LinearLayout vertical): barra superior (▲ CASTV 2.1, `btnSearch`, `btnOutput`, `btnMenu`) → `searchBar` → pestañas `tabAll`/`tabFavs`/`tabResume` → `tvFilter` → `tvStatus` → `listFiles` + `tvEmpty` + `fabShuffle` → `<include player_bar>` → barra inferior con `navVideo`, `navAudio`, `navFolders`, `navQueue` (TextView con `drawableTop` y `drawableTint`, 11sp, peso 1).
+- Iconos de navegación: `ic_nav_video`, `ic_nav_audio`, `ic_nav_folder`, `ic_nav_queue`. Fondo de la barra: `bg_bottom_nav`.
+- Colores/temas: `?attr/castvAccent`, `castvAccentSoft`, `castvPlayingBg` (4 overlays: Cyan, Green, Orange, Purple); base `Theme.MaterialComponents.DayNight.NoActionBar` (así que la librería Material está disponible); colores `vlc_bg`, `vlc_surface`, `vlc_text`, `vlc_muted`; tema oscuro en `values-night/colors.xml`.
+- `MainActivity.kt`: `updateTabs()` pinta activo/inactivo; `updateQueueBadge()` muestra "Cola (N)"; handlers: navVideo→`showMovies()`, navAudio→`showMusic()`, navFolders→`pickFolder()`, navQueue→`showQueue()`.
+- Menú ⋮ (`showMainMenu()`, `PopupMenu`): ids 1 Ordenar · 2 Duplicados · 3 Salida · 4 Mis listas · 5 Artista · 6 Álbum · 7 Temporizador · 8 Velocidad · 9 Ecualizador · 10 Elegir TV · 11 Redes y contacto · 12 Tema · 13 Color · 14 Borrado (API 30+) · 15 Reproducir enlace · 16 Listas M3U · 17 Respaldo.
+- Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
 - **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
