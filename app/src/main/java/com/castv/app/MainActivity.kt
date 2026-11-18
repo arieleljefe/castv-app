@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity() {
         const val ACT_PREV = "com.castv.app.ACT_PREV"
         const val ACT_TOGGLE = "com.castv.app.ACT_TOGGLE"
         const val ACT_NEXT = "com.castv.app.ACT_NEXT"
+        const val ACT_STOP_LOCAL = "com.castv.app.ACT_STOP_LOCAL"   // [LOCAL-1]
         const val CHANNEL_ID = "castv_channel"
         const val FB_URL = "https://www.facebook.com/share/19x6GMsWUM/"
         const val IG_URL = "https://www.instagram.com/arieldejesusbuen"
@@ -157,6 +158,7 @@ class MainActivity : AppCompatActivity() {
                 ACT_PREV -> step(-1)
                 ACT_NEXT -> step(+1)
                 ACT_TOGGLE -> togglePlayPause()
+                ACT_STOP_LOCAL -> if (localActive) stopCurrentPlayback()   // [LOCAL-1]
             }
         }
     }
@@ -295,7 +297,7 @@ class MainActivity : AppCompatActivity() {
         }
         Store.init(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT) }
+        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT); addAction(ACT_STOP_LOCAL) }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(notifReceiver, nf)
         notifReceiverRegistered = true

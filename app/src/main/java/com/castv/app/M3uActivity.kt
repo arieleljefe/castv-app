@@ -371,6 +371,7 @@ class M3uActivity : AppCompatActivity() {
                 runOnUiThread { toast("⚠️ TV no encontrado todavía. Espera unos segundos o usa ⋮ › Elegir TV.") }
                 return@thread
             }
+            sendBroadcast(Intent(MainActivity.ACT_STOP_LOCAL).setPackage(packageName))   // [LOCAL-1] detiene lo local del teléfono
             val hls = isHls(url)
             val phoneIp = CastvNet.localIpAddress(TvController.tvIp)
             val live = hls && phoneIp != null
