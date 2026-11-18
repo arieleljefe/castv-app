@@ -12,6 +12,9 @@ import org.json.JSONObject
  * La clave se arma con tipo + nombre + duración (no con el _ID de MediaStore, que puede
  * cambiar si el sistema reindexa los archivos).
  */
+/** Enlace guardado en el historial de "Reproducir enlace". */
+data class SavedLink(val url: String, val title: String, val fav: Boolean, val t: Long)
+
 object Store {
     private lateinit var prefs: SharedPreferences
     private lateinit var resumePrefs: SharedPreferences
@@ -86,6 +89,65 @@ object Store {
             .putInt("c|$k", statsPrefs.getInt("c|$k", 0) + 1)
             .putLong("t|$k", System.currentTimeMillis())
             .apply()
+    }
+
+    // ------------------------------------------------- Historial de enlaces
+
+    private const val MAX_RECENT_LINKS = 20
+
+    private fun readLinks(): MutableList<SavedLink> {
+        val out = ArrayList<SavedLink>()
+        try {
+            val raw = prefs.getString("links", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(SavedLink(o.getString("u"), o.optString("n", ""), o.optBoolean("f", false), o.optLong("t", 0L)))
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun writeLinks(l: List<SavedLink>) {
+        try {
+            val arr = JSONArray()
+            for (x in l) arr.put(JSONObject().put("u", x.url).put("n", x.title).put("f", x.fav).put("t", x.t))
+            prefs.edit().putString("links", arr.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Favoritos primero y luego los más recientes. */
+    fun links(): List<SavedLink> =
+        readLinks().sortedWith(compareByDescending<SavedLink> { it.fav }.thenByDescending { it.t })
+
+    /** Guarda (o sube al principio) un enlace. Los favoritos no se borran; de los demás quedan los 20 más recientes. */
+    fun addLink(url: String, title: String) {
+        val all = readLinks()
+        val old = all.firstOrNull { it.url == url }
+        all.removeAll { it.url == url }
+        all.add(SavedLink(url, title, old?.fav ?: false, System.currentTimeMillis()))
+        val starred = all.filter { it.fav }
+        val recent = all.filter { !it.fav }.sortedByDescending { it.t }.take(MAX_RECENT_LINKS)
+        writeLinks(starred + recent)
+    }
+
+    /** Devuelve true si quedó como favorito. */
+    fun toggleLinkFav(url: String): Boolean {
+        var now = false
+        val out = readLinks().map {
+            if (it.url == url) { now = !it.fav; it.copy(fav = now) } else it
+        }
+        writeLinks(out)
+        return now
+    }
+
+    fun removeLink(url: String) {
+        writeLinks(readLinks().filter { it.url != url })
+    }
+
+    /** Borra los enlaces que no son favoritos. */
+    fun clearRecentLinks() {
+        writeLinks(readLinks().filter { it.fav })
     }
 
     // ------------------------------------------------- Listas de reproducción

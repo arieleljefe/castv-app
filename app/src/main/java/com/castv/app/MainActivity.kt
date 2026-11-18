@@ -1086,7 +1086,46 @@ class MainActivity : AppCompatActivity() {
             .setView(box)
             .setPositiveButton("📺 Al TV") { _, _ -> playLink(input.text.toString().trim(), true) }
             .setNegativeButton("📱 En el móvil") { _, _ -> playLink(input.text.toString().trim(), false) }
-            .setNeutralButton("Cancelar", null)
+            .setNeutralButton("🕘 Historial") { _, _ -> showLinkHistory() }
+            .show()
+    }
+
+    /** Últimos enlaces usados y favoritos (★). */
+    private fun showLinkHistory() {
+        val saved = Store.links()
+        if (saved.isEmpty()) {
+            toast("Aún no hay enlaces guardados")
+            return
+        }
+        val labels = saved.map { (if (it.fav) "★ " else "") + it.title + "  ·  " + (Uri.parse(it.url).host ?: "") }
+        AlertDialog.Builder(this)
+            .setTitle("Historial de enlaces")
+            .setItems(labels.toTypedArray()) { _, which -> showLinkActions(saved[which]) }
+            .setNeutralButton("Borrar historial") { _, _ ->
+                Store.clearRecentLinks()
+                toast("Historial borrado (los favoritos se conservan)")
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showLinkActions(l: SavedLink) {
+        val labels = arrayOf(
+            "📺 Al TV",
+            "📱 En el móvil",
+            if (l.fav) "☆ Quitar de favoritos" else "★ Marcar favorito",
+            "🗑 Quitar del historial")
+        AlertDialog.Builder(this)
+            .setTitle(l.title)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> playLink(l.url, true)
+                    1 -> playLink(l.url, false)
+                    2 -> { Store.toggleLinkFav(l.url); showLinkHistory() }
+                    3 -> { Store.removeLink(l.url); showLinkHistory() }
+                }
+            }
+            .setNegativeButton("Atrás") { _, _ -> showLinkHistory() }
             .show()
     }
 
@@ -1103,6 +1142,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val title = linkTitle(url)
+        Store.addLink(url, title)   // historial de enlaces
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
         stopLocal()
         adapter.playingId = -1
