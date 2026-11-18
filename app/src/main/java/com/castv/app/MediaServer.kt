@@ -331,6 +331,13 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         // [LIVE-1d] cifrado AES-128: por fragmento -> (URL de la clave, IV en hexadecimal o null, número de secuencia)
         private val segKey = HashMap<String, Triple<String, String?, Long>>()
         private val keyCache = HashMap<String, ByteArray>()
+        // [MUS-1] audio en una lista aparte (#EXT-X-MEDIA:TYPE=AUDIO): se baja y se une al video fragmento a fragmento
+        private var audioListUrl: String? = null
+        private val audioBySeq = LinkedHashMap<Long, String>()   // número de secuencia -> URL del fragmento de audio
+        private val segSeq = HashMap<String, Long>()             // URL del fragmento de video -> número de secuencia
+        private val tsMux = TsMux()
+        private var muxLogged = 0
+        private var muxFails = 0
 
         /** Primera lectura de la lista (antes de contestarle al TV): lanza LiveUnsupported si no se puede. */
         fun prepare() { refresh() }
@@ -342,6 +349,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             val lines = text.lines().map { it.trim() }
             // candidatos: (bandwidth, url, esVideoAvc)
             val cands = ArrayList<Triple<Long, String, Boolean>>()
+            val audioGroups = HashMap<String, String>()   // [MUS-1] URL de la variante -> AUDIO="grupo"
             var i = 0
             while (i < lines.size) {
                 val l = lines[i]
@@ -351,7 +359,12 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     val videoOk = codecs == null || codecs.contains("avc1")
                     var j = i + 1
                     while (j < lines.size && (lines[j].isBlank() || lines[j].startsWith("#"))) j++
-                    if (j < lines.size) cands.add(Triple(bw, URL(URL(base), lines[j]).toString(), videoOk))
+                    if (j < lines.size) {
+                        val vurl = URL(URL(base), lines[j]).toString()
+                        cands.add(Triple(bw, vurl, videoOk))
+                        val ag = Regex("AUDIO=\"([^\"]*)\"").find(l)?.groupValues?.get(1)
+                        if (ag != null) audioGroups[vurl] = ag
+                    }
                     i = j
                 }
                 i++
@@ -360,6 +373,22 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             val pool = cands.filter { it.third }.ifEmpty { cands }
             val best = pool.minByOrNull { it.first }!!
             mediaUrl = best.second
+            // [MUS-1] si el audio va en una lista aparte, se anota para unirlo al video
+            audioListUrl = null
+            val grp = audioGroups[best.second]
+            if (grp != null) {
+                var chosen: String? = null
+                for (ml in lines) {
+                    if (!ml.startsWith("#EXT-X-MEDIA") || !ml.contains("TYPE=AUDIO")) continue
+                    if (Regex("GROUP-ID=\"([^\"]*)\"").find(ml)?.groupValues?.get(1) != grp) continue
+                    val uri = Regex("URI=\"([^\"]*)\"").find(ml)?.groupValues?.get(1) ?: continue
+                    val abs = URL(URL(base), uri).toString()
+                    if (ml.contains("DEFAULT=YES")) { chosen = abs; break }
+                    if (chosen == null) chosen = abs
+                }
+                audioListUrl = chosen
+                if (chosen != null) DebugLog.add("  LIVE audio aparte (grupo $grp): $chosen")
+            }
             DebugLog.add("  LIVE variante elegida BANDWIDTH=${if (best.first >= Long.MAX_VALUE - 1) "?" else best.first.toString()} -> ${best.second}")
         }
 
@@ -416,6 +445,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     val ext = abs.substringBefore('#').substringBefore('?').substringAfterLast('.', "").lowercase()
                     if (ext == "m4s" || ext == "mp4" || ext == "cmfv" || ext == "cmfa") throw LiveUnsupported("fragmentos .$ext")
                     if (curKey != null) segKey[abs] = Triple(curKey, curIv, mediaSeq + segs.size)
+                    if (abs !in sent) segSeq[abs] = mediaSeq + segs.size   // [MUS-1]
                     segs.add(abs)
                 }
             }
@@ -425,14 +455,15 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 first = false
                 // en vivo se arranca cerca del final de la lista; en una lista cerrada, desde el principio
                 if (!sawEnd && fresh.size > 3) fresh = fresh.takeLast(3)
+                // [MUS-1] los viejos que no se entregan se marcan como ya vistos (antes salían como "nuevos" en la
+                // lectura siguiente y se entregaban fuera de orden)
+                val keep = fresh.toHashSet()
+                for (s in segs) if (s !in keep) { sent.add(s); segSeq.remove(s) }
                 DebugLog.add("  LIVE lista: ${segs.size} fragmentos, empieza con ${fresh.size}, fin=${sawEnd}, duracion objetivo=${targetMs / 1000}s")
             }
             for (u in fresh) { pending.addLast(u); sent.add(u) }
-            if (sent.size > 600) {
-                val it = sent.iterator()
-                var k = 0
-                while (it.hasNext() && k < 200) { it.next(); it.remove(); k++ }
-            }
+            // [MUS-1] solo hace falta recordar los fragmentos que siguen en la lista (los demás ya no reaparecen)
+            if (sent.size > 600) sent.retainAll(segs.toHashSet())
         }
 
         private fun closeCur() {
@@ -512,9 +543,113 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                         continue
                     }
                 }
-                return openSegment(pending.removeFirst())
+                val vu = pending.removeFirst()
+                if (!openSegment(vu)) return false
+                if (audioListUrl != null) joinAudio(vu)   // [MUS-1]
+                return true
             }
             return false
+        }
+
+        private fun readAll(s: InputStream): ByteArray {
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(16384)
+            s.use { ins ->
+                while (true) {
+                    val n = ins.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    if (out.size() > 20_000_000) break
+                }
+            }
+            return out.toByteArray()
+        }
+
+        /** [MUS-1] Lee la lista de audio y apunta sus fragmentos por número de secuencia. */
+        private fun refreshAudio() {
+            val au = audioListUrl ?: return
+            try {
+                val (text, base) = LiveHttp.text(au)
+                if (!text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) throw LiveUnsupported("la lista de audio no es válida")
+                var seq = 0L
+                var idx = 0
+                for (raw in text.lines()) {
+                    val l = raw.trim()
+                    if (l.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
+                        seq = l.substringAfter(':').trim().toLongOrNull() ?: 0L
+                    } else if (l.startsWith("#EXT-X-KEY")) {
+                        if (!l.contains("METHOD=NONE")) throw LiveUnsupported("audio cifrado")
+                    } else if (l.startsWith("#EXT-X-MAP")) {
+                        throw LiveUnsupported("audio fMP4")
+                    } else if (l.isNotBlank() && !l.startsWith("#")) {
+                        val abs = URL(URL(base), l).toString()
+                        val ext = abs.substringBefore('#').substringBefore('?').substringAfterLast('.', "").lowercase()
+                        if (ext != "ts") throw LiveUnsupported("audio .$ext")
+                        audioBySeq[seq + idx] = abs
+                        idx++
+                    }
+                }
+                while (audioBySeq.size > 40) {
+                    val iter = audioBySeq.keys.iterator()
+                    iter.next()
+                    iter.remove()
+                }
+            } catch (e: LiveUnsupported) {
+                DebugLog.add("  LIVE audio aparte no soportado (${e.message}): solo video")
+                audioListUrl = null
+            } catch (e: Exception) {
+                DebugLog.add("  LIVE audio: no se pudo leer la lista (${e.javaClass.simpleName}: ${e.message})")
+            }
+        }
+
+        /** [MUS-1] El fragmento de video [videoUrl] ya está abierto en [cur]: se baja entero, se baja el de audio
+         *  de la misma secuencia y [cur] pasa a ser un solo TS con los dos. Si algo falla, queda solo el video. */
+        private fun joinAudio(videoUrl: String) {
+            val seq = segSeq.remove(videoUrl)
+            val src = cur ?: return
+            val vb: ByteArray = try { readAll(src) } catch (e: Exception) {
+                DebugLog.add("  LIVE error leyendo fragmento $count: ${e.javaClass.simpleName}: ${e.message}")
+                closeCur()
+                return
+            }
+            closeCur()
+            var out = vb
+            try {
+                if (seq == null) throw IllegalStateException("sin número de secuencia")
+                var au = audioBySeq[seq]
+                var t = 0
+                while (au == null && t < 4 && audioListUrl != null && !closed) {
+                    refreshAudio()
+                    au = audioBySeq[seq]
+                    t++
+                    if (au == null) { try { Thread.sleep(500) } catch (_: InterruptedException) {} }
+                }
+                if (au == null) throw IllegalStateException("el audio de la secuencia $seq no está publicado")
+                var ab: ByteArray? = null
+                var tries = 0
+                while (ab == null && tries < 3 && !closed) {
+                    tries++
+                    try {
+                        val opened = LiveHttp.open(au, 15000)
+                        try { ab = readAll(opened.first.inputStream) } finally { try { opened.first.disconnect() } catch (_: Exception) {} }
+                    } catch (e: Exception) {
+                        DebugLog.add("  LIVE audio falló ($tries/3): ${e.javaClass.simpleName}: ${e.message}")
+                        try { Thread.sleep(300) } catch (_: InterruptedException) {}
+                    }
+                }
+                if (ab == null) throw IllegalStateException("no se pudo bajar el audio")
+                out = tsMux.join(vb, ab)
+                if (muxLogged < 3) {
+                    muxLogged++
+                    DebugLog.add("  LIVE audio+video: ${videoUrl.substringAfterLast('/')} + ${au.substringAfterLast('/')} " +
+                        "(video ${vb.size} + audio ${ab.size} -> ${out.size} bytes)")
+                }
+            } catch (e: Exception) {
+                muxFails++
+                if (muxFails <= 5) DebugLog.add("  LIVE mezcla falló en el fragmento $count (${e.javaClass.simpleName}: ${e.message}): se entrega solo video")
+                out = vb
+            }
+            cur = ByteArrayInputStream(out)
         }
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
@@ -558,6 +693,261 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             if (!closed) DebugLog.add("  LIVE cerrado (el TV cortó o terminó): $count fragmentos, $total bytes enviados")
             closed = true
             closeCur()
+        }
+    }
+
+    /** [MUS-1] Une un fragmento TS que solo trae video con el de solo audio del mismo momento y devuelve un solo TS
+     *  con los dos flujos: PAT y PMT nuevas, el audio cambia de PID si choca con el del video, y los paquetes de los
+     *  dos se entrelazan por tiempo (PTS/DTS de las cabeceras PES). Todo en memoria, un fragmento a la vez. */
+    private class TsMux {
+        private class Es(val type: Int, val pid: Int, val info: ByteArray)
+        private class Psi(val tsid: Int, val program: Int, val pmtPid: Int, val pcrPid: Int, val es: List<Es>)
+
+        private var patCc = 0
+        private var pmtCc = 0
+
+        private fun u(b: ByteArray, i: Int): Int = b[i].toInt() and 0xff
+        private fun pidOf(b: ByteArray, o: Int): Int = ((u(b, o + 1) and 0x1f) shl 8) or u(b, o + 2)
+
+        /** Posición del contenido del paquete que empieza en [o], o -1 si no trae. */
+        private fun payloadPos(b: ByteArray, o: Int): Int {
+            val afc = (u(b, o + 3) shr 4) and 3
+            val p = when (afc) {
+                1 -> o + 4
+                3 -> o + 5 + u(b, o + 4)
+                else -> return -1
+            }
+            return if (p < o + 188) p else -1
+        }
+
+        private fun syncCheck(b: ByteArray): Int {
+            val n = b.size / 188
+            if (n == 0) throw IllegalStateException("fragmento TS vacío")
+            for (k in 0 until n) {
+                if (u(b, k * 188) != 0x47) throw IllegalStateException("fragmento TS sin sincronía (paquete $k)")
+            }
+            return n
+        }
+
+        private fun ts33(b: ByteArray, p: Int): Long =
+            ((b[p].toLong() and 0x0e) shl 29) or ((b[p + 1].toLong() and 0xff) shl 22) or
+                ((b[p + 2].toLong() and 0xfe) shl 14) or ((b[p + 3].toLong() and 0xff) shl 7) or
+                ((b[p + 4].toLong() and 0xff) shr 1)
+
+        private fun parsePsi(b: ByteArray, n: Int): Psi {
+            var tsid = 0
+            var program = -1
+            var pmtPid = -1
+            for (k in 0 until n) {
+                val o = k * 188
+                if (pidOf(b, o) != 0 || (u(b, o + 1) and 0x40) == 0) continue
+                val p = payloadPos(b, o)
+                if (p < 0) continue
+                val s = p + 1 + u(b, p)
+                if (s + 8 > o + 188 || u(b, s) != 0) continue
+                val end = s + 3 + (((u(b, s + 1) and 0x0f) shl 8) or u(b, s + 2)) - 4
+                if (end > o + 188) throw IllegalStateException("PAT en varios paquetes")
+                tsid = (u(b, s + 3) shl 8) or u(b, s + 4)
+                var q = s + 8
+                while (q + 4 <= end) {
+                    val prog = (u(b, q) shl 8) or u(b, q + 1)
+                    if (prog != 0) {
+                        program = prog
+                        pmtPid = ((u(b, q + 2) and 0x1f) shl 8) or u(b, q + 3)
+                        break
+                    }
+                    q += 4
+                }
+                if (program >= 0) break
+            }
+            if (program < 0) throw IllegalStateException("sin PAT")
+            for (k in 0 until n) {
+                val o = k * 188
+                if (pidOf(b, o) != pmtPid || (u(b, o + 1) and 0x40) == 0) continue
+                val p = payloadPos(b, o)
+                if (p < 0) continue
+                val s = p + 1 + u(b, p)
+                if (s + 12 > o + 188 || u(b, s) != 2) continue
+                val end = s + 3 + (((u(b, s + 1) and 0x0f) shl 8) or u(b, s + 2)) - 4
+                if (end > o + 188) throw IllegalStateException("PMT en varios paquetes")
+                val pcr = ((u(b, s + 8) and 0x1f) shl 8) or u(b, s + 9)
+                var q = s + 12 + (((u(b, s + 10) and 0x0f) shl 8) or u(b, s + 11))
+                val list = ArrayList<Es>()
+                while (q + 5 <= end) {
+                    val len = ((u(b, q + 3) and 0x0f) shl 8) or u(b, q + 4)
+                    if (q + 5 + len > end) break
+                    list.add(Es(u(b, q), ((u(b, q + 1) and 0x1f) shl 8) or u(b, q + 2), b.copyOfRange(q + 5, q + 5 + len)))
+                    q += 5 + len
+                }
+                if (list.isEmpty()) throw IllegalStateException("PMT sin flujos")
+                return Psi(tsid, program, pmtPid, pcr, list)
+            }
+            throw IllegalStateException("sin PMT")
+        }
+
+        /** Marca de tiempo (90 kHz) de cada paquete: la del último PES de su PID (DTS si hay, si no PTS). */
+        private fun keysOf(b: ByteArray, n: Int): LongArray {
+            val keys = LongArray(n) { -1L }
+            val last = HashMap<Int, Long>()
+            for (k in 0 until n) {
+                val o = k * 188
+                val pid = pidOf(b, o)
+                if ((u(b, o + 1) and 0x40) != 0) {
+                    val p = payloadPos(b, o)
+                    if (p >= 0 && p + 14 <= o + 188 && u(b, p) == 0 && u(b, p + 1) == 0 && u(b, p + 2) == 1) {
+                        val fl = (u(b, p + 7) shr 6) and 3
+                        if (fl == 3 && p + 19 <= o + 188) last[pid] = ts33(b, p + 14)
+                        else if (fl >= 2) last[pid] = ts33(b, p + 9)
+                    }
+                }
+                keys[k] = last[pid] ?: -1L
+            }
+            var first = -1L
+            for (v in keys) { if (v >= 0) { first = v; break } }
+            if (first < 0) throw IllegalStateException("sin marcas de tiempo")
+            for (k in 0 until n) { if (keys[k] < 0) keys[k] = first }
+            return keys
+        }
+
+        /** CRC-32 de MPEG (polinomio 0x04C11DB7, valor inicial 0xFFFFFFFF, sin inversión). */
+        private fun crc32(b: ByteArray, len: Int): Int {
+            var crc = -1
+            for (i in 0 until len) {
+                crc = crc xor (u(b, i) shl 24)
+                for (k in 0 until 8) {
+                    crc = if ((crc and Int.MIN_VALUE) != 0) (crc shl 1) xor 0x04C11DB7 else (crc shl 1)
+                }
+            }
+            return crc
+        }
+
+        private fun withCrc(body: ByteArray): ByteArray {
+            val out = ByteArray(body.size + 4)
+            System.arraycopy(body, 0, out, 0, body.size)
+            val c = crc32(body, body.size)
+            out[body.size] = (c ushr 24).toByte()
+            out[body.size + 1] = (c ushr 16).toByte()
+            out[body.size + 2] = (c ushr 8).toByte()
+            out[body.size + 3] = c.toByte()
+            return out
+        }
+
+        private fun psiPacket(pid: Int, cc: Int, section: ByteArray): ByteArray {
+            if (section.size > 183) throw IllegalStateException("sección PSI demasiado grande")
+            val pk = ByteArray(188) { 0xFF.toByte() }
+            pk[0] = 0x47
+            pk[1] = (0x40 or (pid shr 8)).toByte()
+            pk[2] = (pid and 0xff).toByte()
+            pk[3] = (0x10 or (cc and 0x0f)).toByte()
+            pk[4] = 0
+            System.arraycopy(section, 0, pk, 5, section.size)
+            return pk
+        }
+
+        private fun patSection(psi: Psi): ByteArray {
+            val body = byteArrayOf(
+                0x00, 0xB0.toByte(), 13,
+                (psi.tsid shr 8).toByte(), psi.tsid.toByte(),
+                0xC1.toByte(), 0, 0,
+                (psi.program shr 8).toByte(), psi.program.toByte(),
+                (0xE0 or (psi.pmtPid shr 8)).toByte(), psi.pmtPid.toByte()
+            )
+            return withCrc(body)
+        }
+
+        private fun pmtSection(psi: Psi, streams: List<Es>): ByteArray {
+            var esLen = 0
+            for (e in streams) esLen += 5 + e.info.size
+            val secLen = 9 + esLen + 4
+            val out = ByteArrayOutputStream()
+            out.write(0x02)
+            out.write(0xB0 or (secLen shr 8))
+            out.write(secLen and 0xff)
+            out.write(psi.program shr 8)
+            out.write(psi.program and 0xff)
+            out.write(0xC1)
+            out.write(0)
+            out.write(0)
+            out.write(0xE0 or (psi.pcrPid shr 8))
+            out.write(psi.pcrPid and 0xff)
+            out.write(0xF0)
+            out.write(0)
+            for (e in streams) {
+                out.write(e.type)
+                out.write(0xE0 or (e.pid shr 8))
+                out.write(e.pid and 0xff)
+                out.write(0xF0 or (e.info.size shr 8))
+                out.write(e.info.size and 0xff)
+                out.write(e.info, 0, e.info.size)
+            }
+            return withCrc(out.toByteArray())
+        }
+
+        fun join(vb: ByteArray, ab: ByteArray): ByteArray {
+            val nv = syncCheck(vb)
+            val na = syncCheck(ab)
+            val vp = parsePsi(vb, nv)
+            val ap = parsePsi(ab, na)
+            // PIDs del audio: se conservan salvo que choquen con los del video
+            val used = HashSet<Int>()
+            used.add(0); used.add(0x1fff); used.add(vp.pmtPid); used.add(vp.pcrPid)
+            for (e in vp.es) used.add(e.pid)
+            val aPids = HashSet<Int>()
+            for (e in ap.es) aPids.add(e.pid)
+            val audioMap = HashMap<Int, Int>()
+            val audioEs = ArrayList<Es>()
+            var free = 0x100
+            for (e in ap.es) {
+                var np = e.pid
+                if (np in used) {
+                    while (free in used || free in aPids) free++
+                    np = free
+                    free++
+                }
+                used.add(np)
+                audioMap[e.pid] = np
+                audioEs.add(Es(e.type, np, e.info))
+            }
+            val kv = keysOf(vb, nv)
+            val ka = keysOf(ab, na)
+            val vIdx = ArrayList<Int>()
+            for (k in 0 until nv) {
+                val pid = pidOf(vb, k * 188)
+                if (pid != 0 && pid != vp.pmtPid && pid != 0x1fff) vIdx.add(k)
+            }
+            val aIdx = ArrayList<Int>()
+            for (k in 0 until na) {
+                if (audioMap.containsKey(pidOf(ab, k * 188))) aIdx.add(k)
+            }
+            if (aIdx.isEmpty()) throw IllegalStateException("el fragmento de audio no trae paquetes de audio")
+
+            val out = ByteArrayOutputStream(vb.size + ab.size + 400)
+            out.write(psiPacket(0, patCc, patSection(vp)))
+            patCc = (patCc + 1) and 0x0f
+            out.write(psiPacket(vp.pmtPid, pmtCc, pmtSection(vp, vp.es + audioEs)))
+            pmtCc = (pmtCc + 1) and 0x0f
+
+            val tmp = ByteArray(188)
+            var i = 0
+            var j = 0
+            while (i < vIdx.size || j < aIdx.size) {
+                val takeVideo = if (i >= vIdx.size) false else if (j >= aIdx.size) true else kv[vIdx[i]] <= ka[aIdx[j]]
+                if (takeVideo) {
+                    out.write(vb, vIdx[i] * 188, 188)
+                    i++
+                } else {
+                    System.arraycopy(ab, aIdx[j] * 188, tmp, 0, 188)
+                    val old = pidOf(tmp, 0)
+                    val np = audioMap[old] ?: old
+                    if (np != old) {
+                        tmp[1] = ((u(tmp, 1) and 0xE0) or (np shr 8)).toByte()
+                        tmp[2] = (np and 0xff).toByte()
+                    }
+                    out.write(tmp, 0, 188)
+                    j++
+                }
+            }
+            return out.toByteArray()
         }
     }
 
