@@ -1325,17 +1325,18 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { setStatus("⚠️ TV no encontrado todavía. Espera unos segundos o usa ⋮ › Elegir TV.") }
                 return@thread
             }
-            val mime = if (isHls(url)) "application/vnd.apple.mpegurl" else "video/mp4"
+            val live = isHls(url)   // [LIVE-1b] canal en vivo: el teléfono lo entrega como un solo flujo TS (/live)
+            val mime = if (live) "video/mp2t" else "video/mp4"
             // [Etapa 13-A.2] mp4: el TV pide el video al teléfono (/relay) y el teléfono lo baja del enlace
             // (https, redirecciones).
             // [Etapa 13-A.3] HLS (.m3u8) también va por /relay: el teléfono reescribe la lista y sirve los
             // trozos, así el TV solo habla http con el teléfono. La extensión (.m3u8 o .mp4) le dice al relay qué es.
             val phoneIp = getLocalIpAddress()
-            val sendUrl = if (phoneIp != null) TvSend.relayUrl(phoneIp, url, isHls(url)) else url   // [Etapa 14-C]
+            val sendUrl = if (phoneIp != null) (if (live) TvSend.liveUrl(phoneIp, url) else TvSend.relayUrl(phoneIp, url, false)) else url   // [Etapa 14-C] [LIVE-1b]
             DebugLog.add("ENLACE: $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
             if (ok) linkOnTv = true   // [PAUSA-1] ⏸/▶ ahora controlan el enlace del TV
-            if (ok) readLinkDuration(sendUrl, gen)   // [PROG-1d] el TV no informa la duración: la lee el teléfono
+            if (ok && !live) readLinkDuration(sendUrl, gen)   // [PROG-1d] (en vivo no hay duración: se evita abrir un segundo flujo)
             runOnUiThread {
                 if (ok) tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
                 setStatus(
