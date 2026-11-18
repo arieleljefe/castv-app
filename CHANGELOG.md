@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v35)
+# Registro de cambios y guía de continuidad – CASTV (v36)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -21,11 +21,12 @@
 
 ---
 
-## 📍 Estado Actual (v35)
+## 📍 Estado Actual (v36)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
 - ✅ **Historial de enlaces y favoritos sueltos (17 nov 2026):** confirmado por Ariel.
+- ✅ **Etapa 13-B.1 Listas M3U (17 nov 2026):** confirmado por Ariel.
 - ✅ **Reproducción base:** Archivos locales (mp3/mp4) y enlaces externos mp4 por `/relay` (incluye redirección 302) funcionan en TV Hisense HL1 y en móvil (`VideoPlayerActivity` con subtítulos `.srt/.vtt`, siguiente automático y botón 📺 TV).
 - ❌ **HLS (`.m3u8`) al TV:** El TV Hisense no sigue los enlaces de listas HLS; HLS queda solo para el móvil.
 - ⏳ **Pendiente en TV:** Diagnóstico de adelantar (*seek*) en enlaces por `/relay`, pausa/detener enlaces y salir con enlace activo.
@@ -69,48 +70,21 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 - Archivos: `Store.kt` (`SavedLink`, `links()`, `addLink()`, `toggleLinkFav()`, `removeLink()`, `clearRecentLinks()`) y `MainActivity.kt` (`showLinkHistory()`, `showLinkActions()`, `Store.addLink` en `playLink`). Parche: `historial_enlaces.patch`.
 - **Si falla:** `git revert` del commit "Historial de enlaces y favoritos sueltos".
 
-### 🧪 Etapa 13-B.1 — Listas M3U (`parser_m3u.patch`) — pendiente de aplicar y probar
+### ✅ Etapa 13-B.1 — Listas M3U — confirmado por Ariel el 17 nov 2026
 
-- **Estado:** 🧪 entregado el 17 nov 2026; **no se marca ✅ hasta que Ariel confirme que compiló en verde y diga "ya funciona"**.
-- **Qué hace:**
-  1. Nueva entrada en ⋮: **"Listas M3U (canales)…"**. Abre una pantalla nueva (`M3uActivity`, hecha por código, sin XML).
-  2. Arriba: la lista actual (toca para cambiar entre las guardadas), **＋** para añadir una (nombre + enlace) y **🗑** para quitarla. La **primera vez** el diálogo viene pre-rellenado con la lista gratuita **Free-TV** (`https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8`) para probar.
-  3. **Buscador** de canales (sin acentos, varias palabras) y botón **Grupo** (filtra por `group-title`, con conteo).
-  4. Se descarga en segundo plano (sigue redirecciones, límite 25 MB) y se **guarda una copia** en la caché de la app: si no hay internet, abre la copia y avisa "sin conexión (copia guardada)".
-  5. Al tocar un canal: **📺 Al TV** (avisa "HLS: puede no funcionar" si es `.m3u8`) o **📱 En el móvil**. La pantalla se cierra y `MainActivity` lo reproduce con el `playLink` existente (el canal queda también en el 🕘 Historial de enlaces, con el nombre del canal como título).
-- **Archivos (3 nuevos pequeños + 3 con cambios aditivos):**
-  - `M3uParser.kt` (nuevo): `M3uChannel`, `parse()` (`#EXTINF`, `group-title`, `#EXTGRP`, solo http/https) y `download()`.
-  - `M3uActivity.kt` (nuevo): pantalla, buscador, grupos, listas guardadas, devuelve el canal elegido.
-  - `Store.kt`: `M3uList`, `m3uLists()`, `addM3uList()`, `removeM3uList()`, `lastM3u` (clave `m3u` / `m3uLast` en el `SharedPreferences` `castv_lib`). No cambia nada anterior.
-  - `AndroidManifest.xml`: registra `.M3uActivity` (`exported=false`).
-  - `MainActivity.kt` (4 retoques): código de petición `reqM3u = 4714`; entrada de menú id 16; rama `reqM3u ->` en `onActivityResult`; `playLink` recibe un parámetro opcional `titleOverride: String? = null` (las llamadas existentes no cambian).
-- **No toca:** servidor, `/relay`, `TvController`, `VideoPlayerActivity`, layouts XML ni el historial de enlaces ya confirmado.
-- **Verificado antes de entregar:** el parche aplica limpio (`git apply --check`) sobre `MainActivity.kt`, `Store.kt` y `AndroidManifest.xml` que Ariel adjuntó **más** `historial_enlaces.patch` ya aplicado. Nombres reales usados: `playLink`, `Store.init`, `DebugLog.add`, `R.attr.castvAccent`, `R.color.vlc_bg / vlc_text / vlc_muted`. No se pudo compilar aquí; el build de GitHub es la primera prueba.
-- **Probar:**
-  1. ⋮ → **Listas M3U (canales)…**: sale el diálogo con "Free-TV (gratis)"; toca **Guardar y abrir**.
-  2. Debe decir "Descargando lista…" y luego "N canales". Escribe una palabra en el buscador: se filtra.
-  3. Toca **Grupo** y elige uno: se filtra por grupo.
-  4. Toca un canal → **📱 En el móvil**: se abre el reproductor (si el enlace es HLS, es el caso que sí funciona en el móvil).
-  5. Prueba un canal con **📺 Al TV** (esperado: si es `.m3u8`, el Hisense puede no abrirlo; no es un fallo del parche).
-  6. Vuelve a ⋮ → Reproducir enlace → 🕘 Historial: debe estar el canal con su nombre.
-  7. Modo avión + reabrir **Listas M3U**: debe abrir la copia guardada con el aviso "sin conexión".
-  8. **＋** con otra lista (cualquier enlace `.m3u`), cambia entre listas, y **🗑** para quitarla.
-- **Limitaciones conocidas (v1):** al tocar un canal se vuelve a la pantalla principal (hay que reabrir Listas M3U para cambiar de canal; mantener abierta la pantalla sería 13-B.2); sin logos de canales; sin favoritos de canales; solo enlaces http/https (se ignoran rtmp, udp, etc.).
+- Hecho y probado: ⋮ → **Listas M3U (canales)…**, lista Free-TV pre-rellenada la primera vez, buscador, filtro por grupo, copia guardada sin internet, ＋ / 🗑 para listas, y reproducir un canal **📺 Al TV** o **📱 En el móvil** (queda en el 🕘 Historial con el nombre del canal).
+- Archivos: `M3uParser.kt` (nuevo), `M3uActivity.kt` (nuevo), `Store.kt` (`M3uList`, `m3uLists()`, `addM3uList()`, `removeM3uList()`, `lastM3u`), `AndroidManifest.xml` (`.M3uActivity`), `MainActivity.kt` (`reqM3u`, menú id 16, `playLink(..., titleOverride)`). Parche: `parser_m3u.patch`.
 - **Si falla:** `git revert` del commit "Listas M3U (Etapa 13-B.1)".
-- **Riesgo:** bajo-medio. Es casi todo código nuevo en archivos nuevos; en `MainActivity` solo cambian 4 puntos y el parámetro nuevo tiene valor por defecto.
-- **Pasos en Termux:**
-  ```bash
-  cd ~/castv-nuevo/castv-fresh && pwd
-  git apply --exclude=CHANGELOG.md ~/storage/downloads/parser_m3u.patch
-  grep -c "reqM3u" app/src/main/java/com/castv/app/MainActivity.kt
-  ls app/src/main/java/com/castv/app/M3uActivity.kt
-  cp ~/storage/downloads/CHANGELOG_v35.md CHANGELOG.md
-  git add -A && git commit -m "Listas M3U (Etapa 13-B.1)" && git push origin main
-  ```
-  (el `grep` debe dar 3).
+- **Limitaciones conocidas (v1):** al tocar un canal se vuelve a la pantalla principal; sin logos ni favoritos de canales; solo http/https.
 
-### Siguiente después de este
-- **13-B.2:** mantener abierta la pantalla de canales al reproducir y favoritos de canales (según lo que Ariel note al probar).
+### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
+
+1. **13-B.2 — Canales más cómodos (recomendado, beneficio alto):** que la pantalla de canales **siga abierta** al reproducir (cambiar de canal sin reabrir), y **★ favoritos de canales**. Toca `M3uActivity.kt`, `Store.kt` y probablemente `MainActivity.kt`/`VideoPlayerActivity.kt` (hay que decidir cómo se devuelve el control; se detalla en 🧪 antes del código).
+2. **Gestos en el reproductor de video** (brillo, volumen, doble toque ±10 s). Solo `VideoPlayerActivity.kt`.
+3. **Respaldo Exportar/Importar (JSON)** de favoritos, listas M3U, historial y ajustes. `Store.kt` + `MainActivity.kt`.
+4. **Pulido visual** (títulos largos con desplazamiento, mini reproductor más compacto).
+5. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
+- Para el 1 hará falta `VideoPlayerActivity.kt` actual; para el 2 también. Se pedirá antes de entregar nada.
 
 ### Notas de este día
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
@@ -119,6 +93,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **Etapa 13-B.1 (17 nov 2026):** Listas M3U (`M3uParser.kt`, `M3uActivity.kt`, `Store.kt`).
 - **Historial de enlaces + favoritos sueltos (17 nov 2026):** `SavedLink` en `Store.kt`, 🕘 Historial en "Reproducir enlace".
 - **Etapa 14-C:** Extracción de `PortDialog.kt` y `TvSend.kt`.
 - **Etapa 14-A / 14-B (`ac51ab7`):** `CastvUtils.kt` (texto/red) y mensajes de error claros.
