@@ -57,6 +57,12 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var resumeOnReturn = false
     private val handler = Handler(Looper.getMainLooper())
     private val reqSub = 5101
+    private var previewing = false     // [UI-S1] muestra un subtítulo de ejemplo al cambiar el estilo
+    private val hidePreview = Runnable {
+        previewing = false
+        shownCue = null
+        if (::subText.isInitialized) subText.visibility = View.GONE
+    }
 
     // Gestos: brillo (derecha), volumen (izquierda), doble toque lateral ±10 s
     private lateinit var hud: TextView
@@ -136,6 +142,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
                 setMargins(dp(24), 0, dp(24), dp(72))
             })
+        applySubStyle()   // [UI-S1] tamaño, negrita, color y fondo guardados
 
         // Barra superior: título + 💬 + 📺 (solo se ve cuando se muestran los controles)
         topBar = LinearLayout(this).apply {
@@ -397,7 +404,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "📂 Elegir archivo (.srt / .vtt)…",
             "⏩ Subtítulos más tarde (+0,5 s)",
             "⏪ Subtítulos más temprano (−0,5 s)",
-            "🚫 Quitar subtítulos")
+            "🚫 Quitar subtítulos",
+            "🎨 Estilo del subtítulo…")
         AlertDialog.Builder(this)
             .setTitle("Subtítulos")
             .setItems(labels) { _, which ->
@@ -417,8 +425,92 @@ class VideoPlayerActivity : AppCompatActivity() {
                         subPrefs().edit().remove(subKey(items[index])).apply()
                         toast("Subtítulos quitados")
                     }
+                    4 -> { previewSub(); showStyleMenu() }
                 }
             }
+            .show()
+    }
+
+    // ------------------------------------------------------------ [UI-S1] Estilo de subtítulos
+
+    private val sizeNames = arrayOf("Pequeño", "Mediano", "Grande", "Muy grande")
+    private val sizeSp = floatArrayOf(14f, 18f, 24f, 30f)       // Mediano = 18 (el de siempre)
+    private val colorNames = arrayOf("Blanco", "Amarillo", "Cian", "Verde")
+    private val colorVals = intArrayOf(
+        0xFFFFFFFF.toInt(), 0xFFFFEB3B.toInt(), 0xFF00E5FF.toInt(), 0xFF69F0AE.toInt())
+    private val bgNames = arrayOf("Semitransparente", "Opaco", "Sin fondo")
+    private val bgVals = intArrayOf(0xAA000000.toInt(), 0xFF000000.toInt(), 0x00000000)
+
+    private fun stSize() = subPrefs().getInt("style_size", 1).coerceIn(0, sizeNames.size - 1)
+    private fun stColor() = subPrefs().getInt("style_color", 0).coerceIn(0, colorNames.size - 1)
+    private fun stBg() = subPrefs().getInt("style_bg", 0).coerceIn(0, bgNames.size - 1)
+    private fun stBold() = subPrefs().getBoolean("style_bold", false)
+
+    private fun applySubStyle() {
+        subText.textSize = sizeSp[stSize()]
+        subText.setTextColor(colorVals[stColor()])
+        subText.setTypeface(Typeface.DEFAULT, if (stBold()) Typeface.BOLD else Typeface.NORMAL)
+        val bg = bgVals[stBg()]
+        subText.background = GradientDrawable().apply {
+            setColor(bg)
+            cornerRadius = dp(6).toFloat()
+        }
+        // Sin fondo: una sombra negra mantiene el texto legible
+        if (stBg() == 2) subText.setShadowLayer(6f, 2f, 2f, Color.BLACK)
+        else subText.setShadowLayer(0f, 0f, 0f, 0)
+    }
+
+    private fun previewSub() {
+        previewing = true
+        subText.text = "Así se verán los subtítulos"
+        subText.visibility = View.VISIBLE
+        handler.removeCallbacks(hidePreview)
+        handler.postDelayed(hidePreview, 3000)
+    }
+
+    private fun styleChanged() {
+        applySubStyle()
+        previewSub()
+        showStyleMenu()
+    }
+
+    private fun pickStyle(title: String, names: Array<String>, current: Int, key: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setSingleChoiceItems(names, current) { d, which ->
+                subPrefs().edit().putInt(key, which).apply()
+                d.dismiss()
+                styleChanged()
+            }
+            .show()
+    }
+
+    private fun showStyleMenu() {
+        val labels = arrayOf(
+            "🔠 Tamaño: ${sizeNames[stSize()]}",
+            "🅱 Negrita: ${if (stBold()) "sí" else "no"}",
+            "🎨 Color del texto: ${colorNames[stColor()]}",
+            "◼ Fondo: ${bgNames[stBg()]}",
+            "↩ Restablecer estilo")
+        AlertDialog.Builder(this)
+            .setTitle("Estilo del subtítulo")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> pickStyle("Tamaño", sizeNames, stSize(), "style_size")
+                    1 -> {
+                        subPrefs().edit().putBoolean("style_bold", !stBold()).apply()
+                        styleChanged()
+                    }
+                    2 -> pickStyle("Color del texto", colorNames, stColor(), "style_color")
+                    3 -> pickStyle("Fondo", bgNames, stBg(), "style_bg")
+                    4 -> {
+                        subPrefs().edit().remove("style_size").remove("style_bold")
+                            .remove("style_color").remove("style_bg").apply()
+                        styleChanged()
+                    }
+                }
+            }
+            .setNegativeButton("Cerrar", null)
             .show()
     }
 
@@ -488,6 +580,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun updateSub() {
+        if (previewing) return
         if (subs.isEmpty() || !::video.isInitialized) return
         val pos = (try { video.currentPosition } catch (e: Exception) { 0 }) - subOffset
         val cue = subs.firstOrNull { pos >= it.start && pos <= it.end }
@@ -523,6 +616,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(tick)
         handler.removeCallbacks(hideHud)
+        handler.removeCallbacks(hidePreview)
         if (::video.isInitialized) {
             try { video.stopPlayback() } catch (e: Exception) { }
         }
