@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navAudio: TextView
     private lateinit var navFolders: TextView
     private lateinit var navQueue: TextView
+    private lateinit var navMore: TextView   // [UI-1]
     private lateinit var btnQuick: ImageButton
     private lateinit var btnExpand: ImageButton
     private lateinit var playerExpanded: View
@@ -337,6 +338,7 @@ class MainActivity : AppCompatActivity() {
         navAudio = findViewById(R.id.navAudio)
         navFolders = findViewById(R.id.navFolders)
         navQueue = findViewById(R.id.navQueue)
+        navMore = findViewById(R.id.navMore)   // [UI-1]
         btnQuick = findViewById(R.id.btnQuick)
         btnExpand = findViewById(R.id.btnExpand)
         playerExpanded = findViewById(R.id.playerExpanded)
@@ -374,6 +376,7 @@ class MainActivity : AppCompatActivity() {
         navAudio.setOnClickListener { showMusic() }
         navFolders.setOnClickListener { pickFolder() }
         navQueue.setOnClickListener { showQueue() }
+        navMore.setOnClickListener { showMoreSheet() }   // [UI-1]
         tabAll.setOnClickListener { viewMode = ViewMode.ALL; applyFilters() }
         tabFavs.setOnClickListener { viewMode = ViewMode.FAVS; applyFilters() }
         tabResume.setOnClickListener { viewMode = ViewMode.RESUME; applyFilters() }
@@ -885,59 +888,142 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showMainMenu() {
-        val pm = PopupMenu(this, btnMenu)
-        pm.menu.add(0, 1, 0, "Ordenar: " + sortMode.label.removePrefix("↕ "))
-        pm.menu.add(0, 2, 1, when {
+    /** Rellena las opciones del menú principal (las usan el ⋮ y la hoja "Más"). */
+    private fun fillMainMenu(menu: Menu) {
+        menu.add(0, 1, 0, "Ordenar: " + sortMode.label.removePrefix("↕ "))
+        menu.add(0, 2, 1, when {
             dupIds.isEmpty() -> "Duplicados: ninguno"
             Store.hideDups -> "Mostrar duplicados (${dupIds.size})"
             else -> "Ocultar duplicados (${dupIds.size})"
         })
-        pm.menu.add(0, 3, 2, if (outPhone) "Salida: Teléfono" else "Salida: TV")
-        pm.menu.add(0, 4, 3, "Mis listas")
+        menu.add(0, 3, 2, if (outPhone) "Salida: Teléfono" else "Salida: TV")
+        menu.add(0, 4, 3, "Mis listas")
         if (showingMusic) {
-            pm.menu.add(0, 5, 4, "Filtrar por artista")
-            pm.menu.add(0, 6, 5, "Filtrar por álbum")
+            menu.add(0, 5, 4, "Filtrar por artista")
+            menu.add(0, 6, 5, "Filtrar por álbum")
         }
-        pm.menu.add(0, 7, 6, sleepLabel())
-        pm.menu.add(0, 8, 7, "Velocidad: " + speedShort() + " (teléfono)")
-        pm.menu.add(0, 9, 8, "Ecualizador (teléfono)")
-        pm.menu.add(0, 10, 9, "Elegir TV")
-        pm.menu.add(0, 12, 10, "Tema: " + themeLabel())
-        pm.menu.add(0, 13, 11, "Color: " + accentNames[savedAccent().coerceIn(0, 3)])
+        menu.add(0, 7, 6, sleepLabel())
+        menu.add(0, 8, 7, "Velocidad: " + speedShort() + " (teléfono)")
+        menu.add(0, 9, 8, "Ecualizador (teléfono)")
+        menu.add(0, 10, 9, "Elegir TV")
+        menu.add(0, 12, 10, "Tema: " + themeLabel())
+        menu.add(0, 13, 11, "Color: " + accentNames[savedAccent().coerceIn(0, 3)])
         if (Build.VERSION.SDK_INT >= 30) {
-            pm.menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
+            menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
         }
-        pm.menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
-        pm.menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
-        pm.menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
-        pm.menu.add(0, 11, 12, "Mis redes y contacto")
-        pm.setOnMenuItemClickListener { mi ->
-            when (mi.itemId) {
-                1 -> pickSort()
-                2 -> if (dupIds.isNotEmpty()) {
-                    Store.hideDups = !Store.hideDups
-                    applyFilters()
-                }
-                3 -> btnOutput.performClick()
-                4 -> showPlaylists()
-                5 -> pickArtist()
-                6 -> pickAlbum()
-                7 -> pickSleepTimer()
-                8 -> pickSpeed()
-                9 -> showEqualizer()
-                10 -> pickTv()
-                11 -> showSocials()
-                12 -> pickTheme()
-                13 -> pickAccent()
-                14 -> toggleTrash()
-                15 -> askLinkAndPlay()
-                16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
-                17 -> showBackupMenu()
+        menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
+        menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
+        menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
+        menu.add(0, 11, 12, "Mis redes y contacto")
+    }
+
+    /** Ejecuta la acción de una opción del menú principal por su id. */
+    private fun runMenuAction(id: Int) {
+        when (id) {
+            1 -> pickSort()
+            2 -> if (dupIds.isNotEmpty()) {
+                Store.hideDups = !Store.hideDups
+                applyFilters()
             }
+            3 -> btnOutput.performClick()
+            4 -> showPlaylists()
+            5 -> pickArtist()
+            6 -> pickAlbum()
+            7 -> pickSleepTimer()
+            8 -> pickSpeed()
+            9 -> showEqualizer()
+            10 -> pickTv()
+            11 -> showSocials()
+            12 -> pickTheme()
+            13 -> pickAccent()
+            14 -> toggleTrash()
+            15 -> askLinkAndPlay()
+            16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
+            17 -> showBackupMenu()
+        }
+    }
+
+    private fun showMainMenu() {
+        val pm = PopupMenu(this, btnMenu)
+        fillMainMenu(pm.menu)
+        pm.setOnMenuItemClickListener { mi ->
+            runMenuAction(mi.itemId)
             true
         }
         pm.show()
+    }
+
+    // ------------------------------------------- Hoja "Más" [UI-1]
+
+    private fun showMoreSheet() {
+        fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+        // Lee las opciones de un menú auxiliar (sin mostrarlo) para no duplicar textos.
+        val aux = PopupMenu(this, navMore)
+        fillMainMenu(aux.menu)
+        val titles = LinkedHashMap<Int, String>()
+        for (i in 0 until aux.menu.size()) {
+            val mi = aux.menu.getItem(i)
+            titles[mi.itemId] = mi.title?.toString() ?: ""
+        }
+
+        val groups = ArrayList<Pair<String, List<Int>>>()
+        groups.add("Reproducir y canales" to listOf(15, 16, 10, 3))
+        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6))
+        groups.add("Reproductor" to listOf(7, 8, 9))
+        groups.add("Apariencia" to listOf(12, 13))
+        groups.add("Datos" to listOf(17, 14))
+        groups.add("Acerca" to listOf(11))
+        val known = groups.flatMap { it.second }.toSet()
+        val extra = titles.keys.filter { it !in known }.sorted()
+        if (extra.isNotEmpty()) groups.add("Más" to extra)
+
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val r = dp(20).toFloat()
+        val root = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, dp(20))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(col(R.color.vlc_surface))
+                cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
+            }
+        }
+        val sel = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, sel, true)
+
+        for ((name, ids) in groups) {
+            val shown = ids.filter { titles.containsKey(it) }
+            if (shown.isEmpty()) continue
+            root.addView(TextView(this).apply {
+                text = name
+                textSize = 13f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(accentColor())
+                setPadding(dp(20), dp(14), dp(20), dp(4))
+            })
+            for (id in shown) {
+                root.addView(TextView(this).apply {
+                    text = titles[id]
+                    textSize = 16f
+                    setTextColor(col(R.color.vlc_text))
+                    setPadding(dp(20), dp(13), dp(20), dp(13))
+                    setBackgroundResource(sel.resourceId)
+                    setOnClickListener {
+                        sheet.dismiss()
+                        runMenuAction(id)
+                    }
+                })
+            }
+        }
+
+        val scroll = androidx.core.widget.NestedScrollView(this)
+        scroll.addView(root)
+        sheet.setContentView(scroll)
+        (scroll.parent as? View)?.setBackgroundColor(0)   // deja ver las esquinas redondeadas
+        sheet.setOnShowListener {
+            sheet.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+        }
+        sheet.show()
     }
 
     // ------------------------------------------- Respaldo (exportar / importar)
