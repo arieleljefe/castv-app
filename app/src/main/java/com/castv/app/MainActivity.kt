@@ -316,7 +316,7 @@ class MainActivity : AppCompatActivity() {
         }
         Store.init(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT); addAction(ACT_STOP_LOCAL) }
+        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT); addAction(ACT_STOP_LOCAL); addAction(ACT_CHANNEL_ON_TV) }   // [NOW-1b]
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(notifReceiver, nf)
         notifReceiverRegistered = true
