@@ -572,7 +572,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             "DLNA.ORG_OP=00;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
     }
 
-    /** [LIVE-1] Entrega un canal HLS (.m3u8) como un solo flujo video/mp2t sin tamaño (chunked). */
+    /** [LIVE-1] Entrega un canal HLS (.m3u8) como un solo flujo video/mp2t. [LIVE-2] Se comporta como un archivo
+     *  de [LIVE_FAKE_LENGTH] bytes atendido por Range desde un buffer compartido por canal (ver LiveHub). */
     private fun serveLive(session: IHTTPSession, token: String): Response {
         val target = try {
             String(android.util.Base64.decode(token,
@@ -587,35 +588,287 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             addLiveHeaders(r)
             return r
         }
-        var stream = LiveHlsStream(target)
-        try {
+        // [LIVE-2] la TV trata el flujo como un archivo de LIVE_FAKE_LENGTH bytes y lo pide por Range
+        var start = 0L
+        var end = LIVE_FAKE_LENGTH - 1
+        var partial = false
+        val range = session.headers["range"]
+        if (range != null && range.startsWith("bytes=")) {
+            val spec = range.removePrefix("bytes=").substringBefore(",").trim()
+            val s = spec.substringBefore("-")
+            val e = spec.substringAfter("-", "")
             try {
-                stream.prepare()
-            } catch (e: LiveUnsupported) {
-                throw e
-            } catch (e: Exception) {
-                // [GZIP-1] un fallo pasajero al leer la lista: se reintenta una sola vez con un flujo nuevo
-                DebugLog.add("  LIVE falló al preparar (${e.javaClass.simpleName}: ${e.message}): se reintenta una vez")
-                stream.close()
-                try { Thread.sleep(500) } catch (_: InterruptedException) {}
-                stream = LiveHlsStream(target)
-                stream.prepare()
+                if (s.isEmpty()) { // sufijo: últimos N bytes
+                    start = maxOf(0L, LIVE_FAKE_LENGTH - e.toLong())
+                } else {
+                    start = s.toLong()
+                    if (e.isNotEmpty()) end = minOf(e.toLong(), LIVE_FAKE_LENGTH - 1)
+                }
+                partial = true
+            } catch (_: NumberFormatException) {
+                start = 0L; end = LIVE_FAKE_LENGTH - 1; partial = false
             }
+        }
+        if (start >= LIVE_FAKE_LENGTH || start > end) {
+            val r = newFixedLengthResponse(Response.Status.RANGE_NOT_SATISFIABLE, "text/plain", "")
+            r.addHeader("Content-Range", "bytes */$LIVE_FAKE_LENGTH")
+            return r
+        }
+        val length = end - start + 1
+        val hub = try {
+            synchronized(hubs) { findOrCreateHub(token, target, start) }
         } catch (e: LiveUnsupported) {
             DebugLog.add("  LIVE no soportado: ${e.message}")
-            stream.close()
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "LIVE no soportado: ${e.message}")
         } catch (e: Exception) {
             DebugLog.add("  LIVE ERROR al preparar: ${e.javaClass.simpleName}: ${e.message}")
-            stream.close()
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
         }
-        // [LIVE-1f] sin chunked: Content-Length "falso" y grande (el cuerpo termina cuando se cierra el flujo)
-        DebugLog.add("  -> LIVE video/mp2t continuo (LIVE-1f: sin chunked, Content-Length $LIVE_FAKE_LENGTH)")
-        val response = newFixedLengthResponse(Response.Status.OK, "video/mp2t", stream, LIVE_FAKE_LENGTH)
-        addLiveHeaders(response)
+        val body: InputStream = if (hub != null && hub.canServe(start)) HubStream(hub, start, length)
+            else { hub?.release(); NullTsStream(start, length) }
+        DebugLog.add("  -> LIVE2 ${if (partial) "206" else "200"} bytes $start-$end " +
+                if (body is HubStream) "del buffer (${hub?.window()})" else "relleno de TS nulo (fuera del buffer)")
+        val response = newFixedLengthResponse(
+            if (partial) Response.Status.PARTIAL_CONTENT else Response.Status.OK, "video/mp2t", body, length)
+        response.addHeader("Accept-Ranges", "bytes")
+        response.addHeader("Cache-Control", "no-cache")
+        if (partial) response.addHeader("Content-Range", "bytes $start-$end/$LIVE_FAKE_LENGTH")
+        response.addHeader("transferMode.dlna.org", "Streaming")
+        response.addHeader("contentFeatures.dlna.org",
+            "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
         response.addHeader("Connection", "close")
         return response
+    }
+
+    // ===================== [LIVE-2] Un solo flujo por canal, con buffer, atendido por Range =====================
+
+    /** Canales en marcha, por el token del enlace. Se toca siempre dentro de synchronized(hubs). */
+    private val hubs = HashMap<String, LiveHub>()
+
+    /** Hasta dónde (en bytes) se acepta abrir un canal nuevo: los sondeos al final del "archivo" no lo abren. */
+    private val LIVE_REACH = 8L * 1024 * 1024
+
+    /** [GZIP-1] Crea el flujo del canal y lee la primera lista; ante un fallo pasajero reintenta una vez. */
+    private fun openLiveStream(target: String): LiveHlsStream {
+        var stream = LiveHlsStream(target)
+        try {
+            stream.prepare()
+        } catch (e: LiveUnsupported) {
+            stream.close()
+            throw e
+        } catch (e: Exception) {
+            DebugLog.add("  LIVE falló al preparar (${e.javaClass.simpleName}: ${e.message}): se reintenta una vez")
+            stream.close()
+            try { Thread.sleep(500) } catch (_: InterruptedException) {}
+            stream = LiveHlsStream(target)
+            try {
+                stream.prepare()
+            } catch (e2: Exception) {
+                stream.close()
+                throw e2
+            }
+        }
+        return stream
+    }
+
+    /** Devuelve el flujo en marcha del canal (o lo abre). null = pedido lejano sin flujo abierto (se rellena).
+     *  Si devuelve un flujo, ya contó un cliente: quien lo use debe llamar a release() al terminar. */
+    private fun findOrCreateHub(token: String, target: String, start: Long): LiveHub? {
+        val now = System.currentTimeMillis()
+        val iter = hubs.entries.iterator()
+        while (iter.hasNext()) {
+            val h = iter.next().value
+            if (h.closed || (h.clients.get() == 0 && now - h.lastUse > 30_000L)) { h.close(); iter.remove() }
+        }
+        var h = hubs[token]
+        // un pedido desde el principio, con el flujo viejo o ya reciclado: se empieza de nuevo (si no, la TV vería lo de hace rato)
+        if (h != null && start == 0L && (!h.hasFrom0() || now - h.lastUse > 10_000L)) {
+            DebugLog.add("  LIVE2 se reinicia el canal (el flujo anterior estaba viejo)")
+            h.close()
+            hubs.remove(token)
+            h = null
+        }
+        if (h == null) {
+            if (start > LIVE_REACH) return null
+            h = LiveHub(openLiveStream(target))
+            h.start()
+            hubs[token] = h
+            DebugLog.add("  LIVE2 flujo nuevo del canal")
+        }
+        h.clients.incrementAndGet()
+        h.lastUse = now
+        return h
+    }
+
+    /** Baja el canal (LiveHlsStream) en un hilo propio y guarda los bytes en un buffer circular numerado desde 0,
+     *  como si fuera un archivo. Varias conexiones de la TV leen del mismo buffer, cada una desde su posición. */
+    private class LiveHub(private val src: LiveHlsStream) {
+        private val cap = 16 * 1024 * 1024            // bytes que se conservan atrás
+        private val look = 6L * 1024 * 1024           // cuánto se adelanta a lo ya entregado a la TV
+        private val ring = ByteArray(cap)
+        private val lock = java.util.concurrent.locks.ReentrantLock()
+        private val cond = lock.newCondition()
+        private var head = 0L                         // bytes producidos hasta ahora
+        private var served = 0L                       // posición más alta entregada a la TV
+        private var ended = false
+        @Volatile var closed = false
+            private set
+        @Volatile var lastUse = System.currentTimeMillis()
+        val clients = java.util.concurrent.atomic.AtomicInteger(0)
+
+        private fun idleTooLong(): Boolean = clients.get() == 0 && System.currentTimeMillis() - lastUse > 30_000L
+
+        fun hasFrom0(): Boolean {
+            lock.lock()
+            try { return head <= cap } finally { lock.unlock() }
+        }
+
+        /** true si [start] está en el buffer o a poca distancia por delante (se espera a que llegue). */
+        fun canServe(start: Long): Boolean {
+            lock.lock()
+            try { return start >= maxOf(0L, head - cap) && start <= head + look } finally { lock.unlock() }
+        }
+
+        fun window(): String {
+            lock.lock()
+            try { return "${maxOf(0L, head - cap)}-$head" } finally { lock.unlock() }
+        }
+
+        fun release() {
+            clients.decrementAndGet()
+            lastUse = System.currentTimeMillis()
+        }
+
+        fun start() {
+            val t = Thread {
+                val tmp = ByteArray(32768)
+                try {
+                    while (!closed) {
+                        if (idleTooLong()) {
+                            DebugLog.add("  LIVE2 canal sin clientes por 30 s: se cierra")
+                            close()
+                            break
+                        }
+                        // freno: no se adelanta más de [look] bytes a lo que ya recibió la TV
+                        lock.lock()
+                        try {
+                            while (!closed && head - served >= look && !idleTooLong()) {
+                                cond.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                            }
+                        } finally { lock.unlock() }
+                        if (closed) break
+                        val n = src.read(tmp, 0, tmp.size)
+                        if (n < 0) break
+                        lock.lock()
+                        try {
+                            var o = 0
+                            while (o < n) {
+                                val p = (head % cap).toInt()
+                                val c = minOf(n - o, cap - p)
+                                System.arraycopy(tmp, o, ring, p, c)
+                                head += c
+                                o += c
+                            }
+                            cond.signalAll()
+                        } finally { lock.unlock() }
+                    }
+                } catch (e: Exception) {
+                    DebugLog.add("  LIVE2 error del flujo: ${e.javaClass.simpleName}: ${e.message}")
+                }
+                lock.lock()
+                try { ended = true; cond.signalAll() } finally { lock.unlock() }
+            }
+            t.isDaemon = true
+            t.name = "castv-live-hub"
+            t.start()
+        }
+
+        /** Copia hasta [len] bytes desde la posición [pos]; espera si aún no llegan. -1 = fin; -2 = ya salió del buffer. */
+        fun readAt(pos: Long, b: ByteArray, off: Int, len: Int): Int {
+            lock.lock()
+            try {
+                while (true) {
+                    if (closed) return -1
+                    if (pos < head - cap) return -2
+                    if (pos < head) {
+                        val n = minOf(len.toLong(), head - pos).toInt()
+                        var o = 0
+                        while (o < n) {
+                            val p = ((pos + o) % cap).toInt()
+                            val c = minOf(n - o, cap - p)
+                            System.arraycopy(ring, p, b, off + o, c)
+                            o += c
+                        }
+                        if (pos + n > served) {
+                            served = pos + n
+                            cond.signalAll()
+                        }
+                        lastUse = System.currentTimeMillis()
+                        return n
+                    }
+                    if (ended) return -1
+                    cond.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    lastUse = System.currentTimeMillis()
+                }
+            } finally { lock.unlock() }
+        }
+
+        fun close() {
+            if (closed) return
+            closed = true
+            lock.lock()
+            try { cond.signalAll() } finally { lock.unlock() }
+            src.close()
+        }
+    }
+
+    /** Lo que lee una conexión de la TV: [remaining] bytes del buffer del canal a partir de [pos]. */
+    private class HubStream(private val hub: LiveHub, private var pos: Long, private var remaining: Long) : InputStream() {
+        private var done = false
+        private var released = false
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            if (done || remaining <= 0) return -1
+            val n = hub.readAt(pos, b, off, minOf(len.toLong(), remaining).toInt())
+            if (n <= 0) { done = true; return -1 }
+            pos += n
+            remaining -= n
+            return n
+        }
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            val n = read(one, 0, 1)
+            return if (n <= 0) -1 else (one[0].toInt() and 0xff)
+        }
+
+        override fun close() {
+            if (!released) { released = true; hub.release() }
+        }
+    }
+
+    /** Relleno para lo que la TV pide lejos de lo ya bajado (sondeos al final del "archivo"):
+     *  paquetes TS nulos (PID 0x1FFF, sin reloj), válidos y sin abrir el origen. */
+    private class NullTsStream(private var pos: Long, private var remaining: Long) : InputStream() {
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            if (remaining <= 0) return -1
+            val n = minOf(len.toLong(), remaining).toInt()
+            for (i in 0 until n) {
+                val v = when (((pos + i) % 188).toInt()) { 0 -> 0x47; 1 -> 0x1F; 3 -> 0x10; else -> 0xFF }
+                b[off + i] = v.toByte()
+            }
+            pos += n
+            remaining -= n
+            return n
+        }
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            val n = read(one, 0, 1)
+            return if (n <= 0) -1 else (one[0].toInt() and 0xff)
+        }
     }
 
     private fun serveFile(session: IHTTPSession, uri: Uri, mime: String): Response {
