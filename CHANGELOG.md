@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v64)
+# Registro de cambios y guía de continuidad – CASTV (v67)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -25,12 +25,16 @@
 
 ---
 
-## 📍 Estado Actual (v64)
+## 📍 Estado Actual (v67)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **SEL-1 Acciones en la selección múltiple (18 nov 2026):** aplicada y probada en el teléfono; Ariel confirmó que **va bien**. El menú ⋮ de la barra de selección suma ➕ A la cola, ★/☆ Favoritos y 📃 A una lista; ver "Parche en Curso".
 - ✅ **PAUSA-1 El botón ⏸/▶ ahora pausa y reanuda el enlace que va al TV (18 nov 2026):** aplicada, compiló y Ariel confirmó: "se puede bien ya y la app no se cierra… todo salió bien". Parche `pausa_enlace_tv.patch` (`MainActivity.kt`, campo `linkOnTv`). **Sin reportar aún:** adelantar con video largo y qué pasa al cerrar la app con el video en el TV (siguen ⏳ en la línea de pruebas en TV).
-- 🧪 **PROG-1 Progreso y duración del video cuando va al TV (18 nov 2026):** aplicado y compiló; **resultado parcial de Ariel con captura (12:09):** ✅ el título del enlace aparece y el **tiempo transcurrido corre** (0:08); ❌ **la duración sigue en `--:--` y el puntito de la barra no avanza**. Con música local todo va bien. Causa probable: el TV no informa la duración del enlace (la app recibe 0 y deshabilita la barra). **No se marca ✅.** El diagnóstico PROG-1c mostró que el TV manda siempre `00:00:00`; **PROG-1d (el teléfono lee la duración con `MediaMetadataRetriever`) entregado; Ariel aún NO lo instalaba al 18 nov 2026 (nueva sesión): comandos de instalación re-entregados, pendiente de aplicar y probar.**
+- ✅ **PROG-1d Duración del enlace en el TV leída por el teléfono (18 nov 2026):** aplicado; Ariel probó y dijo "todo funcionó". El `/log` mostró `DURACION enlace: 10 s` con los enlaces de 360p y 720p, y ⏸/▶ (`SOAP Pause`/`Play`) siguieron bien. Con un canal HLS salió `DURACION enlace EXCEPCION RuntimeException: setDataSource failed` y `no se pudo leer` (esperado: los canales en vivo no tienen duración; no hubo cierre de la app). Parche `duracion_enlace_tv.patch` (`MainActivity.kt`). Falta anotar: barra con el enlace largo de 1080p/30 fps (lag del TV).
+- ✅ **PROG-1 (historial):** ver PROG-1d; título, tiempo, duración y barra ya funcionan con enlaces mp4 en el TV.
+- 🧪 **LIVE-1 Canal en vivo (HLS) al TV como flujo TS continuo (18 nov 2026):** plan detallado en "Parche en Curso"; Ariel eligió ir por B. **Aún sin parche:** falta `MainActivity_actual.kt` (para `playLink`). Se revisó `MediaServer.kt` (307 líneas) real.
+- ❌ **Canal HLS al TV confirmado (log 12:42 + foto de Ariel, 18 nov 2026, `https://c.mjh.nz/abc-me.m3u8`):** el TV mostró **"Archivo no compatible"**. El relay sí redirigió (307) y reescribió la lista (`4 enlaces reescritos`), el TV pidió la lista pero **nunca pidió fragmentos**: el TV (Hisense HL1, marca JVC en pantalla) no admite HLS por DLNA. Se mantiene ❌ de la línea "HLS al TV". **Siguiente (⬜, plan abajo en nota de hoy):** aviso en pantalla y/o LIVE-1 (el relay entrega el canal como un solo flujo TS continuo).
+- (anterior, superado por PROG-1d) 🧪 **PROG-1 Progreso y duración del video cuando va al TV (18 nov 2026):** aplicado y compiló; **resultado parcial de Ariel con captura (12:09):** ✅ el título del enlace aparece y el **tiempo transcurrido corre** (0:08); ❌ **la duración sigue en `--:--` y el puntito de la barra no avanza**. Con música local todo va bien. Causa probable: el TV no informa la duración del enlace (la app recibe 0 y deshabilita la barra). **No se marca ✅.** El diagnóstico PROG-1c mostró que el TV manda siempre `00:00:00`; **PROG-1d (el teléfono lee la duración con `MediaMetadataRetriever`) entregado; Ariel aún NO lo instalaba al 18 nov 2026 (nueva sesión): comandos de instalación re-entregados, pendiente de aplicar y probar.**
 - 🧪 **DOC-1 Limpieza de inconsistencias del changelog (18 nov 2026):** solo texto de este archivo (sin cambios en la app); esperando que Ariel lo revise y confirme; ver "Parche en Curso".
 - ✅ **UI-S1 Estilo de subtítulos (18 nov 2026):** aplicada, compiló en verde y Ariel confirmó **"ya funciona"**. Opción 🎨 en el menú 💬 del reproductor: tamaño, negrita, color y fondo.
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
@@ -62,7 +66,7 @@
 | ⚠️ | `http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_60fps_normal.mp4` | 1080p a 60 fps. Mucho lag (Ariel, 18 nov 2026); falta confirmar que fue este el enlace probado. El log del relay muestra que lo pidió completo, con los mismos rangos repetidos (el TV no daba abasto). |
 | ✅ | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4` | Se ve fluido en el TV (Ariel, 18 nov 2026). Dura 10 s, no sirve para probar adelantar. Con PAUSA-1 la pausa funciona bien (Ariel, 18 nov 2026). |
 | ⚠️ | `http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4` | **Sigue con lag en el TV** (Ariel, 18 nov 2026, confirmado otra vez a las 12:09). 1080p a 30 fps, unos 10 min. Pausa funciona. Con PROG-1 muestra el tiempo pero no la duración. No sirve para probar adelantar por el lag. |
-| 🧪 | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4` | Sin probar. 720p, 10 s. Sirve para ver si el TV informa la duración (debería salir 0:10). Para probar adelantar aún falta un enlace largo y liviano. |
+| ✅ | `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4` | Probado (Ariel, 18 nov 2026): el log da `DURACION enlace: 10 s`. Antes decía: Sin probar. 720p, 10 s. Sirve para ver si el TV informa la duración (debería salir 0:10). Para probar adelantar aún falta un enlace largo y liviano. |
 
 Evitar: versiones AV1 (la mayoría de los TV no las reproducen) y 4K.
 
@@ -100,7 +104,19 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
-### 🧪 PROG-1b — Duración y barra con enlaces en el TV — ✅ diagnóstico hecho; **PROG-1d entregado (parche `duracion_enlace_tv.patch`), pendiente de aplicar y probar**
+### 🧪 LIVE-1 — Canal en vivo (HLS) al TV como un solo flujo TS — plan, pendiente de `MainActivity_actual.kt` para entregar el parche
+
+- **Por qué:** el TV respondió "Archivo no compatible" a `abc-me.m3u8` y nunca pidió fragmentos (ver nota de hoy). Idea: el teléfono arma él mismo un video continuo y el TV recibe un enlace "normal" de video, no una lista HLS.
+- **Qué hace (experimento):** nueva ruta `/live/<base64 del enlace>.ts` en el relay. Al pedirla el TV, el teléfono: (1) baja la lista; si es maestra (`#EXT-X-STREAM-INF`) elige la variante de **menor `BANDWIDTH`** (la más liviana para el TV; se anota en el log cuál); (2) baja la lista hija y va leyendo los fragmentos `.ts` nuevos, uno tras otro, entregándolos al TV como un único `video/mp2t` sin tamaño (chunked); (3) recarga la lista cada ~mitad de la duración del fragmento y salta los fragmentos ya enviados; (4) termina cuando el TV cierra la conexión o la lista trae `#EXT-X-ENDLIST` y ya se enviaron todos.
+- **Archivos que toca (2):**
+  - `app/src/main/java/com/castv/app/MediaServer.kt` (ya revisado): ruta `live` en `serve()`, función `serveLive()`, clase interna `LiveHlsStream` (InputStream que va pidiendo fragmentos). Se reutiliza el seguimiento de redirecciones y el User-Agent de `serveRelay`. No cambia nada del relay actual (mp4, `/relay/*.m3u8`).
+  - `app/src/main/java/com/castv/app/MainActivity.kt` (**falta que Ariel lo pase**): en `playLink`, modo TV, si el enlace es HLS (`.m3u8`) se envía al TV `http://IP:8001/live/<base64>.ts` con mime `video/mp2t` en vez de `/relay/...m3u8`. El teléfono sigue reproduciendo HLS como hoy.
+- **Límites conocidos (v1):** (1) fragmentos cifrados (`#EXT-X-KEY` AES-128) o fMP4 (`#EXT-X-MAP`, `.m4s`) **no se soportan**: se anota `LIVE no soportado: ...` en el `/log` y se responde error; (2) el TV puede rechazar el contenido por el códec (p. ej. HEVC) aunque llegue bien; (3) no hay duración ni adelantar en vivo (queda `--:--`); (4) el enlace con token que caduca (como `abc-me`, ~15 min): si la lista hija da 403/410 se vuelve a resolver desde el enlace original; (5) un fallo de red en un fragmento se reintenta 3 veces y luego corta el flujo; (6) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba.
+- **Cómo probar (cuando haya parche):** (1) mandar `https://c.mjh.nz/abc-me.m3u8` al TV; (2) si el TV muestra imagen: anotar cuánto dura, si se corta o se traba, y si el sonido va bien; (3) mirar `/log` (puerto 8001): líneas `LIVE variante ...`, `LIVE fragmento N` y cualquier `LIVE no soportado`; (4) enlace mp4 normal, música local y pausa/duración (PROG-1d) siguen igual; (5) canal en el teléfono sigue igual.
+- **Si falla:** `git revert` del commit de LIVE-1. Si el TV vuelve a decir "Archivo no compatible" aun con TS continuo, LIVE-1 queda ❌ y se pasa a A (aviso) o C (ffmpeg).
+- **Pendiente para entregar:** `MainActivity_actual.kt` (copiar con `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt`).
+
+### ✅ PROG-1b/1d — Duración y barra con enlaces en el TV — **PROG-1d aplicado y probado por Ariel (18 nov 2026, "todo funcionó")**
 
 - **Lo que se ve (Ariel, captura 12:09, 18 nov 2026):** con un enlace en el TV: título correcto, tiempo transcurrido corriendo, duración `--:--` y el puntito de la barra pegado al inicio. Con música local todo va bien.
 - **Resultado del diagnóstico PROG-1c (log `/log` de Ariel, 12:21-12:23, 18 nov 2026):** el TV manda `TrackDuration = 00:00:00` durante toda la reproducción (con los enlaces de 720p y 360p, de 10 s). El log solo imprime cuando el valor cambia y salió **una única línea** `POS crudo` (`dur='00:00:00'`), o sea que nunca cambió. El `TrackMetaData` solo repite el encabezado DIDL (primeros 200 caracteres, sin duración). **Conclusión: el TV Hisense HL1 no informa la duración de los enlaces; no es un problema de lectura → opción A descartada, se pasa a la opción B.** También se vio que el TV hace dos pedidos al relay por enlace (uno con `range=bytes=0-` y otro con `ua=curl`, `range=-`), ambos bien respondidos (206 y 200 con la longitud completa); no es un fallo.
@@ -369,6 +385,12 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ### Notas de este día
 
+- **LIVE-1 planificado (18 nov 2026):** Ariel pidió recomendación; se recomendó B (LIVE-1) primero y A (aviso) después. Ariel pasó `MediaServer.kt` (archivo del relay, ruta `app/src/main/java/com/castv/app/MediaServer.kt`). Se vio que hoy el relay solo reescribe la lista y la sirve como `application/vnd.apple.mpegurl`, así que el TV la rechaza por el tipo. Siguiente: pedir `MainActivity_actual.kt`, entregar parche `live_hls_tv.patch`.
+
+- **Canal HLS en el TV (18 nov 2026):** Ariel mandó `abc-me.m3u8` sin querer y fotografió el TV: "Archivo no compatible". Opciones anotadas (⬜, sin parche aún): **(A) aviso HLS:** al mandar un `.m3u8` al TV, la app avisa que no es compatible y ofrece verlo en el teléfono (parche pequeño, `MainActivity.kt`). **(B) LIVE-1 (experimento):** el relay baja los fragmentos `.ts` de la lista HLS y los entrega al TV como un solo `video/mp2t` continuo (sin ffmpeg; solo sirve si los fragmentos son H.264/AAC en TS y el TV acepta TS progresivo; puede fallar). **(C)** ffmpeg dentro de la app (más pesado, ⏳ por evaluar). Recomendación: A pequeño primero o B directo, a elegir por Ariel. Para B hace falta el archivo del relay (el que imprime `RELAY HLS lista`: `grep -rl "RELAY HLS" app/src`).
+
+- **PROG-1d probado (18 nov 2026):** Ariel aplicó el parche y dijo "todo funcionó". Log 12:39-12:42: duración 10 s leída en 360p y 720p; pausa/reanudar bien; canal HLS `abc-me.m3u8` (puesto sin querer) con `EXCEPCION setDataSource` al leer la duración (normal en vivo) y lista reescrita por el relay sin pedidos de fragmentos visibles. Siguiente: diagnóstico del canal en vivo al TV (punto 5, paso 0): preguntar qué mostró el TV y pedir la continuación del `/log`.
+
 - **PROG-1d re-entregado (18 nov 2026, nueva sesión):** Ariel dijo que todavía no instala `duracion_enlace_tv.patch`. Se revisó el parche contra el changelog v63: coincide (solo `MainActivity.kt`; campos `linkDurSec`/`linkGen`, `readLinkDuration()`, `poll()`, y limpieza en Detener/`playLink`/`startPlayback`/`stopCurrentPlayback`). Siguiente paso: aplicar, esperar build verde, probar el enlace de 720p/10 s (debe salir 0:10) y pasar la línea `DURACION enlace` del `/log` (puerto 8001). Nada se marca ✅ hasta que Ariel diga "ya funciona".
 
 - **PROG-1d entregado (18 nov 2026):** Ariel aprobó ("Dale") y pasó `MainActivity_actual.kt`. Parche `duracion_enlace_tv.patch`: campos `linkDurSec` y `linkGen`, función `readLinkDuration()`, `poll()` usa la duración leída cuando el TV informa 0. Nada se marca ✅ hasta que Ariel diga "ya funciona".
@@ -398,6 +420,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **PROG-1d duración del enlace en el TV (18 nov 2026):** `linkDurSec`, `linkGen`, `readLinkDuration()` con `MediaMetadataRetriever` en `MainActivity.kt`; `poll()` usa esa duración si el TV manda 0.
 - **PAUSA-1 pausa del enlace en el TV (18 nov 2026):** campo `linkOnTv` en `MainActivity.kt`; ⏸/▶ controlan el enlace del TV y Detener lo limpia.
 - **SEL-1 acciones en la selección múltiple (18 nov 2026):** ➕ A la cola, ★/☆ Favoritos y 📃 A una lista en el ⋮ de la barra de selección (`MainActivity.kt`).
 - **UI-S1 estilo de subtítulos (18 nov 2026):** 🎨 en el menú 💬; tamaño, negrita, color y fondo guardados en `castv_subs` (`VideoPlayerActivity.kt`).
