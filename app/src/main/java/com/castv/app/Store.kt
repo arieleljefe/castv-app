@@ -15,6 +15,9 @@ import org.json.JSONObject
 /** Enlace guardado en el historial de "Reproducir enlace". */
 data class SavedLink(val url: String, val title: String, val fav: Boolean, val t: Long)
 
+/** Lista M3U guardada (canales de TV por internet). */
+data class M3uList(val name: String, val url: String)
+
 object Store {
     private lateinit var prefs: SharedPreferences
     private lateinit var resumePrefs: SharedPreferences
@@ -149,6 +152,45 @@ object Store {
     fun clearRecentLinks() {
         writeLinks(readLinks().filter { it.fav })
     }
+
+    // ------------------------------------------------- Listas M3U
+
+    fun m3uLists(): List<M3uList> {
+        val out = ArrayList<M3uList>()
+        try {
+            val raw = prefs.getString("m3u", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(M3uList(o.optString("n", ""), o.getString("u")))
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun writeM3u(l: List<M3uList>) {
+        try {
+            val arr = JSONArray()
+            for (x in l) arr.put(JSONObject().put("n", x.name).put("u", x.url))
+            prefs.edit().putString("m3u", arr.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Añade la lista (si el enlace ya existía, se reemplaza el nombre). */
+    fun addM3uList(name: String, url: String) {
+        val l = m3uLists().filter { it.url != url }.toMutableList()
+        l.add(M3uList(name, url))
+        writeM3u(l)
+    }
+
+    fun removeM3uList(url: String) {
+        writeM3u(m3uLists().filter { it.url != url })
+    }
+
+    /** Enlace de la última lista M3U abierta. */
+    var lastM3u: String?
+        get() = prefs.getString("m3uLast", null)
+        set(v) { prefs.edit().putString("m3uLast", v).apply() }
 
     // ------------------------------------------------- Listas de reproducción
 

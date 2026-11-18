@@ -909,6 +909,7 @@ class MainActivity : AppCompatActivity() {
             pm.menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
         }
         pm.menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
+        pm.menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
         pm.menu.add(0, 11, 12, "Mis redes y contacto")
         pm.setOnMenuItemClickListener { mi ->
             when (mi.itemId) {
@@ -930,6 +931,7 @@ class MainActivity : AppCompatActivity() {
                 13 -> pickAccent()
                 14 -> toggleTrash()
                 15 -> askLinkAndPlay()
+                16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
             }
             true
         }
@@ -1136,12 +1138,12 @@ class MainActivity : AppCompatActivity() {
         return if (last.isBlank()) "Enlace" else last
     }
 
-    private fun playLink(url: String, toTv: Boolean) {
+    private fun playLink(url: String, toTv: Boolean, titleOverride: String? = null) {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             setStatus("⚠️ El enlace debe empezar con http:// o https://")
             return
         }
-        val title = linkTitle(url)
+        val title = titleOverride?.takeIf { it.isNotBlank() } ?: linkTitle(url)
         Store.addLink(url, title)   // historial de enlaces
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
         stopLocal()
@@ -1786,6 +1788,7 @@ class MainActivity : AppCompatActivity() {
     private val reqDelete = 4711
     private val reqDeleteOne = 4712
     private val reqVideo = 4713
+    private val reqM3u = 4714   // [Etapa 13-B] listas M3U
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null
@@ -1947,6 +1950,15 @@ class MainActivity : AppCompatActivity() {
                 if (resultCode == RESULT_OK) deletedItems.addAll(pendingDelete)
                 pendingDelete = emptyList()
                 finishDelete()
+            }
+            reqM3u -> {
+                // [Etapa 13-B] canal elegido en Listas M3U: se reproduce con "Reproducir enlace"
+                if (resultCode == RESULT_OK && data != null && data.hasExtra("m3uUrl")) {
+                    playLink(
+                        data.getStringExtra("m3uUrl") ?: "",
+                        data.getBooleanExtra("m3uTo", false),
+                        data.getStringExtra("m3uTitle"))
+                }
             }
             reqVideo -> {
                 // 📺 TV desde el reproductor del teléfono: se manda ese video al TV desde el mismo punto

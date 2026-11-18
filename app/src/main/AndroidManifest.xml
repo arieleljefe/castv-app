@@ -36,6 +36,10 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize" />
 
+        <activity
+            android:name=".M3uActivity"
+            android:exported="false" />
+
         <service
             android:name=".CastvService"
             android:foregroundServiceType="mediaPlayback"
