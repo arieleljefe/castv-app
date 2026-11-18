@@ -281,6 +281,7 @@ class MainActivity : AppCompatActivity() {
             3 -> R.style.AccentOverlayPurple
             else -> R.style.AccentOverlayCyan
         }, true)
+        accentAtStart = savedAccent()   // [UI-1b]
         setContentView(R.layout.activity_main)
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -389,7 +390,9 @@ class MainActivity : AppCompatActivity() {
             override fun onScroll(view: AbsListView?, firstVisibleItem: Int, visibleItemCount: Int, totalItemCount: Int) {}
         })
         btnSearch.setOnClickListener { toggleSearch() }
-        btnMenu.setOnClickListener { showMainMenu() }
+        btnMenu.setOnClickListener {   // [UI-1b] el ⋮ abre la pantalla Ajustes
+            startActivityForResult(Intent(this, SettingsActivity::class.java), reqSettings)
+        }
         btnQuick.setOnClickListener { if (playingItem == null) step(+1) else togglePlayPause() }
         val toggleExpand = View.OnClickListener { setPlayerExpanded(playerExpanded.visibility != View.VISIBLE) }
         btnExpand.setOnClickListener(toggleExpand)
@@ -943,16 +946,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showMainMenu() {
-        val pm = PopupMenu(this, btnMenu)
-        fillMainMenu(pm.menu)
-        pm.setOnMenuItemClickListener { mi ->
-            runMenuAction(mi.itemId)
-            true
-        }
-        pm.show()
-    }
-
     // ------------------------------------------- Hoja "Más" [UI-1]
 
     private fun showMoreSheet() {
@@ -971,11 +964,9 @@ class MainActivity : AppCompatActivity() {
         groups.add("Reproducir y canales" to listOf(15, 16, 10, 3))
         groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6))
         groups.add("Reproductor" to listOf(7, 8, 9))
-        groups.add("Apariencia" to listOf(12, 13))
-        groups.add("Datos" to listOf(17, 14))
-        groups.add("Acerca" to listOf(11))
         val known = groups.flatMap { it.second }.toSet()
-        val extra = titles.keys.filter { it !in known }.sorted()
+        val inSettings = setOf(11, 12, 13, 14, 17)   // [UI-1b] viven en la pantalla Ajustes
+        val extra = titles.keys.filter { it !in known && it !in inSettings }.sorted()
         if (extra.isNotEmpty()) groups.add("Más" to extra)
 
         val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
@@ -1373,6 +1364,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
         if (::adapter.isInitialized) adapter.notifyDataSetChanged()   // refresca "Continuar" al volver del reproductor
     }
 
@@ -1954,6 +1946,8 @@ class MainActivity : AppCompatActivity() {
     private val reqM3u = 4714   // [Etapa 13-B] listas M3U
     private val reqBackupOut = 4716   // [Respaldo JSON] exportar
     private val reqBackupIn = 4717    // [Respaldo JSON] importar
+    private val reqSettings = 4718    // [UI-1b] pantalla Ajustes
+    private var accentAtStart = 0     // [UI-1b] color con el que se dibujó esta pantalla
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null
@@ -2123,6 +2117,13 @@ class MainActivity : AppCompatActivity() {
             reqBackupIn -> {
                 val u = data?.data
                 if (resultCode == RESULT_OK && u != null) confirmImport(u)
+            }
+            reqSettings -> {
+                // [UI-1b] Ajustes pide abrir el respaldo o las redes
+                when (data?.getStringExtra("action")) {
+                    "backup" -> showBackupMenu()
+                    "socials" -> showSocials()
+                }
             }
             reqM3u -> {
                 // [Etapa 13-B] canal elegido en Listas M3U: se reproduce con "Reproducir enlace"
