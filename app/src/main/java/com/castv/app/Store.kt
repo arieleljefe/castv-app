@@ -192,6 +192,31 @@ object Store {
         get() = prefs.getString("m3uLast", null)
         set(v) { prefs.edit().putString("m3uLast", v).apply() }
 
+    // ------------------------------------------------- Canales favoritos (M3U)
+
+    /** Enlaces de los canales marcados con ★ en Listas M3U. */
+    fun chFavs(): Set<String> {
+        val out = HashSet<String>()
+        try {
+            val raw = prefs.getString("chfav", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) out.add(arr.getString(i))
+        } catch (e: Exception) { }
+        return out
+    }
+
+    /** Devuelve true si el canal quedó como favorito. */
+    fun toggleChFav(url: String): Boolean {
+        val s = chFavs().toMutableSet()
+        val now = if (s.contains(url)) { s.remove(url); false } else { s.add(url); true }
+        try {
+            val arr = JSONArray()
+            for (x in s) arr.put(x)
+            prefs.edit().putString("chfav", arr.toString()).apply()
+        } catch (e: Exception) { }
+        return now
+    }
+
     // ------------------------------------------------- Listas de reproducción
 
     private fun loadLists() {
