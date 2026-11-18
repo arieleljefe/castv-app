@@ -321,6 +321,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         @Volatile private var closed = false
         private var count = 0
         private var keyLogged = false
+        private var total = 0L            // [LIVE-1e] bytes entregados al TV
+        private var segFirst = false      // [LIVE-1e] falta mirar el primer byte del fragmento actual
         // [LIVE-1d] cifrado AES-128: por fragmento -> (URL de la clave, IV en hexadecimal o null, número de secuencia)
         private val segKey = HashMap<String, Triple<String, String?, Long>>()
         private val keyCache = HashMap<String, ByteArray>()
@@ -471,6 +473,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                         javax.crypto.CipherInputStream(opened.first.inputStream, cipher)
                     }
                     count++
+                    segFirst = true
                     if (count <= 5 || count % 20 == 0) DebugLog.add("  LIVE fragmento $count")
                     return true
                 } catch (e: Exception) {
@@ -515,8 +518,17 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 while (!closed) {
                     val s = cur
                     if (s != null) {
-                        val n = try { s.read(b, off, len) } catch (e: Exception) { -1 }
-                        if (n > 0) return n
+                        val n = try { s.read(b, off, len) } catch (e: Exception) {
+                            DebugLog.add("  LIVE error leyendo fragmento $count: ${e.javaClass.simpleName}: ${e.message}"); -1 }
+                        if (n > 0) {
+                            total += n
+                            if (segFirst) {
+                                segFirst = false
+                                if (count <= 5) DebugLog.add("  LIVE fragmento $count primer byte=0x" +
+                                    String.format("%02x", b[off].toInt() and 0xff) + " (TS valido = 0x47)")
+                            }
+                            return n
+                        }
                         closeCur()
                         continue
                     }
@@ -538,6 +550,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
 
         override fun close() {
+            if (!closed) DebugLog.add("  LIVE cerrado (el TV cortó o terminó): $count fragmentos, $total bytes enviados")
             closed = true
             closeCur()
         }
