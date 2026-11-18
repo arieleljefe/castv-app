@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v55)
+# Registro de cambios y guía de continuidad – CASTV (v56)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -29,7 +29,7 @@
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **SEL-1 Acciones en la selección múltiple (18 nov 2026):** aplicada y probada en el teléfono; Ariel confirmó que **va bien**. El menú ⋮ de la barra de selección suma ➕ A la cola, ★/☆ Favoritos y 📃 A una lista; ver "Parche en Curso".
-- 🧪 **PAUSA-1 El botón ⏸/▶ no pausa el enlace que va al TV (18 nov 2026):** causa **encontrada en el código** (no en el log); parche propuesto, **sin entregar todavía**, esperando que Ariel apruebe el plan; ver "Parche en Curso".
+- 🧪 **PAUSA-1 El botón ⏸/▶ no pausa el enlace que va al TV (18 nov 2026):** plan aprobado por Ariel; **parche entregado** (`pausa_enlace_tv.patch`, 1 archivo, 8 líneas nuevas y 2 cambiadas, comprobado con `git apply --check` contra el `MainActivity.kt` real). **Falta que Ariel lo aplique, compile en verde y diga "ya funciona"**; ver "Parche en Curso".
 - 🧪 **DOC-1 Limpieza de inconsistencias del changelog (18 nov 2026):** solo texto de este archivo (sin cambios en la app); esperando que Ariel lo revise y confirme; ver "Parche en Curso".
 - ✅ **UI-S1 Estilo de subtítulos (18 nov 2026):** aplicada, compiló en verde y Ariel confirmó **"ya funciona"**. Opción 🎨 en el menú 💬 del reproductor: tamaño, negrita, color y fondo.
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
@@ -98,7 +98,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
-### 🧪 PAUSA-1 — El botón ⏸/▶ debe pausar el enlace que está en el TV — pendiente de aprobar el plan (aún sin parche)
+### 🧪 PAUSA-1 — El botón ⏸/▶ debe pausar el enlace que está en el TV — parche entregado, pendiente de aplicar y probar
 
 - **Síntoma (Ariel, 18 nov 2026):** con un enlace de video en el TV, al tocar ⏸ el video "se cierra" y suena una canción del teléfono.
 - **Causa (verificada leyendo `MainActivity.kt` real, `castv_tv.txt`):** `playLink(..., toTv = true)` manda el enlace por DLNA pero **no fija `playingItem`** (queda `null`). Los dos botones ⏸/▶ (`btnQuick`, mini reproductor, y `btnPlay`, barra expandida) hacen `if (playingItem == null) step(+1) else togglePlayPause()`. Con `playingItem == null`, el toque cuenta como "siguiente" y se envía `/audio/NNNNNN.mp3` al TV, que reemplaza el video. El log lo confirma: 8 veces aparece `ENVIANDO ... /audio/...mp3` a los 4-8 s de un video, y **nunca** `SOAP Pause`.
@@ -108,10 +108,12 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
   2. En `playLink`: `linkOnTv = false` al empezar y `linkOnTv = true` solo si `TvController.setUriAndPlay(...)` devolvió `ok` (modo TV).
   3. En `stopCurrentPlayback()` y en `startPlayback()` (donde se fija `playingItem = item`): `linkOnTv = false`.
   4. En los dos botones: la condición pasa a `if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause()`.
+  5. **Añadido al entregar el parche (no estaba en el plan aprobado, pequeño y del mismo archivo):** en el botón ⏹ Detener, rama del TV, `linkOnTv = false`. Así, tras Detener, ▶ vuelve a comportarse como hoy (pasa a la siguiente canción) en vez de intentar reanudar algo que ya no existe.
+  - **Dónde queda cada línea (verificado en el `MainActivity.kt` real de 2720 líneas):** campo junto a `playingItem` (línea ~179); `btnQuick` (~397) y `btnPlay` (~425); botón Detener (~435); `playLink`: reinicio tras `Store.addLink` (~1304) y `if (ok) linkOnTv = true` justo después de `TvController.setUriAndPlay` (~1333); `startPlayback` tras `playingItem = item` (~1381); `stopCurrentPlayback` tras `playingItem = null` (~2134). `startLocal` llama a `TvController.stop()` pero se llega a él desde `startPlayback`, que ya limpia la marca.
   - No se tocan `Store.kt`, `TvController`, el relay, el manifest ni layouts.
 - **Riesgos / límites (v1):** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba final; (2) cuando el enlace **termina** en el TV, `linkOnTv` sigue en `true` hasta que se inicie otra cosa, así que un ▶ después del final llamará a `play()` del TV en vez de pasar a la siguiente canción (se afina en otro parche si molesta); (3) no incluye barra de progreso/duración para enlaces en el TV (eso es el punto 7 de "Siguiente"); (4) hay que comprobar en la prueba que el icono ⏸/▶ cambie bien, porque con `playingItem == null` la notificación puede no refrescarlo igual.
 - **Cómo probar (con el enlace ✅ de 360p y el de 1080p a 30 fps):** (1) mandar el enlace al TV, tocar ⏸ del mini reproductor: el video **se queda en pausa** (no cambia a una canción) y el icono pasa a ▶; (2) tocar ▶: sigue desde donde estaba; (3) repetir con el ⏸ de la barra expandida; (4) con el de 1080p a 30 fps probar también adelantar, y mirar `/log`: debe salir `SOAP Pause`/`Play` y **ningún** `/audio/...mp3` nuevo; (5) con música local al TV, ⏸/▶ siguen igual que antes; (6) sin nada sonando, ▶ sigue arrancando la siguiente canción; (7) cerrar la app con el video en el TV y anotar si sigue sonando (pendiente de diagnóstico).
-- **Aplicar (Termux, uno por uno; el `.patch` se entregará después de que Ariel apruebe este plan):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/pausa_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PAUSA-1 pausa del enlace en el TV"` → `git push origin main`.
+- **Aplicar (Termux, uno por uno; el `.patch` va en `~/storage/downloads/pausa_enlace_tv.patch`):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/pausa_enlace_tv.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "PAUSA-1 pausa del enlace en el TV"` → `git push origin main`.
 - **Si falla:** `git revert` del commit "PAUSA-1 pausa del enlace en el TV".
 
 ### ✅ SEL-1 — Acciones en la selección múltiple — confirmado por Ariel el 18 nov 2026 ("lo acabo de probar y va bien")
@@ -228,7 +230,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-0. 🧪 **PAUSA-1: pausar/reanudar el enlace que está en el TV** (causa encontrada, plan detallado arriba; **siguiente paso: Ariel aprueba el plan y se entrega `pausa_enlace_tv.patch`**). Va antes que todo lo demás porque es un fallo real, de un solo archivo.
+0. 🧪 **PAUSA-1: pausar/reanudar el enlace que está en el TV** (parche `pausa_enlace_tv.patch` entregado; **siguiente paso: Ariel lo aplica, espera el build verde y prueba con el enlace de 360p y el de 1080p a 30 fps**). Si sale bien: ✅ y se sigue con el punto 3 (detener reproducción local al enviar un canal M3U) o el diagnóstico de canales en vivo (punto 5, paso 0), a elección de Ariel.
 1. ✅ **Estilo de subtítulos** (UI-S1, confirmado 18 nov 2026). Falta a futuro ⬜: contorno, codificación, idioma preferido, estilo por video y respaldo del estilo.
 2. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 3. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
@@ -327,6 +329,8 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **PAUSA-1 entregado (18 nov 2026):** Ariel aprobó el plan ("Pausa-1 primero") y pasó `MainActivity_actual.kt`. Se confirmó en el código real que los dos botones usaban `playingItem == null` y que `playLink` nunca fija `playingItem`; el parche agrega la marca `linkOnTv`. Se añadió el reinicio en Detener (punto 5 del plan). Nada se marca ✅ hasta la confirmación de Ariel.
 
 - **Diagnóstico de la pausa (18 nov 2026):** el log de `/log` (puerto **8001**, no 8000; la IP del teléfono era 192.168.100.43) mostró que el relay y el enlace funcionan y que al "pausar" la app manda una canción al TV. La lectura del código lo confirma (ver PAUSA-1). Aprendizaje de proceso: `castv_log.txt` salió vacío (0 bytes) cuando se consultó desde Termux por la IP equivocada; se resolvió abriendo `http://192.168.100.43:8001/log` en el navegador. `castv_tv.txt` contiene el código (`TvSend.kt` y `MainActivity.kt`), no un log.
 - **Pedido de Ariel (18 nov 2026):** que cada respuesta traiga el changelog con lo que sigue, para no tener que re-pasar contexto entre chats. Guardado como Regla 8.
