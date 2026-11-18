@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v95)
+# Registro de cambios y guía de continuidad – CASTV (v99)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -37,7 +37,11 @@
 
 ---
 
-## 📍 Estado Actual (v95)
+## 📍 Estado Actual (v99)
+
+- 🧪 **CATALOGO-1 Canales preinstalados de iptv-org (18 nov 2026):** Ariel dijo "Dale" y **el parche está entregado: `catalogo_listas.patch`** (3 archivos: `Catalog.kt` nuevo, `Store.kt`, `M3uActivity.kt`; 93 líneas nuevas, 1 cambiada). Comprobado con `git apply --check` sobre los archivos reales y aplicado en una copia de prueba (`git status` da 2 modificados + 1 nuevo); **no se pudo compilar aquí**, el build de GitHub Actions es la prueba final. Nada se marca ✅ sin su "ya funciona".
+- ⬜ **REGIONES-1 Listas M3U con apartados por región y categoría (pedido de Ariel, 18 nov 2026):** cada región/país con su propio apartado. Depende de CATALOGO-1. Plan en "Parche en Curso".
+- ⬜ **ICONO-1 Nuevo icono de la app (Ariel, 18 nov 2026):** **decidido:** Ariel aceptó la sugerencia (recorte cuadrado de la TV con ▶ sobre los colores de la bandera, sin el texto CASTV). Sin código todavía; va **después** de CATALOGO-1. Detalle en "Parche en Curso".
 
 - ✅ **MUS-1 Canales con el audio en una lista aparte: video y audio unidos (18 nov 2026, 17:30):** parche `mus1_audio_video.patch` (solo `MediaServer.kt`), aplicado, compiló e instalado. **Ariel probó DELUXE MUSIC DANCE BY KONTOR en la TV y dijo: "Todo va muy bien 👍"** (log 17:30-17:31 sin `ERROR` ni `LIVE mezcla falló`; llegó al fragmento 40). Incluye la corrección del orden de fragmentos al arrancar un canal en vivo. **Nota:** el `/log` pegado empieza con el canal ya en marcha (buffer de 10 MB al primer pedido), así que no trae las líneas `LIVE audio aparte` / `LIVE audio+video`; no hace falta repetirlo salvo que Ariel note desfase o cortes. Detalle en "Parche en Curso" (MUS-1).
 - ✅ **Adelantar un video en el TV (Ariel, 18 nov 2026):** probado, **funciona**.
@@ -124,6 +128,40 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 ---
 
 ## 🛠️ Parche en Curso / Próximo Paso
+
+### 🧪 CATALOGO-1 — Listas preinstaladas de iptv-org (parche `catalogo_listas.patch` entregado en v99; falta aplicar, compilar y probar)
+
+- **Decisión de Ariel (18 nov 2026):** opción **A** (Latinoamérica completa + EE.UU. + España) **más las 8 categorías**. Habla español e inglés, por eso EE.UU. y España; Reino Unido, Canadá y Australia están en el Anexo para sumarlos después.
+- **Corrección a v97 (importante):** en v97 se escribió que `firstRun` "ya existe" para Free-TV. **Es falso.** Revisando `Store.kt` y `M3uActivity.kt` reales: no hay `firstRun`; Free-TV solo aparece como texto **pre-escrito en el diálogo "Añadir lista"** cuando no hay ninguna lista (hay que tocar "Guardar y abrir"). Por eso este parche crea un mecanismo nuevo y pequeño. Tampoco existe lectura de `tvg-logo` ni `tvg-name` en `M3uParser.kt` (solo `group-title` y el nombre tras la coma); eso queda para REGIONES-1.
+- **Cómo funciona hoy (verificado):** `M3uActivity` carga **una lista a la vez** (descarga en un hilo aparte con copia guardada sin internet); las listas guardadas son pares nombre+enlace en `Store` (`castv_lib`, clave `m3u`).
+- **Cambio de enfoque sobre los repetidos (por esa arquitectura):** no se descargan 31 listas al arrancar (sería pesado y lento). Se **registran** las listas y cada una se descarga solo al abrirla. Los repetidos se manejan así: (1) **enlaces de lista**: no se añade ninguna lista cuyo enlace ya esté guardado (Free-TV no se duplica); (2) **dentro de cada lista**: al cargarla se descartan los canales con el mismo enlace de stream (queda el primero) y se anota en el `/log` cuántos se quitaron; (3) **entre listas** (un canal que está en su país y en su categoría): al ser vistas separadas no molesta; se resuelve al mezclar en REGIONES-1, que unirá por región sin repetidos. Los 4 índices maestros **no** se preinstalan (repiten todo; siguen disponibles en el Anexo para añadirlos a mano con ＋).
+- **Qué se preinstala (31 entradas, en este orden; la primera que se abre en una instalación limpia es República Dominicana):** 🇩🇴 República Dominicana · 🇦🇷 Argentina · 🇧🇴 Bolivia · 🇧🇷 Brasil · 🇨🇱 Chile · 🇨🇴 Colombia · 🇨🇷 Costa Rica · 🇨🇺 Cuba · 🇪🇨 Ecuador · 🇸🇻 El Salvador · 🇬🇹 Guatemala · 🇭🇳 Honduras · 🇲🇽 México · 🇳🇮 Nicaragua · 🇵🇦 Panamá · 🇵🇾 Paraguay · 🇵🇪 Perú · 🇵🇷 Puerto Rico · 🇺🇾 Uruguay · 🇻🇪 Venezuela · 🇺🇸 Estados Unidos · 🇪🇸 España · 🎬 Películas · 📺 Series · ⚽ Deportes · 📰 Noticias · 🎵 Música · 🧒 Infantil · 🎞️ Documentales · 🎨 Animación · Free-TV (gratis). Las 30 primeras salen de `https://iptv-org.github.io/iptv/` (ver Anexo).
+- **Archivos que toca (3):** `app/src/main/java/com/castv/app/Catalog.kt` (**nuevo**), `Store.kt` y `M3uActivity.kt`. No se tocan `M3uParser.kt`, el manifest, layouts, `MediaServer.kt` ni el respaldo (`Backup.kt` no se revisó; no se modifica).
+- **Código que modifica (todo aditivo, verificado contra los archivos reales que pasó Ariel):**
+  - **`Catalog.kt` (nuevo, 50 líneas):** `object Catalog` con `const val VERSION = 1` y `val items: List<M3uList>` (nombre + enlace de cada entrada de arriba). Reutiliza el `data class M3uList(name, url)` que ya está en `Store.kt`.
+  - **`Store.kt` (+38 líneas, justo antes de la sección "Canales favoritos (M3U)"):** función nueva `installCatalog(version: Int, items: List<M3uList>): Int`. Si la versión guardada (`catV` en `castv_lib`) ya es igual o mayor, no hace nada. Si no, añade al final de `m3u` las entradas cuyo enlace no esté ya guardado ni se haya ofrecido antes (`catSeen`), anota todos los enlaces vistos y devuelve cuántas añadió. Usa el `writeM3u()` privado ya existente. **No toca** `addM3uList`, `removeM3uList`, `lastM3u`, favoritos ni nada más.
+  - **`M3uActivity.kt` (2 sitios, +5 líneas, 1 cambiada):** (1) en `onCreate`, justo antes de `val saved = Store.m3uLists()`: `val added = Store.installCatalog(Catalog.VERSION, Catalog.items)` y, si `added > 0`, un aviso "📡 Se añadieron N listas de canales"; (2) en `loadList`, la línea `val list = if (body != null) M3uParser.parse(body) else emptyList()` pasa a quitar enlaces repetidos con `distinctBy { it.url }` y a anotar en `DebugLog` cuántos quitó. El resto de `loadList`, `chooseList`, `addListDialog` y la ★ no cambian.
+- **Qué pasa con cada caso:** (a) **instalación encima** (Ariel): conserva Free-TV, sus ★ y su última lista; las 30 listas nuevas se añaden al final (31 si no tuviera Free-TV); (b) **instalación limpia:** quedan las 31 y se abre República Dominicana; (c) **si quitas una lista con 🗑, no vuelve** a aparecer (solo reaparecería una lista nueva si en el futuro se sube `VERSION`); (d) **si Ariel ya había quitado Free-TV** antes, volverá a aparecer una vez.
+- **Riesgos / límites:** (1) no puedo compilar Kotlin aquí; el parche se comprueba con `git apply --check` y revisando nombres reales, pero el build de GitHub Actions es la prueba final; (2) el diálogo "Mis listas M3U" pasará a tener unas 31 filas (se desplaza bien, pero es largo; REGIONES-1 lo mejora); (3) algunas listas (EE.UU., Brasil, México) son grandes: se descargan solo al abrirlas y el tope por lista ya es de 25 MB; (4) los canales de iptv-org son públicos de terceros, algunos estarán caídos o bloqueados por país, y muchos no se verán en el TV; (5) `distinctBy` cambia el contador "N de M canales" en listas que ya tenían repetidos (por ejemplo Free-TV), que es lo pedido.
+- **Cómo probar (cuando exista):** (1) instalar encima y abrir ⋮ → Listas M3U: sale el aviso "📡 Se añadieron 30 listas de canales"; (2) tocar 📡: aparecen República Dominicana, los demás países, las categorías y Free-TV; (3) abrir República Dominicana: carga canales; mirar el `/log` (`http://192.168.100.43:8001/log`) por si dice cuántos repetidos quitó; (4) abrir Deportes y Estados Unidos; (5) comprobar que Free-TV y tus ★ siguen igual; (6) quitar una lista con 🗑, cerrar y abrir la pantalla: no vuelve; (7) probar un canal 📺 Al TV y otro 📱 En el móvil; (8) sin internet: una lista ya abierta usa la copia guardada.
+- **Aplicar (Termux, uno por uno; subir antes el changelog v99 para que `git status` salga limpio):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/catalogo_listas.patch` → `git status --short` (deben salir **3** archivos: 2 modificados y `Catalog.kt` nuevo) → `git add -A` → `git commit -m "CATALOGO-1 listas preinstaladas"` → `git push origin main`.
+- **Si falla:** `git revert` del commit "CATALOGO-1 listas preinstaladas".
+
+### ⬜ REGIONES-1 — Apartados por región y categoría en Listas M3U (plan, depende de CATALOGO-1)
+
+- **Qué:** en `M3uActivity` una navegación superior por región: 🌎 Latinoamérica · 🇺🇸 Norteamérica · 🇪🇺 Europa · 🌏 Asia y Medio Oriente · 🌍 África y Oceanía · 🎬 Categorías · ⭐ Favoritos. Dentro de cada región, la lista de países y luego los canales, manteniendo buscador, filtro por grupo, ★ y 📺 Al TV / 📱 En el móvil.
+- **Requisitos del texto de Ariel que se respetan:** procesar en hilos secundarios y leer `group-title`, `tvg-logo` y `tvg-name` (el parser actual ya lo hace en segundo plano; se verifica con el `M3uParser.kt` real).
+- **Archivos:** `M3uActivity.kt` (y posiblemente `Store.kt`). Es buen momento para resolver ACENTO-1 en el mismo archivo, **como parche aparte**.
+- **Riesgos:** pantalla ya algo cargada en vertical; se prueba que no se aplasten las pestañas.
+- **Lo que ya se sabe del código real (v98):** `M3uParser.kt` hoy solo lee `group-title` y el nombre tras la coma (hay que añadir `tvg-logo` y `tvg-name` si se quieren logos); `M3uActivity` maneja una sola lista a la vez, así que mezclar por región implicará descargar varias listas y **unirlas sin repetidos por enlace de stream** (aquí se resuelve el repetido entre país y categoría y contra Free-TV).
+
+### ⬜ ICONO-1 — Nuevo icono de la app (decidido por Ariel el 18 nov 2026; sin código aún; va después de CATALOGO-1)
+
+- **Decisión:** Ariel aceptó la sugerencia: usar un **recorte cuadrado de la TV cian con ▶** sobre los colores de la bandera dominicana, **sin el texto CASTV** (a tamaño de icono el texto y los detalles se pierden).
+- **Imagen de origen:** `706635.jpg` (horizontal, la subió Ariel).
+- **Falta para empezar (se piden cuando CATALOGO-1 esté ✅):** `AndroidManifest.xml` y la lista de archivos `ic_launcher*` de `res/` (comandos en la nota v99), para ver si hoy hay iconos adaptables y en qué tamaños.
+- **Plan (a detallar en 🧪 antes del parche):** preparar el recorte cuadrado con margen de seguridad (el lanzador recorta en círculo o esquinas redondeadas), mostrárselo a Ariel **antes** de aplicarlo, generarlo en los tamaños de `mipmap` y registrarlo en el manifest sin tocar código Kotlin.
+- **Riesgos:** el lanzador puede tardar en refrescar el icono (a veces hay que reinstalar o reiniciar); el icono viejo se conserva para revertir con `git revert`.
 
 ### ✅ MUS-1 — Canales HLS con el audio en una lista aparte (`#EXT-X-MEDIA:TYPE=AUDIO`) — confirmado por Ariel el 18 nov 2026 ("Todo va muy bien")
 
@@ -394,6 +432,20 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
+**Lista ordenada v97 (18 nov 2026), recomendada de arriba abajo (ninguno urgente):**
+1. 🧪 **CATALOGO-1:** listas preinstaladas de iptv-org (Ariel eligió A + las 8 categorías; changelog 🧪 entregado en v98, falta el parche).
+2. ⬜ **REGIONES-1:** apartados por región y categoría en Listas M3U.
+3. ⬜ **ACENTO-1:** `M3uActivity` no aplica el color de acento (su ★ sale siempre cian); conviene justo después de REGIONES-1 (mismo archivo, parche aparte).
+4. ⬜ **CANAL-BG:** que el canal siga en la TV con la app cerrada (servicio en primer plano).
+5. ⬜ **AVISO-HLS:** mensaje claro cuando un canal no se pueda preparar, con "📱 En el móvil" (más útil con tantos canales nuevos).
+6. ⬜ **SEL-2:** ▶ Reproducir selección y Compartir en la selección múltiple.
+7. ⬜ **ICONO-1:** nuevo icono (decidido: recorte de la TV con ▶ sobre los colores de la bandera, sin texto); va después de CATALOGO-1.
+8. ⬜ **UI-2 / UI-3:** HUD del reproductor de video y mini reproductor expandible.
+9. ⬜ **Caché de Gradle:** solo si vuelve el error 429.
+10. ⬜ **Banco de ideas (VLC):** el resto de la sección "Banco de ideas futuras" (A-B, PiP, zoom, ecualizador, control remoto web, control parental, etc.).
+
+**Lista de v95/v96 (superada por la de arriba; se conserva como historial):**
+
 **Al día desde v95 (18 nov 2026): no queda nada por probar.** Pendientes reales, a elección de Ariel (ninguno urgente; recomendado: el 1):
 1. ⬜ **CANAL-BG: que el canal siga en la TV con la app cerrada** (servicio en primer plano que mantiene vivo el servidor `/live`). Hoy, al cerrar la app, el canal se corta al ~1 minuto.
 2. ⬜ **SEL-2:** ▶ Reproducir selección y Compartir en la selección múltiple.
@@ -481,6 +533,8 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 **Canales en vivo**
 20. ✅ **Canales HLS que se vean en el TV:** hecho con LIVE-1, LIVE-2 y MUS-1 (ver "Siguiente" punto 5).
+22. ⬜ **Catálogo de canales preinstalado sin repetidos** (CATALOGO-1) y **apartados por región** (REGIONES-1): ver "Parche en Curso".
+23. ⬜ **Nuevo icono de la app** (ICONO-1): decidido el recorte; ver "Parche en Curso".
 
 **Selección múltiple**
 21. ✅ **Acciones para varios archivos a la vez** (cola, favoritos, listas, etc.), además de Borrar: detalle en "Siguiente" punto 6.
@@ -503,6 +557,22 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v99 (18 nov 2026):** Ariel dijo **"Dale"** a CATALOGO-1 y aceptó la sugerencia para el icono (recorte de la TV con ▶, sin texto). **Entregado el parche `catalogo_listas.patch`** (3 archivos, 93 líneas nuevas), verificado con `git apply --check` y aplicado en una copia de prueba; sigue 🧪 hasta que compile en verde y Ariel diga "ya funciona". **ICONO-1** pasa a ⬜ decidido (sin código). **Siguiente:** Ariel sube este changelog, aplica el parche, espera el build en verde, prueba (ver "Cómo probar" de CATALOGO-1) y pasa el aviso que salga y, si quiere, el `/log`. Después, ICONO-1: pedir `AndroidManifest.xml` y la lista `ic_launcher*` con `cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/AndroidManifest.xml ~/storage/downloads/AndroidManifest_actual.xml` → `find app/src/main/res -name "ic_launcher*" > ~/storage/downloads/iconos_lista.txt`. **Cómo retomar:** pasar solo `CHANGELOG_v99.md`; subir con `cd ~/castv-nuevo/castv-fresh` → `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v99.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v99 (CATALOGO-1 entregado, icono decidido)"` → `git push origin main`.
+
+- **v98 (18 nov 2026):** Ariel eligió **A (Latinoamérica + EE.UU. + España) + las 8 categorías** y pasó `Store_actual.kt`, `M3uParser_actual.kt` y `M3uActivity_actual.kt`. Se leyeron los tres archivos completos. **Corrección a v97:** `firstRun` **no existe** (Free-TV solo viene pre-escrito en el diálogo "Añadir lista"); además la app carga **una lista a la vez**, así que el plan de repetidos cambió (ver CATALOGO-1). **🧪 CATALOGO-1 con el detalle exacto entregado; el `.patch` aún NO se entrega** (regla 2). **Siguiente:** Ariel sube este changelog y dice "Dale" (o pide cambios); entonces se entrega `catalogo_listas.patch` (3 archivos, uno nuevo) con sus comandos de Termux. Nada se marca ✅ sin su "ya funciona". **Cómo retomar:** pasar solo `CHANGELOG_v98.md`; subir con `cd ~/castv-nuevo/castv-fresh` → `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v98.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v98 (CATALOGO-1 detallado)"` → `git push origin main`.
+
+- **v97 (18 nov 2026):** Ariel pasó `CHANGELOG_v96.md`, la imagen `706635.jpg` (posible icono, sin decidir) y el texto "Listas de Canales M3U Globales e Internacionales (Maestro Definitivo v2 para CASTV)" (guardado en el Anexo). Se pidió: preinstalar esos canales junto a los actuales descartando repetidos, avisar si hay algo raro, apartados por región en la interfaz y una lista ordenada de pendientes. **Hecho:** revisión de la lista (hallazgos en CATALOGO-1), planes CATALOGO-1, REGIONES-1 e ICONO-1 (⬜/⏳, sin código) y lista ordenada en "Siguiente". **Sin parche nuevo.** **Siguiente:** Ariel elige A, B o C (qué se preinstala) y sube `Store_actual.kt`, `M3uActivity_actual.kt` y `M3uParser_actual.kt`; con eso se entrega el changelog 🧪 con el detalle exacto y recién después el `.patch` con sus comandos de Termux. **Cómo retomar:** pasar solo `CHANGELOG_v97.md`; subir con `cd ~/castv-nuevo/castv-fresh` → `git ls-files | grep -i changelog` → `cp ~/storage/downloads/CHANGELOG_v97.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v97 (catálogo de canales, regiones e icono)"` → `git push origin main`.
+
+- **v96 (18 nov 2026, CIERRE DEL DÍA, punto de continuidad para la próxima sesión):** Ariel se va a dormir. **Todo está ✅ y probado; no queda nada por probar.** Qué quedó funcionando hoy: LIVE-2 (canales fluidos, sin lag), MUS-1 (canales con audio aparte, como Kontor, con imagen y sonido), GZIP-1, adelantar video en el TV, pausa y duración del enlace, SEL-1, UI-S1, canales en vivo por `/live` desde Reproducir enlace y Listas M3U.
+  - **Pendientes (⬜, ninguno urgente; el 1 es el recomendado):**
+    1. **CANAL-BG:** que el canal siga en la TV con la app cerrada (servicio en primer plano que mantiene vivo el servidor `/live`). Hoy se corta al ~1 minuto. **Para empezar se necesitan 3 archivos** (Termux, uno por uno): `cd ~/castv-nuevo/castv-fresh` → `cp app/src/main/java/com/castv/app/MediaServer.kt ~/storage/downloads/MediaServer_actual.kt` → `cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt` → `cp app/src/main/AndroidManifest.xml ~/storage/downloads/AndroidManifest_actual.xml`; y subirlos. Antes del parche se entrega el changelog 🧪 con el detalle (permiso `FOREGROUND_SERVICE`, notificación, riesgos de batería).
+    2. **SEL-2:** ▶ Reproducir selección y Compartir en la selección múltiple.
+    3. **UI-2 / UI-3:** HUD del reproductor de video y mini reproductor expandible.
+    4. **ACENTO-1:** `M3uActivity` no aplica el color de acento guardado (su ★ sale siempre cian).
+    5. **AVISO-HLS:** mensaje claro cuando un canal no se pueda preparar, con "📱 En el móvil".
+    6. **Caché de Gradle** solo si vuelve el error 429.
+  - **Cómo retomar:** pasar solo este archivo (`CHANGELOG_v96.md`). Datos fijos al inicio (IP del teléfono 192.168.100.43, puerto 8001, TV 192.168.100.14). Se sube al repo con: `cd ~/castv-nuevo/castv-fresh` → `cp ~/storage/downloads/CHANGELOG_v96.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v96 (cierre del día)"` → `git push origin main`.
 
 - **v95 (18 nov 2026, ~19:00):** Ariel confirmó que las pruebas 1 y 2 están todas bien (Retro, canales de video normales y Kontor; GZIP-1) y autorizó la limpieza del changelog (DOC-1). **GZIP-1 ✅, DOC-1 ✅**; LIVE-1 y PROG-1 antiguos pasados a ✅ (ya estaban confirmados por sus sub-parches); "Siguiente" reescrito con los pendientes reales. Sin parche nuevo. **Siguiente recomendado:** CANAL-BG (que el canal siga en la TV con la app cerrada); primero se entrega su changelog 🧪 y se piden los archivos necesarios (`AndroidManifest.xml`, `MainActivity.kt`, `MediaServer.kt` actual). **Cómo retomar:** pasar solo `CHANGELOG_v95.md`; subir con `cd ~/castv-nuevo/castv-fresh` → `cp ~/storage/downloads/CHANGELOG_v95.md ~/castv-nuevo/castv-fresh/CHANGELOG.md` → `git add CHANGELOG.md` → `git commit -m "Changelog v95 (todo al día, limpieza DOC-1)"` → `git push origin main`.
 
@@ -670,3 +740,19 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - **Etapa 13-A.1 / 13-A.2 (`98bcf78`, `11d93df`):** Búsqueda de puerto libre (8000-8010) y servidor `/relay` para enlaces externos mp4 al TV.
 - **Reproductor y UI:** Salida Teléfono/TV para video, subtítulos `.srt/.vtt`, siguiente automático, botón 📺 TV, selección múltiple con papelera Android, tema Claro/Oscuro, 4 colores de acento, carga en segundo plano y log en `/log`.
 - **Etapa 11 (`d7010ac`):** Base estable v2.1.
+
+---
+
+## 📦 Anexo: Catálogo Maestro v2 de listas M3U (texto pegado por Ariel el 18 nov 2026)
+
+Todas las URL salen de `https://iptv-org.github.io/iptv/`. Los códigos son de dos letras en minúsculas. Total: 48 listas, sin repetidas.
+
+- **Índices maestros (4; propuesta: NO preinstalar, repiten todo):** `index.m3u` (todo el mundo), `index.category.m3u`, `index.language.m3u`, `index.country.m3u`.
+- **Por país:** `countries/<código>.m3u`
+  - **América Latina (20):** do (República Dominicana), ar, bo, br (Brasil, portugués), cl, co, cr, cu, ec, sv, gt, hn, mx, ni, pa, py, pe, pr, uy, ve.
+  - **Europa (7):** es, fr, gb, de, it, ru, pt.
+  - **Norteamérica (2):** us, ca.
+  - **Asia y Medio Oriente (5):** jp, kr, cn, in, ae.
+  - **África y Oceanía (2):** za, au.
+- **Categorías (8):** `categories/<nombre>.m3u` con movies (Películas), series, sports (Deportes), news (Noticias), music (Música), kids (Infantil), documentary (Documentales), animation (Animación y anime).
+- **Notas técnicas del texto original:** (1) `firstRun` en `Store.kt` con República Dominicana y Latinoamérica o el índice por categorías; (2) parser en hilos secundarios leyendo `group-title`, `tvg-logo` y `tvg-name`; (3) pestañas por región/país y por categoría en `M3uActivity.kt`; (4) HLS por el proxy local con buffer de 16 MB (hoy 10 MB, ya ✅ fluido). Estado de cada punto en CATALOGO-1 y REGIONES-1.
