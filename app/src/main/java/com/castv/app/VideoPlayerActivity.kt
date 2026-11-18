@@ -6,13 +6,17 @@ import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.Settings
 import android.text.TextUtils
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -28,6 +32,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.concurrent.thread
+import kotlin.math.abs
 
 /**
  * Reproduce videos en el propio teléfono (pantalla completa).
@@ -52,6 +57,17 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var resumeOnReturn = false
     private val handler = Handler(Looper.getMainLooper())
     private val reqSub = 5101
+
+    // Gestos: brillo (derecha), volumen (izquierda), doble toque lateral ±10 s
+    private lateinit var hud: TextView
+    private lateinit var gesture: GestureDetector
+    private lateinit var audio: AudioManager
+    private var gMode = 0          // 0 sin decidir, 1 brillo, 2 volumen, -1 ignorado
+    private var gDownX = 0f
+    private var gDownY = 0f
+    private var gBright = 0.5f
+    private var gVol = 0f
+    private val hideHud = Runnable { if (::hud.isInitialized) hud.visibility = View.GONE }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -163,6 +179,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
         controller.setPrevNextListeners({ playAt(index + 1) }, { playAt(index - 1) })
         video.setMediaController(controller)
+        setupGestures(root)
 
         video.setOnPreparedListener {
             if (pendingStart > 0) video.seekTo(pendingStart * 1000)
@@ -180,6 +197,114 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
         playAt(index, startAt = pendingStart, saveCurrent = false)
         handler.post(tick)
+    }
+
+    // ------------------------------------------------------------ Gestos
+
+    private fun inEdge(x: Float, y: Float): Boolean {
+        val m = dp(32)   // márgenes seguros: evita toques accidentales y gestos del sistema
+        return x < m || y < m || x > video.width - m || y > video.height - m
+    }
+
+    private fun showHud(text: String) {
+        hud.text = text
+        hud.visibility = View.VISIBLE
+        handler.removeCallbacks(hideHud)
+        handler.postDelayed(hideHud, 800)
+    }
+
+    private fun currentBrightness(): Float {
+        val b = window.attributes.screenBrightness
+        if (b >= 0f) return b
+        return try {
+            Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255f
+        } catch (e: Exception) { 0.5f }
+    }
+
+    private fun seekBy(sec: Int) {
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        if (dur <= 0) return   // canal en vivo: no se puede adelantar
+        val pos = try { video.currentPosition } catch (e: Exception) { return }
+        video.seekTo((pos + sec * 1000).coerceIn(0, maxOf(dur - 500, 0)))
+        showHud(if (sec > 0) "⏩ +$sec s" else "⏪ −${-sec} s")
+    }
+
+    private fun setupGestures(root: FrameLayout) {
+        audio = getSystemService(AUDIO_SERVICE) as AudioManager
+        hud = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            background = GradientDrawable().apply {
+                setColor(0xAA000000.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            visibility = View.GONE
+        }
+        root.addView(
+            hud,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+
+        gesture = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                gMode = 0
+                gDownX = e.x
+                gDownY = e.y
+                return true
+            }
+
+            // El VideoView ya no recibe el toque: mostrar/ocultar controles se hace aquí
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (controller.isShowing) controller.hide() else controller.show()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (inEdge(e.x, e.y)) return false
+                val w = video.width.toFloat()
+                if (e.x < w / 3f) seekBy(-10) else if (e.x > w * 2f / 3f) seekBy(10)
+                return true
+            }
+
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                if (gMode == -1) return true
+                val h = video.height.toFloat()
+                val w = video.width.toFloat()
+                if (h <= 0f || w <= 0f) return true
+                if (gMode == 0) {
+                    if (inEdge(gDownX, gDownY)) { gMode = -1; return true }
+                    val tx = e2.x - gDownX
+                    val ty = e2.y - gDownY
+                    if (abs(tx) < dp(12) && abs(ty) < dp(12)) return true   // aún no se decide
+                    if (abs(ty) <= abs(tx)) { gMode = -1; return true }      // deslizar horizontal: se ignora
+                    if (gDownX >= w / 2f) {
+                        gMode = 1
+                        gBright = currentBrightness()
+                    } else {
+                        gMode = 2
+                        gVol = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+                    }
+                }
+                val frac = dy / (h * 0.8f)   // dy > 0: el dedo sube
+                if (gMode == 1) {
+                    gBright = (gBright + frac).coerceIn(0.01f, 1f)
+                    val lp = window.attributes
+                    lp.screenBrightness = gBright
+                    window.attributes = lp
+                    showHud("☀ ${(gBright * 100).toInt()} %")
+                } else {
+                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    gVol = (gVol + frac * max).coerceIn(0f, max.toFloat())
+                    val v = Math.round(gVol)
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0)
+                    showHud((if (v == 0) "🔇 " else "🔊 ") + "$v/$max")
+                }
+                return true
+            }
+        })
+        video.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev); true }
     }
 
     private fun chip(text: String, onClick: () -> Unit): TextView = TextView(this).apply {
@@ -397,6 +522,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(hideHud)
         if (::video.isInitialized) {
             try { video.stopPlayback() } catch (e: Exception) { }
         }
