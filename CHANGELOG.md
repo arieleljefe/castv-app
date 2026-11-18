@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v47)
+# Registro de cambios y guía de continuidad – CASTV (v50)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -24,12 +24,14 @@
 
 ---
 
-## 📍 Estado Actual (v47)
+## 📍 Estado Actual (v50)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
+- ✅ **UI-S1 Estilo de subtítulos (18 nov 2026):** aplicada, compiló en verde y Ariel confirmó **"ya funciona"**. Opción 🎨 en el menú 💬 del reproductor: tamaño, negrita, color y fondo.
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
 - ✅ **UI-1 pestaña "Más" (18 nov 2026):** aplicada, compiló y Ariel la probó en el teléfono ("todo bello"). Commit "UI-1 aplicado: pestaña Más".
 - ✅ **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (18 nov 2026):** aplicada (commit `074af2b`), compiló y Ariel confirmó **"ya funciona"** con captura de la pantalla Ajustes; **Versión** muestra CASTV 2.1, igual que el encabezado.
+- ⬜ **Idea de Ariel (18 nov 2026): más acciones en la selección múltiple** (añadir varios a la cola, a favoritos, a listas, etc.); ver "Siguiente" punto 6.
 - ⬜ **Idea de Ariel (18 nov 2026): canales en vivo que SÍ se vean en el TV** (convertir o retransmitir el video desde la app); ver "Siguiente" punto 5.
 - ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
@@ -73,6 +75,25 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 ---
 
 ## 🛠️ Parche en Curso / Próximo Paso
+
+### ✅ UI-S1 — Estilo de subtítulos (v1) — confirmado por Ariel el 18 nov 2026 ("ya funciona")
+
+- **Qué:** nueva opción **🎨 Estilo del subtítulo…** dentro del menú 💬 del reproductor de video. Abre un menú con: **Tamaño** (Pequeño 14 · Mediano 18 · Grande 24 · Muy grande 30), **Negrita** (sí/no), **Color del texto** (Blanco · Amarillo · Cian · Verde), **Fondo** (Semitransparente · Opaco · Sin fondo) y **Restablecer estilo**. Al cambiar algo se aplica al instante y sale 3 s un subtítulo de ejemplo ("Así se verán los subtítulos"). Con **Sin fondo** se añade una sombra negra automática para que se lea. Los valores por defecto (Mediano, blanco, semitransparente, sin negrita) dejan el aspecto idéntico al de hoy.
+- **Archivo que toca (solo uno):** `app/src/main/java/com/castv/app/VideoPlayerActivity.kt`. No se tocan `Store.kt`, el manifest ni layouts.
+- **Código que modifica (todo aditivo, verificado contra el archivo real):**
+  - Campos nuevos: `previewing` y `hidePreview`.
+  - `onCreate`: una llamada `applySubStyle()` justo después de crear `subText`.
+  - `updateSub()`: una línea `if (previewing) return` para no pisar el ejemplo.
+  - `showSubtitleMenu()`: una opción más (índice 4) que llama a `previewSub()` y `showStyleMenu()`. Las 4 opciones existentes no cambian de índice.
+  - Funciones nuevas: `stSize()`, `stColor()`, `stBg()`, `stBold()`, `applySubStyle()`, `previewSub()`, `styleChanged()`, `pickStyle()`, `showStyleMenu()`.
+  - `onDestroy()`: `handler.removeCallbacks(hidePreview)`.
+- **Dónde se guarda:** en las mismas `SharedPreferences` `castv_subs` que ya usa el reproductor, con claves `style_size`, `style_bold`, `style_color`, `style_bg` (no chocan con las claves `s|...` de cada video). El estilo es **global** (vale para todos los videos).
+- **Riesgos:** (1) no pude compilar Kotlin aquí; el parche se comprobó con `git apply --check` y revisando nombres reales, pero el build de GitHub Actions es la prueba final; (2) el menú de estilo se vuelve a abrir tras cada cambio para poder ajustar varias cosas seguidas; en pantalla horizontal puede tapar parte del ejemplo; (3) el estilo **no entra** en el respaldo JSON (`Backup.kt` no lo incluye en esta v1); (4) solo afecta al reproductor del **móvil**, no al TV.
+- **Cómo probar:** (1) abrir un video con subtítulos y tocar 💬 → debe aparecer **🎨 Estilo del subtítulo…** y las otras 4 opciones deben seguir funcionando; (2) cambiar Tamaño, Negrita, Color y Fondo: se ve el ejemplo y luego el subtítulo real; (3) probar **Sin fondo** (sombra legible); (4) cerrar y reabrir otro video: el estilo se mantiene; (5) **Restablecer estilo** vuelve al aspecto de antes; (6) girar el teléfono; (7) los gestos y el 📺 TV siguen igual.
+- **Aplicar (Termux, uno por uno):** `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/subtitulos_estilo.patch` → `git status --short` (debe salir **1** archivo) → `git add -A` → `git commit -m "UI-S1 estilo de subtítulos"` → `git push origin main`.
+- **Si falla:** `git revert` del commit "UI-S1 estilo de subtítulos".
+- **Resultado:** probado en el teléfono; el estilo se aplica al instante, se mantiene entre videos y Restablecer vuelve al aspecto original. Parche: `subtitulos_estilo.patch`.
+- **Pendiente para futuras versiones (⬜, NO en este parche):** contorno, codificación del texto, autocarga e idioma preferido, estilo por video, incluir el estilo en el respaldo (`Backup.kt` aún no lo guarda).
 
 ### ✅ UI-1b — Pantalla de Ajustes en el ⋮ — confirmado por Ariel el 18 nov 2026 ("ya funciona")
 
@@ -137,7 +158,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
+1. ✅ **Estilo de subtítulos** (UI-S1, confirmado 18 nov 2026). Falta a futuro ⬜: contorno, codificación, idioma preferido, estilo por video y respaldo del estilo.
 2. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 3. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
 4. **Caché de Gradle en el workflow** (⬜, solo si vuelve a fallar por "429 Too Many Requests"). Necesita `.github/workflows/*.yml`.
@@ -148,6 +169,13 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
    - **Siempre:** si un canal no se puede preparar, se avisa con un mensaje claro (como en 14-B) y se ofrece "📱 En el móvil".
    - **Cómo probar (cuando exista):** un canal HLS en abierto de la lista Free-TV al TV; que arranque, que no se corte en 10 minutos y que "Detener" funcione.
    - **Para empezar se necesitará:** `TvController`/`TvSend.kt`, el servidor `/relay` de `MainActivity.kt` y `M3uActivity.kt` (se pedirán antes de entregar nada).
+6. ⬜ **Selección múltiple con más acciones** (idea de Ariel, 18 nov 2026; a pulir en el futuro; **sin parche ni plan aprobado todavía**). Hoy, al mantener pulsado un archivo, la barra de selección solo ofrece **Todo** y **🗑 Borrar**. Ariel quiere hacer con varios archivos a la vez lo mismo que hoy se hace uno por uno desde el ⋮ del archivo, tanto con música como con videos.
+   - **Acciones propuestas** (se eligen con Ariel antes de construir): **➕ A la cola**, **★ Favoritos** (añadir o quitar), **📃 A una lista** y, si se quiere, **▶ Reproducir selección** o **Compartir** (el "etc." de Ariel).
+   - **Cómo se vería (previsto):** la barra de selección mantiene "Todo" y "🗑 Borrar" y suma las acciones nuevas (las que no quepan van en un menú ⋮ de la misma barra). Al terminar una acción se sale de la selección y sale un aviso con la cantidad ("5 añadidas a la cola").
+   - **Cosas a cuidar:** en el ⋮ de un archivo, Favoritos *alterna* (añade o quita); con varios se debe **añadir solo a los que aún no son favoritos** y ofrecer "Quitar" cuando todos ya lo son, para no invertir a medias; no duplicar pistas que ya están en la cola o en la lista; la selección sigue funcionando con Ordenar, Duplicados y filtros activos.
+   - **Riesgos:** toca la barra de selección y el adaptador de `MainActivity.kt`; el cambio es aditivo y reutiliza las funciones que ya existen para un solo archivo (cola, favoritos, listas).
+   - **Cómo probar (cuando exista):** seleccionar 5 pistas y mandarlas a la cola, a favoritos y a una lista; hacerlo igual con videos; "Todo" + acción; salir de la selección con atrás; ver que la insignia de Cola muestra el total correcto.
+   - **Para empezar se necesitará:** `MainActivity.kt` actual (barra de selección y `showItemMenu`) y, si hace falta, `Store.kt` (se pedirán antes de entregar nada).
 - Se pedirán los archivos actuales necesarios antes de entregar nada.
 
 **Cómo pasar los archivos de interfaz** (Termux, un solo comando; luego adjuntar `castv_interfaz.txt` desde Descargas):
@@ -202,6 +230,9 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 18. ⬜ **Manejo del foco de audio** (pausa en llamadas o al abrir otra app de sonido).
 19. ⬜ **Vocabulario en español** de referencia (`values-es` de VLC) para mantener textos coherentes, escritos con palabras propias.
 
+**Selección múltiple**
+21. ⬜ **Acciones para varios archivos a la vez** (cola, favoritos, listas, etc.), además de Borrar: detalle en "Siguiente" punto 6.
+
 **Canales en vivo**
 20. ⬜ **Canales HLS que se vean en el TV** (retransmitir o convertir desde la app): detalle y opciones en "Siguiente" punto 5.
 
@@ -224,6 +255,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ### Notas de este día
 
+- **Pedido de Ariel (18 nov 2026):** además de seleccionar y borrar varios archivos, poder también **añadir varios a la cola** (música o videos) y **añadir varios a favoritos**, "etc.". Guardado como "Siguiente" punto 6.
 - **Pedido de Ariel (18 nov 2026, antes de dormir):** que al poner un canal "todo se reproduzca efectivamente en la tv"; la app debería convertir o preparar el video en vivo. Guardado como "Siguiente" punto 5 para pulir más adelante.
 - **Observación (18 nov 2026, ⬜ pequeño):** `M3uActivity` no aplica el color de acento guardado (no hace `theme.applyStyle` como `MainActivity`), así que su ★ sale siempre cian. `SettingsActivity` sí lo aplica.
 - **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
@@ -233,6 +265,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **UI-S1 estilo de subtítulos (18 nov 2026):** 🎨 en el menú 💬; tamaño, negrita, color y fondo guardados en `castv_subs` (`VideoPlayerActivity.kt`).
 - **UI-1b pantalla de Ajustes (18 nov 2026):** `SettingsActivity.kt` nuevo, registro en el manifest, ⋮ abre Ajustes, Más sin repetidos.
 - **UI-1 pestaña Más (18 nov 2026):** `navMore`, `ic_nav_more.xml`, `showMoreSheet()` en `MainActivity.kt`.
 - **Respaldo Exportar/Importar JSON (17 nov 2026):** `Backup.kt`, `Store.reload()`, menú id 17 en `MainActivity.kt`.
