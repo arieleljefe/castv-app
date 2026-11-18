@@ -1313,6 +1313,7 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(i, reqVideo)
             return
         }
+        resetProgress()   // [PROG-1] barra en cero para el enlace nuevo
         // Directo al TV por DLNA: no pasa por el servidor del puerto 8000
         if (url.startsWith("https://")) setStatus("🚀 Enviando enlace https al TV (algunos TV lo rechazan)…")
         else setStatus("🚀 Enviando enlace al TV…")
@@ -1332,6 +1333,7 @@ class MainActivity : AppCompatActivity() {
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
             if (ok) linkOnTv = true   // [PAUSA-1] ⏸/▶ ahora controlan el enlace del TV
             runOnUiThread {
+                if (ok) tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
                     else "❌ El TV no aceptó el enlace. ¿Está encendido y en el mismo Wi-Fi? Prueba otro enlace mp4.")
@@ -1514,7 +1516,7 @@ class MainActivity : AppCompatActivity() {
             lastPos = pos
             lastDur = dur
             runOnUiThread {
-                if (!userSeeking && playingItem != null) {
+                if (!userSeeking && (playingItem != null || linkOnTv)) {   // [PROG-1] también con un enlace en el TV
                     if (dur > 0) {
                         seekBar.isEnabled = true
                         seekBar.max = dur
