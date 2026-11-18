@@ -281,11 +281,22 @@ $innerXml
         return h * 3600 + m * 60 + sec
     }
 
+    private var lastPosRaw: String? = null
+
     /** Devuelve (posición, duración) en segundos, o null si el TV no responde. */
     fun getPositionInfo(): Pair<Int, Int>? {
         val body = soapCall("GetPositionInfo", "<InstanceID>0</InstanceID>") ?: return null
         val pos = parseTime(tag(body, "RelTime"))
         val dur = parseTime(tag(body, "TrackDuration"))
+        // PROG-1c (diagnóstico): dato crudo de duración, solo cuando cambia
+        val rawDur = tag(body, "TrackDuration")
+        val rawMeta = tag(body, "TrackMetaData")?.take(200)
+        val rawKey = "$rawDur|$rawMeta"
+        if (rawKey != lastPosRaw) {
+            lastPosRaw = rawKey
+            val extra = if (rawDur == null) " cuerpo='${body.replace(Regex("\\s+"), " ").take(300)}'" else ""
+            DebugLog.add("POS crudo: dur='$rawDur' meta='$rawMeta'$extra")
+        }
         return Pair(maxOf(pos, 0), maxOf(dur, 0))
     }
 
