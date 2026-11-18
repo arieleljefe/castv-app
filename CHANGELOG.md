@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v41)
+# Registro de cambios y guía de continuidad – CASTV (v45)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -17,16 +17,19 @@
 1. **Cero rupturas:** Todo cambio debe ser modular, aditivo y verificado contra los nombres reales del código (`ServerPort.port`, `getLocalIpAddress()`, etc.) antes de entregarlo.
 2. **Changelog PRIMERO con detalle del parche:** Antes de pasar código o un parche nuevo, se entrega el changelog con estado **🧪** detallando **exactamente qué parche se aplicará, qué código modifica, qué archivos toca y cómo probarlo**.
 3. **PROHIBIDO marcar ✅ sin confirmación (Regla 7):** Nada se marca ✅ hasta que Ariel confirme que compiló en verde en GitHub Actions y diga *"ya funciona"* tras probarlo. Solo entonces se entrega el changelog actualizado a ✅.
-4. **Un cambio a la vez:** No acumular parches grandes. Entorno del usuario: teléfono Android con **Termux** (comandos cortos uno por uno, cambios en `.patch` excluyendo `CHANGELOG.md`).
-5. **VLC solo como inspiración (licencia GPLv2+):** NO copiar código, recursos, iconos, textos largos, nombre ni logo (cono) de VLC. Las ideas y la organización de pantallas se reimplementan con código propio (Material Icons u otros propios). Copiar código haría que CASTV tuviera que ser GPL con fuentes publicadas. Referencia local: `vlc-android-master.zip` (solo consulta).
+4. **Un cambio a la vez:** No acumular parches grandes. Entorno del usuario: teléfono Android con **Termux** (comandos cortos uno por uno, cambios en `.patch` sin incluir el changelog; el changelog se sube aparte, ver regla 6).
+5. **SIEMPRE pasar los comandos de Termux (OBLIGATORIO, sin excepción):** Cada vez que se entregue un parche o cambio, la respuesta DEBE incluir los comandos completos para aplicarlo en Termux, **uno por uno, cada uno en su propio bloque de código copiable** (no en lista de texto ni en una sola línea corrida). Mínimo: `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/<parche>.patch` → `git status --short` → `git add -A` → `git commit -m "..."` → `git push origin main`. Se deben dar aunque ya se hayan dado antes y aunque el cambio sea pequeño. Ariel lo pidió expresamente el 18 nov 2026.
+6. **El changelog TAMBIÉN se sube al repo (OBLIGATORIO, por seguridad):** En cada entrega se pasa, además de los comandos del parche, el bloque de comandos de Termux para copiar el changelog nuevo a `~/castv-nuevo/castv-fresh/CHANGELOG.md` y subirlo (`cp` → `git add CHANGELOG.md` → `git commit` → `git push origin main`), cada comando en su propio bloque de código. Primero se confirma dónde está el archivo con `git ls-files | grep -i changelog`. Ariel lo pidió el 18 nov 2026.
+7. **VLC solo como inspiración (licencia GPLv2+):** NO copiar código, recursos, iconos, textos largos, nombre ni logo (cono) de VLC. Las ideas y la organización de pantallas se reimplementan con código propio (Material Icons u otros propios). Copiar código haría que CASTV tuviera que ser GPL con fuentes publicadas. Referencia local: `vlc-android-master.zip` (solo consulta).
 
 ---
 
-## 📍 Estado Actual (v41)
+## 📍 Estado Actual (v45)
 
 - **Repo oficial:** `~/castv-nuevo/castv-fresh` (`github.com/arieleljefe/castv-app`, rama `main`).
 - ✅ **Etapa 14-A (`ac51ab7`) y 14-C (`PortDialog.kt`, `TvSend.kt`):** Orden de código y mensajes de error claros confirmados.
-- 🧪 **UI-1 pestaña "Más" (plan detallado, parche NO entregado):** esperando decisión de Ariel (ver "Siguiente" punto 1).
+- ✅ **UI-1 pestaña "Más" (18 nov 2026):** aplicada, compiló y Ariel la probó en el teléfono ("todo bello"). Commit "UI-1 aplicado: pestaña Más".
+- 🧪 **UI-1b Pantalla de Ajustes en el ⋮ + Más sin opciones repetidas (parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`):** Ariel eligió "Pantalla de Ajustes con categorías (como VLC)"; falta que compile en verde y que Ariel confirme "ya funciona" (ver "Siguiente" punto 1).
 - ✅ **Respaldo Exportar/Importar JSON (17 nov 2026):** confirmado por Ariel.
 - ✅ **Gestos en el reproductor de video (17 nov 2026):** confirmado por Ariel.
 - ✅ **Etapa 13-B.2 Canales más cómodos (17 nov 2026):** confirmado por Ariel.
@@ -70,6 +73,11 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ## 🛠️ Parche en Curso / Próximo Paso
 
+### ✅ UI-1 — Pestaña "Más" — confirmado por Ariel el 18 nov 2026
+
+- Hecho y probado: barra inferior de 5 botones (Vídeo · Audio · Carpetas · Cola · **Más**); Más abre una hoja (`BottomSheetDialog`) con las opciones agrupadas. Archivos: `activity_main.xml` (`navMore`), `res/drawable/ic_nav_more.xml` (nuevo), `MainActivity.kt` (`fillMainMenu`, `runMenuAction`, `showMoreSheet`). Parche: `ui1_mas.patch`.
+- **Problema detectado por Ariel:** el ⋮ y Más muestran las mismas opciones. Se corrige en UI-1b.
+
 ### ✅ Respaldo Exportar/Importar JSON — confirmado por Ariel el 17 nov 2026
 
 - Hecho y probado: ⋮ → **Respaldo (exportar/importar)…** → 📤 Exportar (guarda `castv_respaldo_AAAA-MM-DD.json` donde se elija) y 📥 Importar (pide confirmación, **reemplaza** lo actual, valida el archivo antes de tocar nada y reinicia la pantalla con `recreate()` para aplicar tema/color/orden).
@@ -107,15 +115,24 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-1. **🧪 UI-1 — Pestaña "Más" en la barra inferior** (plan detallado; **parche aún no entregado**; falta que Ariel diga "va").
-   - **Qué:** barra inferior de 4 a **5 botones: Vídeo · Audio · Carpetas · Cola · Más**. "Más" abre una hoja (`BottomSheetDialog`) que sube desde abajo con las opciones del menú ⋮ ordenadas en grupos. Cada fila hace lo mismo que su opción del ⋮, y el **⋮ se queda como está** (no se quita nada).
-   - **Grupos propuestos (ids del menú actual):** Reproducir y canales (15 enlace, 16 listas M3U, 10 elegir TV, 3 salida) · Biblioteca (1 ordenar, 2 duplicados, 4 mis listas, 5 artista, 6 álbum) · Reproductor (7 temporizador, 8 velocidad, 9 ecualizador) · Apariencia (12 tema, 13 color) · Datos (17 respaldo, 14 borrado) · Acerca (11 redes y contacto). Cualquier id nuevo cae en un grupo "Más".
-   - **Cómo:** `activity_main.xml` (nuevo `navMore`, mismo estilo que los otros 4), `res/drawable/ic_nav_more.xml` (nuevo, icono propio de 4 puntos) y `MainActivity.kt`: las opciones del menú se mueven a `fillMainMenu(menu)` y las acciones a `runMenuAction(id)` (los usan el ⋮ y la hoja), más `showMoreSheet()` que lee las opciones de un `PopupMenu` auxiliar sin mostrarlo para no duplicar textos. Respeta Claro/Oscuro y los 4 colores de acento. No toca reproductor, `Store`, manifest ni permisos. Parche: `ui1_mas.patch`.
-   - **Cómo probar:** (1) 5 botones sin recortes y la insignia de Cola sigue funcionando; (2) Más abre la hoja con scroll; (3) probar varias filas (enlace, M3U, tema, color, respaldo); (4) el ⋮ sigue igual; (5) Claro/Oscuro y otro color de acento; (6) girar el teléfono.
-   - **Si falla:** `git revert` del commit "UI-1 pestaña Más (v40)".
-   - **Riesgo:** al mover el menú a funciones nuevas, un error afectaría al ⋮ y a Más a la vez; por eso el parche cambia solo eso.
-   - **Decisión pendiente de Ariel:** mantener **Cola** en la barra y dejar "Mis listas" dentro de Más (propuesta, no se pierde ningún acceso) **o** cambiar Cola por una pestaña **Listas** como VLC (parche aparte, después).
-   - **Para retomar:** pasar `MainActivity.kt` actual y `activity_main.xml` (comando de abajo, "Cómo pasar los archivos de interfaz").
+1. **🧪 UI-1b — Pantalla de Ajustes en el ⋮ y Más sin repetidos** (**parche `ui1b_ajustes.patch` aplicado y subido el 18 nov 2026, commit `074af2b`**; Ariel eligió el formato; pendiente de build verde y prueba).
+   - **Por qué:** tras UI-1, el ⋮ y Más muestran las mismas opciones. Ariel quiere que el ⋮ sea para los **ajustes de la app**, como en VLC.
+   - **Qué:** el ⋮ abre una pantalla **Ajustes** con categorías:
+     - **Interfaz:** Tema · Color de acento.
+     - **Almacenamiento:** Borrado (papelera / permanente; solo Android 11+, igual que ahora).
+     - **Respaldo:** Exportar · Importar.
+     - **Acerca de:** Mis redes y contacto · versión de la app.
+   - **Más** queda solo con herramientas: Reproducir enlace, Listas M3U, Elegir TV, Salida, Ordenar, Duplicados, Mis listas, filtros de artista/álbum, Temporizador, Velocidad y Ecualizador. Se quitan de Más los ids 11, 12, 13, 14 y 17 (las funciones siguen en `MainActivity.kt`).
+   - **Futuro dentro de Ajustes (⬜, NO en este parche):** idioma de la app y ajustes de notificaciones. La pantalla se arma por categorías para poder sumarlos sin rehacerla.
+   - **Detalle exacto del parche entregado (verificado contra el `AndroidManifest.xml`, `M3uActivity.kt` y `MainActivity.kt` reales):**
+     - `SettingsActivity.kt` (nuevo, construida en código como `M3uActivity`): encabezado "← Ajustes" y categorías Interfaz (Tema, Color de acento) · Almacenamiento (Borrado; solo Android 11+) · Respaldo · Acerca de (Mis redes y contacto, Versión). Aplica tema y color guardados al abrir (igual que `MainActivity`) y ajusta los iconos de la barra de estado a Claro/Oscuro.
+     - `AndroidManifest.xml`: registra `.SettingsActivity` (`exported=false`).
+     - `MainActivity.kt`: el ⋮ lanza `SettingsActivity` (`reqSettings = 4718`); **Respaldo** y **Mis redes** cierran Ajustes y `onActivityResult` abre `showBackupMenu()` / `showSocials()` (se reutiliza lo que ya funciona); si cambió el color, `onResume` recrea la pantalla (`accentAtStart`); se elimina `showMainMenu()` (ya nadie lo usa); `showMoreSheet()` deja fuera los ids 11, 12, 13, 14 y 17 y ya no tiene los grupos Apariencia, Datos y Acerca. `fillMainMenu` y `runMenuAction` se conservan.
+     - El tema se cambia con `AppCompatDelegate` (recrea las pantallas solo, igual que antes); Borrado usa la misma preferencia `trash`.
+     - Aplicar (Termux, uno por uno): `cd ~/castv-nuevo/castv-fresh` → `git apply ~/storage/downloads/ui1b_ajustes.patch` → `git status --short` (deben salir 3 archivos) → `git add -A` → `git commit -m "UI-1b pantalla de Ajustes"` → `git push origin main`.
+   - **Riesgos:** una pantalla nueva mal registrada cierra la app (el manifest se armó con el real); recrear pantallas al cambiar tema/color; Respaldo y Redes cierran Ajustes antes de abrir su diálogo (v1, a propósito, para no duplicar código); si se cambia el color y se toca Respaldo en la misma visita, el diálogo puede perderse al redibujar (se vuelve a tocar).
+   - **Cómo probar:** (1) el ⋮ abre Ajustes y atrás vuelve; (2) Tema y Color cambian y se ven al volver; (3) Borrado cambia y el aviso sale bien; (4) Exportar e Importar respaldo funcionan; (5) Redes y contacto abre los enlaces; (6) Más ya no repite nada de Ajustes; (7) Claro/Oscuro y girar el teléfono; (8) **Versión** dice lo mismo que el "2.1" del encabezado (si no, se ajusta `build.gradle` o el texto).
+   - **Si falla:** `git revert` del commit de UI-1b.
 2. **Estilo de subtítulos** (tamaño, negrita, color, fondo, sombra, contorno). Solo `VideoPlayerActivity.kt`.
 3. **Aviso para HLS al TV** (el Hisense no lo sigue): avisar en pantalla o dejarlo solo para el móvil.
 4. **Detener reproducción local al enviar un canal desde M3U** (limitación de 13-B.2).
@@ -140,7 +157,8 @@ Meta de Ariel: que CASTV tenga una interfaz con la **misma comodidad y organizac
 **Corrección (18 nov 2026):** CASTV **ya tiene** barra inferior (Vídeo · Audio · Carpetas · Cola), pestañas superiores (PISTAS/VIDEOS · FAVORITOS · CONTINUAR) y mini reproductor (`player_bar`). Por eso UI-1 no crea la navegación: la acerca a la de VLC añadiendo "Más".
 
 Fases propuestas (una por parche, cada una con su 🧪 antes del código):
-- 🧪 **UI-1:** pestaña **Más** (hoja con las opciones del ⋮ en grupos); detalle completo en "Siguiente" punto 1. Opcional después: cambiar Cola por una pestaña Listas.
+- ✅ **UI-1:** pestaña **Más** (hoja con opciones en grupos), confirmada el 18 nov 2026. Opcional después: cambiar Cola por una pestaña Listas.
+- 🧪 **UI-1b:** el ⋮ pasa a ser la pantalla **Ajustes** (tema, color, borrado, respaldo, acerca de; idioma y notificaciones a futuro) y Más queda solo con herramientas; parche entregado, detalle en "Siguiente" punto 1.
 - ⬜ **UI-2:** HUD del reproductor de video (barra propia con anterior/retroceder/play/adelantar/siguiente, tamaño de pantalla, rotación, 🔒 bloqueo).
 - ⬜ **UI-3:** mini reproductor expandible para audio y video.
 - ⬜ **UI-4:** pestaña "Más" (historial, ajustes, respaldo, acerca de).
@@ -191,6 +209,8 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **Observación (18 nov 2026, ⬜ pequeño):** `M3uActivity` no aplica el color de acento guardado (no hace `theme.applyStyle` como `MainActivity`), así que su ★ sale siempre cian. `SettingsActivity` sí lo aplica.
 - **Build fallido por 429 (18 nov 2026):** un build falló al descargar el plugin de Kotlin desde Maven Central (HTTP 429, "Too Many Requests"), antes de compilar nada. No era error de código; se resolvió con **Re-run all jobs** en GitHub Actions. Si se repite, esperar 10-15 min y reintentar; el workflow actual no usa caché de Gradle (mejora posible, punto 5 de Siguiente).
 - `playLink` aún manda HLS (`.m3u8`) al TV por `/relay`, aunque el Hisense no lo sigue (❌). Pendiente decidir si se avisa en pantalla o se deja solo para el móvil (otro parche, no incluido aquí).
 
@@ -198,6 +218,7 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 
 ## 📋 Historial Resumido de Etapas Confirmadas (✅)
 
+- **UI-1 pestaña Más (18 nov 2026):** `navMore`, `ic_nav_more.xml`, `showMoreSheet()` en `MainActivity.kt`.
 - **Respaldo Exportar/Importar JSON (17 nov 2026):** `Backup.kt`, `Store.reload()`, menú id 17 en `MainActivity.kt`.
 - **Gestos en el reproductor (17 nov 2026):** brillo, volumen y doble toque ±10 s (`VideoPlayerActivity.kt`).
 - **Etapa 13-B.2 (17 nov 2026):** Canales más cómodos y ★ favoritos de canales (`M3uActivity.kt`, `Store.kt`).
