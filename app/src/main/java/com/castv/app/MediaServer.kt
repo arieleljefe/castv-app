@@ -556,6 +556,9 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
     }
 
+    /** [LIVE-1f] Tamaño anunciado al TV para el flujo en vivo (unos 2 GB, cabe en 32 bits con signo). */
+    private val LIVE_FAKE_LENGTH = 2000000000L
+
     private fun addLiveHeaders(r: Response) {
         r.addHeader("Accept-Ranges", "none")
         r.addHeader("Cache-Control", "no-cache")
@@ -591,9 +594,11 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             stream.close()
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
         }
-        DebugLog.add("  -> LIVE video/mp2t continuo (sin tamaño)")
-        val response = newChunkedResponse(Response.Status.OK, "video/mp2t", stream)
+        // [LIVE-1f] sin chunked: Content-Length "falso" y grande (el cuerpo termina cuando se cierra el flujo)
+        DebugLog.add("  -> LIVE video/mp2t continuo (LIVE-1f: sin chunked, Content-Length $LIVE_FAKE_LENGTH)")
+        val response = newFixedLengthResponse(Response.Status.OK, "video/mp2t", stream, LIVE_FAKE_LENGTH)
         addLiveHeaders(response)
+        response.addHeader("Connection", "close")
         return response
     }
 
