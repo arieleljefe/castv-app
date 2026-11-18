@@ -320,6 +320,10 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private var curConn: HttpURLConnection? = null
         @Volatile private var closed = false
         private var count = 0
+        private var keyLogged = false
+        // [LIVE-1d] cifrado AES-128: por fragmento -> (URL de la clave, IV en hexadecimal o null, número de secuencia)
+        private val segKey = HashMap<String, Triple<String, String?, Long>>()
+        private val keyCache = HashMap<String, ByteArray>()
 
         /** Primera lectura de la lista (antes de contestarle al TV): lanza LiveUnsupported si no se puede. */
         fun prepare() { refresh() }
@@ -377,10 +381,23 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             if (!text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) throw LiveUnsupported("la lista hija no es válida")
             val segs = ArrayList<String>()
             var sawEnd = false
+            var mediaSeq = 0L
+            var curKey: String? = null
+            var curIv: String? = null
             for (raw in text.lines()) {
                 val l = raw.trim()
-                if (l.startsWith("#EXT-X-KEY")) {
-                    if (!l.contains("METHOD=NONE")) throw LiveUnsupported("fragmentos cifrados (#EXT-X-KEY)")
+                if (l.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
+                    mediaSeq = l.substringAfter(':').trim().toLongOrNull() ?: 0L
+                } else if (l.startsWith("#EXT-X-KEY")) {
+                    val method = Regex("METHOD=([A-Z0-9-]+)").find(l)?.groupValues?.get(1) ?: "?"
+                    if (method == "NONE") { curKey = null; curIv = null }
+                    else if (method == "AES-128") {
+                        val uri = Regex("URI=\"([^\"]*)\"").find(l)?.groupValues?.get(1)
+                            ?: throw LiveUnsupported("AES-128 sin URI de clave")
+                        curKey = URL(URL(base), uri).toString()
+                        curIv = Regex("IV=0[xX]([0-9a-fA-F]+)").find(l)?.groupValues?.get(1)
+                        if (!keyLogged) { keyLogged = true; DebugLog.add("  LIVE cifrado AES-128 (se descifra en el teléfono)") }
+                    } else throw LiveUnsupported("cifrado $method (solo se soporta AES-128)")
                 } else if (l.startsWith("#EXT-X-MAP")) {
                     throw LiveUnsupported("fragmentos fMP4 (#EXT-X-MAP)")
                 } else if (l.startsWith("#EXT-X-TARGETDURATION:")) {
@@ -391,6 +408,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     val abs = URL(URL(base), l).toString()
                     val ext = abs.substringBefore('#').substringBefore('?').substringAfterLast('.', "").lowercase()
                     if (ext == "m4s" || ext == "mp4" || ext == "cmfv" || ext == "cmfa") throw LiveUnsupported("fragmentos .$ext")
+                    if (curKey != null) segKey[abs] = Triple(curKey, curIv, mediaSeq + segs.size)
                     segs.add(abs)
                 }
             }
@@ -417,13 +435,41 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             curConn = null
         }
 
+        private fun fetchKey(uri: String): ByteArray {
+            val opened = LiveHttp.open(uri, 15000)
+            try {
+                val k = ByteArray(16)
+                var got = 0
+                opened.first.inputStream.use { ins ->
+                    while (got < 16) { val n = ins.read(k, got, 16 - got); if (n < 0) break; got += n }
+                }
+                if (got != 16) throw LiveUnsupported("clave AES de $got bytes (se esperaban 16)")
+                return k
+            } finally { try { opened.first.disconnect() } catch (_: Exception) {} }
+        }
+
         private fun openSegment(u: String): Boolean {
             for (t in 1..3) {
                 if (closed) return false
                 try {
                     val opened = LiveHttp.open(u, 20000)
                     curConn = opened.first
-                    cur = opened.first.inputStream
+                    val ki = segKey.remove(u)
+                    cur = if (ki == null) opened.first.inputStream else {
+                        val key = keyCache.getOrPut(ki.first) { fetchKey(ki.first) }
+                        val iv = ByteArray(16)
+                        if (ki.second != null) {
+                            val hex = ki.second!!.padStart(32, '0').takeLast(32)
+                            for (b in 0 until 16) iv[b] = hex.substring(b * 2, b * 2 + 2).toInt(16).toByte()
+                        } else {
+                            var n = ki.third
+                            for (b in 15 downTo 8) { iv[b] = (n and 0xff).toByte(); n = n shr 8 }
+                        }
+                        val cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
+                        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, javax.crypto.spec.SecretKeySpec(key, "AES"),
+                            javax.crypto.spec.IvParameterSpec(iv))
+                        javax.crypto.CipherInputStream(opened.first.inputStream, cipher)
+                    }
                     count++
                     if (count <= 5 || count % 20 == 0) DebugLog.add("  LIVE fragmento $count")
                     return true
