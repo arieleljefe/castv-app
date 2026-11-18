@@ -9,6 +9,13 @@ object TvSend {
         return "http://$phoneIp:${ServerPort.port}/relay/$token.${if (hls) "m3u8" else "mp4"}"
     }
 
+    /** [LIVE-1] Canal HLS (.m3u8) entregado por el teléfono como un solo flujo TS continuo (/live). */
+    fun liveUrl(phoneIp: String, url: String): String {
+        val token = android.util.Base64.encodeToString(url.toByteArray(Charsets.UTF_8),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+        return "http://$phoneIp:${ServerPort.port}/live/$token.ts"
+    }
+
     /** Archivo local (música o video) servido por /audio o /video del teléfono. */
     fun mediaUrl(phoneIp: String, kind: String, id: Long, ext: String): String =
         "http://$phoneIp:${ServerPort.port}/$kind/$id.$ext"

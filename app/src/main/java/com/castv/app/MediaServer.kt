@@ -70,6 +70,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             // [Etapa 13-A.3] la extensión dice qué se pide: mp4, m3u8 (lista HLS), ts/m4s (trozos), key…
             if (parts.size == 2 && parts[0] == "relay") return serveRelay(session,
                 parts[1].substringBeforeLast('.'), parts[1].substringAfterLast('.', "").lowercase())
+            // [LIVE-1] /live/<base64 del enlace .m3u8>.ts: canal HLS entregado como un solo flujo TS continuo
+            if (parts.size == 2 && parts[0] == "live") return serveLive(session, parts[1].substringBeforeLast('.'))
             if (parts.size == 2) {
                 val kind = parts[0]
                 val id = parts[1].substringBeforeLast('.').toLongOrNull()
@@ -246,6 +248,294 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             sb.append("\n")
         }
         return sb.toString()
+    }
+
+    // ===================== [LIVE-1] Canal HLS como un solo flujo TS continuo =====================
+
+    private class HttpFail(val code: Int) : Exception("HTTP $code")
+    private class LiveUnsupported(msg: String) : Exception(msg)
+
+    private object LiveHttp {
+        /** Abre [url] siguiendo redirecciones (igual que serveRelay). Devuelve la conexión y la URL final. */
+        fun open(url: String, readTimeout: Int): Pair<HttpURLConnection, String> {
+            var current = url
+            var hops = 0
+            while (true) {
+                val c = URL(current).openConnection() as HttpURLConnection
+                c.instanceFollowRedirects = false
+                c.connectTimeout = 10000
+                c.readTimeout = readTimeout
+                c.requestMethod = "GET"
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CASTV")
+                c.setRequestProperty("Accept", "*/*")
+                val code = c.responseCode
+                if (code in 301..303 || code == 307 || code == 308) {
+                    val loc = c.getHeaderField("Location")
+                    c.disconnect()
+                    hops++
+                    if (loc == null || hops > 8) throw HttpFail(code)
+                    current = URL(URL(current), loc).toString()
+                    continue
+                }
+                if (code != 200) {
+                    c.disconnect()
+                    throw HttpFail(code)
+                }
+                return Pair(c, current)
+            }
+        }
+
+        /** Baja una lista de texto (máx. 2 MB). Devuelve el texto y la URL final. */
+        fun text(url: String): Pair<String, String> {
+            val opened = open(url, 15000)
+            val c = opened.first
+            try {
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(8192)
+                c.inputStream.use { ins ->
+                    while (true) {
+                        val n = ins.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        if (out.size() > 2_000_000) break
+                    }
+                }
+                return Pair(String(out.toByteArray(), Charsets.UTF_8), opened.second)
+            } finally {
+                try { c.disconnect() } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /** InputStream que va bajando los fragmentos .ts de una lista HLS, uno tras otro, y los entrega
+     *  como un solo flujo continuo. Si la lista es maestra elige la variante de menor BANDWIDTH. */
+    private class LiveHlsStream(private val startUrl: String) : InputStream() {
+        private var mediaUrl: String? = null
+        private val sent = LinkedHashSet<String>()
+        private val pending = ArrayDeque<String>()
+        private var first = true
+        private var endList = false
+        private var targetMs = 6000L
+        private var cur: InputStream? = null
+        private var curConn: HttpURLConnection? = null
+        @Volatile private var closed = false
+        private var count = 0
+
+        /** Primera lectura de la lista (antes de contestarle al TV): lanza LiveUnsupported si no se puede. */
+        fun prepare() { refresh() }
+
+        private fun resolveMedia() {
+            val (text, base) = LiveHttp.text(startUrl)
+            if (!text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) throw LiveUnsupported("no es una lista HLS")
+            if (!text.contains("#EXT-X-STREAM-INF")) { mediaUrl = base; return }
+            val lines = text.lines().map { it.trim() }
+            // candidatos: (bandwidth, url, esVideoAvc)
+            val cands = ArrayList<Triple<Long, String, Boolean>>()
+            var i = 0
+            while (i < lines.size) {
+                val l = lines[i]
+                if (l.startsWith("#EXT-X-STREAM-INF")) {
+                    val bw = Regex("BANDWIDTH=(\\d+)").find(l)?.groupValues?.get(1)?.toLongOrNull() ?: (Long.MAX_VALUE - 1)
+                    val codecs = Regex("CODECS=\"([^\"]*)\"").find(l)?.groupValues?.get(1)
+                    val videoOk = codecs == null || codecs.contains("avc1")
+                    var j = i + 1
+                    while (j < lines.size && (lines[j].isBlank() || lines[j].startsWith("#"))) j++
+                    if (j < lines.size) cands.add(Triple(bw, URL(URL(base), lines[j]).toString(), videoOk))
+                    i = j
+                }
+                i++
+            }
+            if (cands.isEmpty()) throw LiveUnsupported("lista maestra sin variantes")
+            val pool = cands.filter { it.third }.ifEmpty { cands }
+            val best = pool.minByOrNull { it.first }!!
+            mediaUrl = best.second
+            DebugLog.add("  LIVE variante elegida BANDWIDTH=${if (best.first >= Long.MAX_VALUE - 1) "?" else best.first.toString()} -> ${best.second}")
+        }
+
+        /** Lee la lista hija y agrega a [pending] los fragmentos nuevos. */
+        private fun refresh() {
+            var retried = false
+            while (true) {
+                try {
+                    if (mediaUrl == null) resolveMedia()
+                    val (text, base) = LiveHttp.text(mediaUrl!!)
+                    parse(text, base)
+                    return
+                } catch (e: HttpFail) {
+                    if (!retried && (e.code == 403 || e.code == 404 || e.code == 410)) {
+                        retried = true
+                        mediaUrl = null
+                        DebugLog.add("  LIVE la lista dio ${e.code}: se vuelve a resolver desde el enlace original")
+                        continue
+                    }
+                    throw e
+                }
+            }
+        }
+
+        private fun parse(text: String, base: String) {
+            if (!text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) throw LiveUnsupported("la lista hija no es válida")
+            val segs = ArrayList<String>()
+            var sawEnd = false
+            for (raw in text.lines()) {
+                val l = raw.trim()
+                if (l.startsWith("#EXT-X-KEY")) {
+                    if (!l.contains("METHOD=NONE")) throw LiveUnsupported("fragmentos cifrados (#EXT-X-KEY)")
+                } else if (l.startsWith("#EXT-X-MAP")) {
+                    throw LiveUnsupported("fragmentos fMP4 (#EXT-X-MAP)")
+                } else if (l.startsWith("#EXT-X-TARGETDURATION:")) {
+                    targetMs = (l.substringAfter(':').trim().toLongOrNull() ?: 6L) * 1000L
+                } else if (l.startsWith("#EXT-X-ENDLIST")) {
+                    sawEnd = true
+                } else if (l.isNotBlank() && !l.startsWith("#")) {
+                    val abs = URL(URL(base), l).toString()
+                    val ext = abs.substringBefore('#').substringBefore('?').substringAfterLast('.', "").lowercase()
+                    if (ext == "m4s" || ext == "mp4" || ext == "cmfv" || ext == "cmfa") throw LiveUnsupported("fragmentos .$ext")
+                    segs.add(abs)
+                }
+            }
+            endList = sawEnd
+            var fresh = segs.filter { it !in sent }
+            if (first) {
+                first = false
+                // en vivo se arranca cerca del final de la lista; en una lista cerrada, desde el principio
+                if (!sawEnd && fresh.size > 3) fresh = fresh.takeLast(3)
+                DebugLog.add("  LIVE lista: ${segs.size} fragmentos, empieza con ${fresh.size}, fin=${sawEnd}, duracion objetivo=${targetMs / 1000}s")
+            }
+            for (u in fresh) { pending.addLast(u); sent.add(u) }
+            if (sent.size > 600) {
+                val it = sent.iterator()
+                var k = 0
+                while (it.hasNext() && k < 200) { it.next(); it.remove(); k++ }
+            }
+        }
+
+        private fun closeCur() {
+            try { cur?.close() } catch (_: Exception) {}
+            try { curConn?.disconnect() } catch (_: Exception) {}
+            cur = null
+            curConn = null
+        }
+
+        private fun openSegment(u: String): Boolean {
+            for (t in 1..3) {
+                if (closed) return false
+                try {
+                    val opened = LiveHttp.open(u, 20000)
+                    curConn = opened.first
+                    cur = opened.first.inputStream
+                    count++
+                    if (count <= 5 || count % 20 == 0) DebugLog.add("  LIVE fragmento $count")
+                    return true
+                } catch (e: Exception) {
+                    DebugLog.add("  LIVE fragmento falló ($t/3): ${e.javaClass.simpleName}: ${e.message}")
+                    try { Thread.sleep(500) } catch (_: InterruptedException) {}
+                }
+            }
+            return false
+        }
+
+        /** Deja abierto el siguiente fragmento. false = no hay más (o se cortó). */
+        private fun nextSegment(): Boolean {
+            var idleMs = 0L
+            while (!closed) {
+                if (pending.isEmpty()) {
+                    if (endList) return false
+                    refresh()
+                    if (pending.isEmpty()) {
+                        if (endList) return false
+                        if (idleMs > 90_000L) {
+                            DebugLog.add("  LIVE sin fragmentos nuevos por 90 s: se corta")
+                            return false
+                        }
+                        val wait = maxOf(1000L, targetMs / 2)
+                        var slept = 0L
+                        while (slept < wait && !closed) {
+                            try { Thread.sleep(250) } catch (_: InterruptedException) {}
+                            slept += 250
+                        }
+                        idleMs += wait
+                        continue
+                    }
+                }
+                return openSegment(pending.removeFirst())
+            }
+            return false
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            try {
+                while (!closed) {
+                    val s = cur
+                    if (s != null) {
+                        val n = try { s.read(b, off, len) } catch (e: Exception) { -1 }
+                        if (n > 0) return n
+                        closeCur()
+                        continue
+                    }
+                    if (!nextSegment()) {
+                        DebugLog.add("  LIVE fin del flujo ($count fragmentos entregados)")
+                        return -1
+                    }
+                }
+            } catch (e: Exception) {
+                DebugLog.add("  LIVE ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            }
+            return -1
+        }
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            val n = read(one, 0, 1)
+            return if (n <= 0) -1 else (one[0].toInt() and 0xff)
+        }
+
+        override fun close() {
+            closed = true
+            closeCur()
+        }
+    }
+
+    private fun addLiveHeaders(r: Response) {
+        r.addHeader("Accept-Ranges", "none")
+        r.addHeader("Cache-Control", "no-cache")
+        r.addHeader("transferMode.dlna.org", "Streaming")
+        r.addHeader("contentFeatures.dlna.org",
+            "DLNA.ORG_OP=00;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
+    }
+
+    /** [LIVE-1] Entrega un canal HLS (.m3u8) como un solo flujo video/mp2t sin tamaño (chunked). */
+    private fun serveLive(session: IHTTPSession, token: String): Response {
+        val target = try {
+            String(android.util.Base64.decode(token,
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING), Charsets.UTF_8)
+        } catch (e: Exception) { null }
+        if (target == null || !(target.startsWith("http://") || target.startsWith("https://"))) {
+            DebugLog.add("  LIVE: enlace no válido")
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Enlace no válido")
+        }
+        if (session.method == Method.HEAD) {
+            val r = newFixedLengthResponse(Response.Status.OK, "video/mp2t", "")
+            addLiveHeaders(r)
+            return r
+        }
+        val stream = LiveHlsStream(target)
+        try {
+            stream.prepare()
+        } catch (e: LiveUnsupported) {
+            DebugLog.add("  LIVE no soportado: ${e.message}")
+            stream.close()
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "LIVE no soportado: ${e.message}")
+        } catch (e: Exception) {
+            DebugLog.add("  LIVE ERROR al preparar: ${e.javaClass.simpleName}: ${e.message}")
+            stream.close()
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Error: ${e.message}")
+        }
+        DebugLog.add("  -> LIVE video/mp2t continuo (sin tamaño)")
+        val response = newChunkedResponse(Response.Status.OK, "video/mp2t", stream)
+        addLiveHeaders(response)
+        return response
     }
 
     private fun serveFile(session: IHTTPSession, uri: Uri, mime: String): Response {
