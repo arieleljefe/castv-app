@@ -910,6 +910,7 @@ class MainActivity : AppCompatActivity() {
         }
         pm.menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
         pm.menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
+        pm.menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
         pm.menu.add(0, 11, 12, "Mis redes y contacto")
         pm.setOnMenuItemClickListener { mi ->
             when (mi.itemId) {
@@ -932,10 +933,86 @@ class MainActivity : AppCompatActivity() {
                 14 -> toggleTrash()
                 15 -> askLinkAndPlay()
                 16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
+                17 -> showBackupMenu()
             }
             true
         }
         pm.show()
+    }
+
+    // ------------------------------------------- Respaldo (exportar / importar)
+
+    @Suppress("DEPRECATION")
+    private fun showBackupMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("Respaldo")
+            .setItems(arrayOf("📤 Exportar respaldo", "📥 Importar respaldo")) { _, which ->
+                try {
+                    if (which == 0) {
+                        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                            .format(java.util.Date())
+                        val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType("application/json")
+                            .putExtra(Intent.EXTRA_TITLE, "castv_respaldo_$day.json")
+                        startActivityForResult(i, reqBackupOut)
+                    } else {
+                        val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType("*/*")
+                        startActivityForResult(i, reqBackupIn)
+                    }
+                } catch (e: Exception) {
+                    toast("No se pudo abrir el selector de archivos")
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun doExport(uri: Uri) {
+        thread {
+            val ok = try {
+                val json = Backup.build(this)
+                contentResolver.openOutputStream(uri, "wt")?.use { it.write(json.toByteArray(Charsets.UTF_8)) } != null
+            } catch (e: Exception) {
+                DebugLog.add("RESPALDO: error al exportar: ${e.javaClass.simpleName}: ${e.message}")
+                false
+            }
+            runOnUiThread { toast(if (ok) "✅ Respaldo guardado" else "❌ No se pudo guardar el respaldo") }
+        }
+    }
+
+    private fun confirmImport(uri: Uri) {
+        AlertDialog.Builder(this)
+            .setTitle("¿Importar respaldo?")
+            .setMessage("Esto REEMPLAZA tus favoritos, listas, historial de enlaces, listas M3U y ajustes actuales por los del archivo. Los puntos de reanudación, las estadísticas y el TV elegido no cambian. Si suena algo en el teléfono, se detendrá.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Importar") { _, _ -> doImport(uri) }
+            .show()
+    }
+
+    private fun doImport(uri: Uri) {
+        thread {
+            var err: String? = null
+            try {
+                val text = contentResolver.openInputStream(uri)?.use { Backup.readLimited(it) }
+                err = if (text == null) "No se pudo leer el archivo (o es demasiado grande)." else Backup.restore(this, text)
+            } catch (e: Exception) {
+                DebugLog.add("RESPALDO: error al importar: ${e.javaClass.simpleName}: ${e.message}")
+                err = "No se pudo leer el archivo."
+            }
+            val msg = err
+            runOnUiThread {
+                if (msg != null) {
+                    toast("❌ $msg")
+                } else {
+                    Store.reload()
+                    toast("✅ Respaldo importado")
+                    recreate()   // aplica tema, color, orden y demás ajustes
+                }
+            }
+        }
     }
 
     private fun openWhatsapp() {
@@ -1789,6 +1866,8 @@ class MainActivity : AppCompatActivity() {
     private val reqDeleteOne = 4712
     private val reqVideo = 4713
     private val reqM3u = 4714   // [Etapa 13-B] listas M3U
+    private val reqBackupOut = 4716   // [Respaldo JSON] exportar
+    private val reqBackupIn = 4717    // [Respaldo JSON] importar
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null
@@ -1950,6 +2029,14 @@ class MainActivity : AppCompatActivity() {
                 if (resultCode == RESULT_OK) deletedItems.addAll(pendingDelete)
                 pendingDelete = emptyList()
                 finishDelete()
+            }
+            reqBackupOut -> {
+                val u = data?.data
+                if (resultCode == RESULT_OK && u != null) doExport(u)
+            }
+            reqBackupIn -> {
+                val u = data?.data
+                if (resultCode == RESULT_OK && u != null) confirmImport(u)
             }
             reqM3u -> {
                 // [Etapa 13-B] canal elegido en Listas M3U: se reproduce con "Reproducir enlace"

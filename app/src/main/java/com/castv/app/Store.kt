@@ -35,6 +35,13 @@ object Store {
         loadLists()
     }
 
+    /** Vuelve a leer favoritos y listas desde las preferencias (se usa tras importar un respaldo). */
+    fun reload() {
+        if (!::prefs.isInitialized) return
+        favs = HashSet(prefs.getStringSet("fav", emptySet()) ?: emptySet())
+        loadLists()
+    }
+
     fun key(item: MediaItem): String =
         (if (item.isMusic) "a" else "v") + "|" + item.name.lowercase() + "|" + item.durationSec
 
