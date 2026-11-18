@@ -176,6 +176,7 @@ class MainActivity : AppCompatActivity() {
     private var playIndex = -1
     private var unsupportedSkips = 0
     @Volatile private var playingItem: MediaItem? = null
+    @Volatile private var linkOnTv = false   // [PAUSA-1] hay un enlace de video sonando en el TV (playingItem sigue en null)
     private var showingMusic = false
     private var repeatMode = Repeat.OFF
     private var selectedArtist: String? = null
@@ -393,7 +394,7 @@ class MainActivity : AppCompatActivity() {
         btnMenu.setOnClickListener {   // [UI-1b] el ⋮ abre la pantalla Ajustes
             startActivityForResult(Intent(this, SettingsActivity::class.java), reqSettings)
         }
-        btnQuick.setOnClickListener { if (playingItem == null) step(+1) else togglePlayPause() }
+        btnQuick.setOnClickListener { if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause() }
         val toggleExpand = View.OnClickListener { setPlayerExpanded(playerExpanded.visibility != View.VISIBLE) }
         btnExpand.setOnClickListener(toggleExpand)
         tvNowPlaying.setOnClickListener(toggleExpand)
@@ -421,7 +422,7 @@ class MainActivity : AppCompatActivity() {
 
         btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
         btnPlay.setOnClickListener {
-            if (playingItem == null) step(+1) else togglePlayPause()
+            if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause()
         }
         findViewById<View>(R.id.btnStop).setOnClickListener {
             manualStop = true
@@ -431,6 +432,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 thread { TvController.stop() }
                 resetProgress()
+                linkOnTv = false   // [PAUSA-1] tras Detener ya no hay enlace que pausar
             }
             adapter.notifyDataSetChanged()
         }
@@ -1299,6 +1301,7 @@ class MainActivity : AppCompatActivity() {
         }
         val title = titleOverride?.takeIf { it.isNotBlank() } ?: linkTitle(url)
         Store.addLink(url, title)   // historial de enlaces
+        linkOnTv = false   // [PAUSA-1] se vuelve a marcar solo si el TV acepta este enlace
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
         stopLocal()
         adapter.playingId = -1
@@ -1327,6 +1330,7 @@ class MainActivity : AppCompatActivity() {
             val sendUrl = if (phoneIp != null) TvSend.relayUrl(phoneIp, url, isHls(url)) else url   // [Etapa 14-C]
             DebugLog.add("ENLACE: $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
+            if (ok) linkOnTv = true   // [PAUSA-1] ⏸/▶ ahora controlan el enlace del TV
             runOnUiThread {
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
@@ -1374,6 +1378,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         playingItem = item
+        linkOnTv = false   // [PAUSA-1] lo nuevo reemplaza al enlace
         Store.registerPlay(item)
         pendingResume = resumeAt
         resumeTries = 0
@@ -2126,6 +2131,7 @@ class MainActivity : AppCompatActivity() {
         manualStop = true
         if (localActive) stopLocal() else thread { TvController.stop() }
         playingItem = null
+        linkOnTv = false   // [PAUSA-1]
         resetProgress()
         lastNotifKey = ""
         postDefaultNotification()
