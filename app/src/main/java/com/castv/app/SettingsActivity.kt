@@ -206,6 +206,13 @@ class SettingsActivity : AppCompatActivity() {
         // [GESTO-1] Vídeo
         l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
 
+        // [BIBLIO-1] Biblioteca
+        l.add(Entry("Biblioteca", "Re-escanear ahora", "Vuelve a leer tus videos y tu música", { sendAction("rescan") }))
+        l.add(Entry("Biblioteca", "Re-escanear al volver a la app",
+            if (rescanOnResume()) "Sí: actualiza la lista si pasó más de un minuto"
+            else "No: solo al abrir la app o cambiar de pestaña",
+            { toggleRescan() }))
+
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
@@ -477,6 +484,17 @@ class SettingsActivity : AppCompatActivity() {
         val now = !warnMobile()
         prefs().edit().putBoolean("warn_mobile", now).apply()
         toast(if (now) "📶 Se avisará al usar datos móviles" else "📶 Sin aviso con datos móviles")
+        render()
+    }
+
+    // ------------------------------------------------- [BIBLIO-1] Biblioteca
+
+    private fun rescanOnResume(): Boolean = prefs().getBoolean("rescan_resume", false)
+
+    private fun toggleRescan() {
+        val now = !rescanOnResume()
+        prefs().edit().putBoolean("rescan_resume", now).apply()
+        toast(if (now) "🔄 Se actualizará la lista al volver a la app" else "🔄 Sin re-escaneo automático")
         render()
     }
 

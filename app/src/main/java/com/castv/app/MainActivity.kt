@@ -635,10 +635,11 @@ class MainActivity : AppCompatActivity() {
     private fun warnIfPortBusy() = PortDialog.showIfBusy(this)
 
     private var loadGen = 0
+    private var lastScanMs = 0L   // [BIBLIO-1] cuándo terminó la última lectura de la biblioteca
 
     /** Lee la lista en segundo plano para que la pantalla no se congele al abrir. */
-    private fun loadMedia(music: Boolean) {
-        actionMode?.finish()
+    private fun loadMedia(music: Boolean, keepFilters: Boolean = false) {
+        if (!keepFilters) actionMode?.finish()
         showingMusic = music
         getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("lastMusic", music).apply()
         nameKeyCache.clear()
@@ -656,9 +657,12 @@ class MainActivity : AppCompatActivity() {
                 if (gen != loadGen || isFinishing) return@runOnUiThread
                 allItems = items
                 dupIds = dups
-                selectedFolder = null
-                selectedArtist = null
-                selectedAlbum = null
+                lastScanMs = System.currentTimeMillis()
+                if (!keepFilters) {   // [BIBLIO-1] el re-escaneo automático conserva carpeta/artista/álbum
+                    selectedFolder = null
+                    selectedArtist = null
+                    selectedAlbum = null
+                }
                 applyFilters()
                 updateTabs()
             }
@@ -1484,6 +1488,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
         if (::adapter.isInitialized) adapter.notifyDataSetChanged()   // refresca "Continuar" al volver del reproductor
+        // [BIBLIO-1] re-escaneo opcional (Ajustes › Biblioteca): solo si pasó más de un minuto y no hay selección activa
+        if (getSharedPreferences("castv", MODE_PRIVATE).getBoolean("rescan_resume", false) &&
+            lastScanMs != 0L && actionMode == null &&
+            System.currentTimeMillis() - lastScanMs > 60_000L) {
+            loadMedia(showingMusic, keepFilters = true)
+        }
     }
 
     private fun startPlayback(item: MediaItem, resumeAt: Int = 0) {
@@ -2637,6 +2647,7 @@ class MainActivity : AppCompatActivity() {
                 when (data?.getStringExtra("action")) {
                     "backup" -> showBackupMenu()
                     "socials" -> showSocials()
+                    "rescan" -> loadMedia(showingMusic)   // [BIBLIO-1]
                 }
             }
             reqM3u -> {
