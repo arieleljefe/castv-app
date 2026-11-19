@@ -43,7 +43,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private class Cue(val start: Int, val end: Int, val text: String)
 
-    private lateinit var video: VideoView
+    private lateinit var video: SizedVideoView   // [UI-2c]
     private lateinit var subText: TextView
     private lateinit var topBar: LinearLayout
     private lateinit var titleView: TextView
@@ -78,6 +78,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     // [UI-2a] bloqueo de controles y giro de pantalla
     private var locked = false
+    private var sizeMode = 0       // [UI-2c] 0 ajustar, 1 llenar, 2 estirar, 3 16:9, 4 4:3
     private var rotMode = 0        // 0 automático, 1 horizontal, 2 vertical
     private lateinit var lockBtn: TextView
     private lateinit var backLock: OnBackPressedCallback
@@ -126,7 +127,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
-        video = VideoView(this)
+        video = SizedVideoView(this)   // [UI-2c]
         root.addView(
             video,
             FrameLayout.LayoutParams(
@@ -170,6 +171,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         topBar.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
         topBar.addView(chip("🔒") { lock() })     // [UI-2a]
+        topBar.addView(chip("🖼") { cycleSize() })   // [UI-2c]
         topBar.addView(chip("💬") { showSubtitleMenu() })
         topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
@@ -223,7 +225,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         video.setMediaController(controller)
         setupGestures(root)
 
-        video.setOnPreparedListener {
+        video.setOnPreparedListener { mp ->
+            video.setVideoDims(mp.videoWidth, mp.videoHeight)   // [UI-2c]
             if (pendingStart > 0) video.seekTo(pendingStart * 1000)
             pendingStart = 0
             video.start()
@@ -385,6 +388,56 @@ class VideoPlayerActivity : AppCompatActivity() {
             1 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE; toast("↔ Horizontal") }
             2 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT; toast("↕ Vertical") }
             else -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR; toast("🔄 Giro automático") }
+        }
+    }
+
+    // ------------------------------------------------------------ [UI-2c] Tamaño de pantalla
+
+    private fun cycleSize() {
+        sizeMode = (sizeMode + 1) % 5
+        video.sizeMode = sizeMode
+        video.requestLayout()
+        toast(when (sizeMode) {
+            1 -> "🖼 Llenar (recorta los bordes)"
+            2 -> "🖼 Estirar"
+            3 -> "🖼 16:9"
+            4 -> "🖼 4:3"
+            else -> "🖼 Ajustar"
+        })
+    }
+
+    /** VideoView que además puede llenar, estirar o forzar una proporción. Modo 0 = comportamiento de siempre. */
+    private class SizedVideoView(ctx: android.content.Context) : VideoView(ctx) {
+        var sizeMode = 0
+        private var vw = 0
+        private var vh = 0
+
+        fun setVideoDims(w: Int, h: Int) {
+            vw = w; vh = h
+            requestLayout()
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            if (sizeMode == 0 || vw <= 0 || vh <= 0) {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                return
+            }
+            val pw = View.MeasureSpec.getSize(widthMeasureSpec)
+            val ph = View.MeasureSpec.getSize(heightMeasureSpec)
+            var w = pw
+            var h = ph
+            when (sizeMode) {
+                1 -> {   // llenar: escala hasta cubrir todo y recorta lo que sobre
+                    val sc = maxOf(pw.toFloat() / vw, ph.toFloat() / vh)
+                    w = (vw * sc).toInt()
+                    h = (vh * sc).toInt()
+                }
+                3, 4 -> {   // proporción fija dentro de la pantalla
+                    val ar = if (sizeMode == 3) 16f / 9f else 4f / 3f
+                    if (pw.toFloat() / ph > ar) { h = ph; w = (ph * ar).toInt() } else { w = pw; h = (pw / ar).toInt() }
+                }
+            }
+            setMeasuredDimension(w, h)
         }
     }
 
