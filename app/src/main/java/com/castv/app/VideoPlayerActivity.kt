@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.view.GestureDetector
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -219,6 +220,16 @@ class VideoPlayerActivity : AppCompatActivity() {
             override fun hide() {
                 super.hide()
                 topBar.visibility = View.GONE
+            }
+
+            // [UI-2e] El MediaController se come el botón Atrás (solo oculta los controles);
+            // lo pasamos a la actividad para que salga a la primera (y respete el 🔒).
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                    if (event.action == KeyEvent.ACTION_UP) this@VideoPlayerActivity.onBackPressedDispatcher.onBackPressed()
+                    return true
+                }
+                return super.dispatchKeyEvent(event)
             }
         }
         controller.setPrevNextListeners({ playAt(index + 1) }, { playAt(index - 1) })
