@@ -218,6 +218,10 @@ class SettingsActivity : AppCompatActivity() {
                 { toggleTrash() }))
         }
 
+        // [AJUSTES-2c] Avanzado: registro de la app
+        l.add(Entry("Avanzado", "Ver registro", "Eventos de la app y del servidor, para diagnosticar fallos", { showLog() }))
+        l.add(Entry("Avanzado", "Limpiar registro", "Borra el registro actual", { confirmClearLog() }))
+
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
 
@@ -403,6 +407,49 @@ class SettingsActivity : AppCompatActivity() {
                 Store.unhideChannels(Store.hiddenUrls())
                 toast("👁 Canales ocultos devueltos a la vista")
                 render()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    // ------------------------------------------------- [AJUSTES-2c] Avanzado: registro
+
+    private fun showLog() {
+        val full = try { DebugLog.dump() } catch (e: Exception) { "" }
+        val tv = TextView(this)
+        tv.text = if (full.isBlank()) "(El registro está vacío)" else full
+        tv.textSize = 11f
+        tv.typeface = android.graphics.Typeface.MONOSPACE
+        tv.setTextColor(txtColor)
+        tv.setTextIsSelectable(true)
+        tv.setPadding(dp(16), dp(8), dp(16), dp(8))
+        val sv = ScrollView(this)
+        sv.addView(tv)
+        AlertDialog.Builder(this)
+            .setTitle("Registro")
+            .setView(sv)
+            .setPositiveButton("Cerrar", null)
+            .setNeutralButton("Copiar") { _, _ -> copyLog(full) }
+            .show()
+    }
+
+    private fun copyLog(text: String) {
+        try {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("Registro CASTV", text))
+            toast("📋 Registro copiado")
+        } catch (e: Exception) {
+            toast("No se pudo copiar el registro (es muy grande)")
+        }
+    }
+
+    private fun confirmClearLog() {
+        AlertDialog.Builder(this)
+            .setTitle("Limpiar registro")
+            .setMessage("Se borrará el registro actual. Después solo se anotará lo nuevo.")
+            .setPositiveButton("Limpiar") { _, _ ->
+                try { DebugLog.clear() } catch (e: Exception) { }
+                toast("🧹 Registro limpio")
             }
             .setNegativeButton("Cancelar", null)
             .show()
