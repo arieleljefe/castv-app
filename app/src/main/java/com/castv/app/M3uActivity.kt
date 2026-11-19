@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.text.Normalizer
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 /**
@@ -53,6 +54,7 @@ class M3uActivity : AppCompatActivity() {
     private var favNorm: List<String> = emptyList()
     private lateinit var favBtn: TextView
     private val reqPlayer = 4715
+    private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
 
     private val freeTvUrl = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
     private val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
@@ -241,7 +243,7 @@ class M3uActivity : AppCompatActivity() {
             .setTitle("Regiones y categorías")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == groups.size) showListsOf(saved, "Todas mis listas", true)
-                else showListsOf(groups[which].second, groups[which].first, true)
+                else showListsOf(groups[which].second, groups[which].first, true, groups[which].first)   // [REGIONES-1b]
             }
             .setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
             .setNegativeButton("Cerrar", null)
@@ -249,14 +251,97 @@ class M3uActivity : AppCompatActivity() {
     }
 
     /** [REGIONES-1a] Lista de listas; con "← Regiones" vuelve al nivel 1. */
-    private fun showListsOf(lists: List<M3uList>, title: String, canGoBack: Boolean) {
+    private fun showListsOf(lists: List<M3uList>, title: String, canGoBack: Boolean, regionName: String? = null) {
         val b = AlertDialog.Builder(this)
             .setTitle(title)
             .setItems(lists.map { it.name }.toTypedArray()) { _, which -> loadList(lists[which]) }
             .setNegativeButton("Cerrar", null)
+        if (regionName != null) b.setPositiveButton("🌐 Toda la región") { _, _ -> loadRegion(lists, regionName) }   // [REGIONES-1b]
         if (canGoBack) b.setNeutralButton("← Regiones") { _, _ -> chooseList() }
         else b.setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
         b.show()
+    }
+
+    /** [REGIONES-1b] Descarga y une todas las listas de una región o categoría, sin repetidos por enlace de stream. */
+    private fun loadRegion(lists: List<M3uList>, name: String) {
+        if (lists.isEmpty()) return
+        current = null
+        groupFilter = null
+        groupBtn.text = "Grupo: Todos ▾"
+        listBtn.text = "🌐 $name · toda ▾"
+        channels = emptyList()
+        normNames = emptyList()
+        shown = emptyList()
+        fromCache = false
+        statusView.text = "Descargando 0 de ${lists.size} listas…"
+        chAdapter.notifyDataSetChanged()
+        val gen = ++loadGen
+        val total = lists.size
+        val results = arrayOfNulls<List<M3uChannel>>(total)
+        val done = java.util.concurrent.atomic.AtomicInteger(0)
+        val failed = java.util.concurrent.atomic.AtomicInteger(0)
+        val normCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+        val applied = IntArray(1)   // solo se toca en el hilo de la interfaz
+        val pool = Executors.newFixedThreadPool(4)
+        for (idx in 0 until total) {
+            pool.execute {
+                if (gen != loadGen) return@execute
+                val l = lists[idx]
+                val cache = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
+                var text: String? = null
+                try {
+                    val t = M3uParser.download(l.url)
+                    text = t
+                    try { cache.writeText(t) } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    DebugLog.add("M3U región: no se pudo descargar ${l.url}: ${e.javaClass.simpleName}: ${e.message}")
+                    if (cache.exists()) {
+                        try { text = cache.readText() } catch (x: Exception) { }
+                    }
+                }
+                val body = text
+                if (body == null) failed.incrementAndGet()
+                val parsed = if (body != null) M3uParser.parse(body) else emptyList()
+                synchronized(results) { results[idx] = parsed }
+                val n = done.incrementAndGet()
+                // Une todo lo que ya llegó, en el orden de las listas (el primero que trae un enlace gana)
+                val merged = LinkedHashMap<String, M3uChannel>()
+                var dupes = 0
+                var capped = false
+                synchronized(results) {
+                    loop@ for (r in results) {
+                        if (r == null) continue
+                        for (c in r) {
+                            if (merged.containsKey(c.url)) { dupes++; continue }
+                            if (merged.size >= regionMax) { capped = true; break@loop }
+                            merged[c.url] = c
+                        }
+                    }
+                }
+                val list = ArrayList(merged.values)
+                val names = list.map { normCache.getOrPut(it.url) { norm(it.name) } }
+                if (n == total) {
+                    DebugLog.add("M3U región $name: $total listas, ${list.size} canales, $dupes repetidos quitados" +
+                        (if (failed.get() > 0) ", ${failed.get()} sin conexión" else "") + (if (capped) ", tope de $regionMax" else ""))
+                    Store.backfillChFavs(list)   // [FAV-1]
+                    pool.shutdown()
+                }
+                runOnUiThread {
+                    if (isFinishing || gen != loadGen || n <= applied[0]) return@runOnUiThread
+                    applied[0] = n
+                    channels = list
+                    normNames = names
+                    applyFilter()
+                    if (!favOnly) {
+                        statusView.text = if (n < total) "Descargando $n de $total listas… · ${list.size} canales"
+                            else "${list.size} canales de $total listas (sin repetidos)" +
+                                (if (failed.get() > 0) " · ${failed.get()} sin conexión" else "") +
+                                (if (capped) " · tope de $regionMax" else "")
+                    }
+                }
+            }
+        }
+        pool.shutdown()   // deja terminar lo ya pedido y no acepta más
     }
 
     private fun addListDialog() {
@@ -297,7 +382,7 @@ class M3uActivity : AppCompatActivity() {
     }
 
     private fun removeCurrent() {
-        val cur = current ?: return
+        val cur = current ?: run { toast("Elige una lista para quitarla"); return }   // [REGIONES-1b]
         AlertDialog.Builder(this)
             .setTitle("¿Quitar la lista?")
             .setMessage("«${cur.name}» se quitará de tus listas (los canales no se borran de internet).")
