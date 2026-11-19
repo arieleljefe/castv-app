@@ -49,6 +49,8 @@ class M3uActivity : AppCompatActivity() {
     private var fromCache = false
     private var favs: Set<String> = emptySet()
     private var favOnly = false
+    private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
+    private var favNorm: List<String> = emptyList()
     private lateinit var favBtn: TextView
     private val reqPlayer = 4715
 
@@ -203,6 +205,7 @@ class M3uActivity : AppCompatActivity() {
             val body = text
             val parsed = if (body != null) M3uParser.parse(body) else emptyList()
             val list = parsed.distinctBy { it.url }   // [CATALOGO-1] sin enlaces repetidos
+            Store.backfillChFavs(list)   // [FAV-1] completa el nombre de los favoritos de esta lista
             if (list.size != parsed.size) DebugLog.add("M3U: ${l.name}: ${parsed.size - list.size} repetidos quitados")
             val names = list.map { norm(it.name) }
             runOnUiThread {
@@ -325,17 +328,22 @@ class M3uActivity : AppCompatActivity() {
         val toks = norm(searchBox.text.toString()).split(' ').filter { it.isNotEmpty() }
         val g = groupFilter
         val out = ArrayList<M3uChannel>()
-        for (i in channels.indices) {
-            val c = channels[i]
-            if (g != null && c.group != g) continue
-            if (favOnly && !favs.contains(c.url)) continue
-            val n = normNames[i]
+        // [FAV-1] con ★ Favs activo la base son los favoritos de TODAS las listas
+        val base = if (favOnly) favChannels else channels
+        val baseNames = if (favOnly) favNorm else normNames
+        for (i in base.indices) {
+            val c = base[i]
+            if (!favOnly && g != null && c.group != g) continue
+            val n = baseNames[i]
             if (toks.all { n.contains(it) }) out.add(c)
         }
         // Favoritos primero (el orden es estable: el resto conserva su orden)
         shown = if (favs.isEmpty()) out else out.sortedByDescending { favs.contains(it.url) }
         chAdapter.notifyDataSetChanged()
-        if (channels.isNotEmpty()) {
+        if (favOnly) {
+            statusView.text = if (favChannels.isEmpty()) "Aún no tienes favoritos: marca ★ en un canal"
+                else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)"
+        } else if (channels.isNotEmpty()) {
             statusView.text = "${shown.size} de ${channels.size} canales" +
                 (if (fromCache) " · sin conexión (copia guardada)" else "")
         }
@@ -366,13 +374,21 @@ class M3uActivity : AppCompatActivity() {
     private fun toggleFavOnly() {
         favOnly = !favOnly
         favBtn.text = if (favOnly) "★ Favs" else "☆ Favs"
+        if (favOnly) reloadFavChannels()   // [FAV-1]
         applyFilter()
     }
 
+    /** [FAV-1] Vuelve a leer los favoritos de todas las listas (con su nombre). */
+    private fun reloadFavChannels() {
+        favChannels = Store.chFavChannels()
+        favNorm = favChannels.map { norm(it.name) }
+    }
+
     private fun toggleFav(c: M3uChannel) {
-        Store.toggleChFav(c.url)
+        val on = Store.toggleChFav(c.url)
+        if (on) Store.rememberChFav(c) else Store.forgetChFav(c.url)   // [FAV-1]
         favs = Store.chFavs()
-        if (favOnly) applyFilter() else chAdapter.notifyDataSetChanged()
+        if (favOnly) { reloadFavChannels(); applyFilter() } else chAdapter.notifyDataSetChanged()
     }
 
     private fun isHls(url: String) = url.substringBefore('?').lowercase().endsWith(".m3u8")

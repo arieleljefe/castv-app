@@ -262,6 +262,72 @@ object Store {
         return now
     }
 
+    // [FAV-1] Nombre y grupo de los canales favoritos, para verlos desde cualquier lista.
+    // Clave nueva "chfavmeta"; "chfav" (solo enlaces) no cambia.
+
+    private fun readChFavMeta(): MutableList<M3uChannel> {
+        val out = ArrayList<M3uChannel>()
+        try {
+            val raw = prefs.getString("chfavmeta", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", "")))
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun writeChFavMeta(l: List<M3uChannel>) {
+        try {
+            val arr = JSONArray()
+            for (c in l) arr.put(JSONObject().put("u", c.url).put("n", c.name).put("g", c.group))
+            prefs.edit().putString("chfavmeta", arr.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Todos los canales favoritos (de cualquier lista) con su nombre; los viejos sin nombre salen con el servidor. */
+    fun chFavChannels(): List<M3uChannel> {
+        val urls = chFavs()
+        val out = ArrayList<M3uChannel>()
+        val seen = HashSet<String>()
+        for (c in readChFavMeta()) if (urls.contains(c.url) && seen.add(c.url)) out.add(c)
+        for (u in urls) if (seen.add(u)) {
+            val host = u.substringAfter("://").substringBefore('/')
+            out.add(M3uChannel("Canal guardado · $host", u, ""))
+        }
+        return out
+    }
+
+    /** Guarda (o actualiza) el nombre y el grupo de un canal favorito. */
+    fun rememberChFav(c: M3uChannel) {
+        val l = readChFavMeta()
+        val i = l.indexOfFirst { it.url == c.url }
+        if (i >= 0) { if (l[i] == c) return; l[i] = c } else l.add(c)
+        writeChFavMeta(l)
+    }
+
+    /** Borra el nombre guardado de un canal que ya no es favorito. */
+    fun forgetChFav(url: String) {
+        val l = readChFavMeta()
+        if (l.removeAll { it.url == url }) writeChFavMeta(l)
+    }
+
+    /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
+    fun backfillChFavs(list: List<M3uChannel>) {
+        val urls = chFavs()
+        if (urls.isEmpty()) return
+        val meta = readChFavMeta()
+        var changed = false
+        for (c in list) {
+            if (!urls.contains(c.url)) continue
+            val i = meta.indexOfFirst { it.url == c.url }
+            if (i < 0) { meta.add(c); changed = true }
+            else if (meta[i] != c) { meta[i] = c; changed = true }
+        }
+        if (changed) writeChFavMeta(meta)
+    }
+
     // ------------------------------------------------- Listas de reproducción
 
     private fun loadLists() {
