@@ -216,12 +216,37 @@ class M3uActivity : AppCompatActivity() {
             addListDialog()
             return
         }
+        // [REGIONES-1a] nivel 1: regiones y categorías; nivel 2: las listas de la región elegida
+        val groups = Regions.ORDER
+            .map { r -> r to saved.filter { Regions.regionOf(it.url) == r } }
+            .filter { it.second.isNotEmpty() }
+        if (groups.size <= 1) {
+            showListsOf(saved, "Mis listas M3U", false)
+            return
+        }
+        val labels = ArrayList<String>()
+        for ((r, l) in groups) labels.add("$r (${l.size})")
+        labels.add("📋 Ver todas (${saved.size})")
         AlertDialog.Builder(this)
-            .setTitle("Mis listas M3U")
-            .setItems(saved.map { it.name }.toTypedArray()) { _, which -> loadList(saved[which]) }
+            .setTitle("Regiones y categorías")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == groups.size) showListsOf(saved, "Todas mis listas", true)
+                else showListsOf(groups[which].second, groups[which].first, true)
+            }
             .setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
             .setNegativeButton("Cerrar", null)
             .show()
+    }
+
+    /** [REGIONES-1a] Lista de listas; con "← Regiones" vuelve al nivel 1. */
+    private fun showListsOf(lists: List<M3uList>, title: String, canGoBack: Boolean) {
+        val b = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(lists.map { it.name }.toTypedArray()) { _, which -> loadList(lists[which]) }
+            .setNegativeButton("Cerrar", null)
+        if (canGoBack) b.setNeutralButton("← Regiones") { _, _ -> chooseList() }
+        else b.setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
+        b.show()
     }
 
     private fun addListDialog() {
