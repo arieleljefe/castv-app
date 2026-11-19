@@ -230,6 +230,11 @@ class SettingsActivity : AppCompatActivity() {
             if (rescanOnResume()) "Sí: actualiza la lista si pasó más de un minuto"
             else "No: solo al abrir la app o cambiar de pestaña",
             { toggleRescan() }))
+        val hiddenF = hiddenFolders()   // [CARPETAS-1]
+        val onHiddenF: (() -> Unit)? = if (hiddenF.isEmpty()) null else ({ pickHiddenFolders() })
+        l.add(Entry("Biblioteca", "Carpetas ocultas",
+            if (hiddenF.isEmpty()) "Ninguna (mantén pulsada una carpeta en el selector 📁 para ocultarla)"
+            else "${hiddenF.size} ocultas (toca para elegir cuáles mostrar de nuevo)", onHiddenF))
 
         // [AUDIO-1] Audio
         val bassOn = prefs().getBoolean("bassOn", false)
@@ -656,6 +661,28 @@ class SettingsActivity : AppCompatActivity() {
         prefs().edit().putBoolean(key, now).apply()
         toast(if (now) "🔒 Se pedirá el PIN" else "🔓 Ya no se pedirá el PIN aquí")
         render()
+    }
+
+    // ------------------------------------------------- [CARPETAS-1] Carpetas ocultas
+
+    private fun hiddenFolders(): Set<String> = prefs().getStringSet("hidden_folders", emptySet()) ?: emptySet()
+
+    private fun pickHiddenFolders() {
+        val hidden = hiddenFolders().sorted()
+        if (hidden.isEmpty()) return
+        val checked = BooleanArray(hidden.size) { true }
+        AlertDialog.Builder(this)
+            .setTitle("Carpetas ocultas")
+            .setMultiChoiceItems(hidden.toTypedArray(), checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton("Guardar") { _, _ ->
+                val keep = HashSet<String>()
+                hidden.forEachIndexed { i, f -> if (checked[i]) keep.add(f) }
+                prefs().edit().putStringSet("hidden_folders", keep).apply()
+                toast(if (keep.size < hidden.size) "📁 Carpetas mostradas de nuevo" else "Sin cambios")
+                render()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------------- [GESTO-1] Vídeo

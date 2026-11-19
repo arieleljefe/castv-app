@@ -635,6 +635,7 @@ class MainActivity : AppCompatActivity() {
     private fun warnIfPortBusy() = PortDialog.showIfBusy(this)
 
     private var loadGen = 0
+    private var hiddenSig = ""   // [CARPETAS-1] carpetas ocultas con las que se leyó la lista
     private var lastScanMs = 0L   // [BIBLIO-1] cuándo terminó la última lectura de la biblioteca
 
     /** Lee la lista en segundo plano para que la pantalla no se congele al abrir. */
@@ -646,12 +647,15 @@ class MainActivity : AppCompatActivity() {
         val gen = ++loadGen
         updateTabs()
         thread {
-            val items = try {
+            val scanned = try {
                 if (music) MediaScanner.scanMusic(this) else MediaScanner.scanVideos(this)
             } catch (e: Exception) {
                 DebugLog.add("ERROR leyendo la lista: ${e.javaClass.simpleName}: ${e.message}")
                 emptyList()
             }
+            val hide = hiddenFolderSet()   // [CARPETAS-1] carpetas que Ariel ocultó
+            hiddenSig = hide.sorted().joinToString("|")
+            val items = if (hide.isEmpty()) scanned else scanned.filter { it.folder !in hide }
             val dups = computeDups(items)
             runOnUiThread {
                 if (gen != loadGen || isFinishing) return@runOnUiThread
@@ -668,6 +672,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun hiddenFolderSet(): Set<String> =
+        getSharedPreferences("castv", MODE_PRIVATE).getStringSet("hidden_folders", emptySet()) ?: emptySet()
 
     private fun showMovies() = loadMedia(false)
 
@@ -859,11 +866,34 @@ class MainActivity : AppCompatActivity() {
         val labels = ArrayList<String>()
         labels.add("📁 Todas (${allItems.size})")
         folders.forEach { labels.add("📁 $it (${counts[it]})") }
-        AlertDialog.Builder(this)
+        val picker = AlertDialog.Builder(this)
             .setTitle("Carpeta")
             .setItems(labels.toTypedArray()) { _, which ->
                 selectedFolder = if (which == 0) null else folders[which - 1]
                 applyFilters()
+            }
+            .show()
+        // [CARPETAS-1] mantener pulsada una carpeta la oculta de la biblioteca
+        picker.listView.setOnItemLongClickListener { _, _, pos, _ ->
+            if (pos > 0) confirmHideFolder(folders[pos - 1], picker)
+            true
+        }
+    }
+
+    private fun confirmHideFolder(folder: String, picker: AlertDialog) {
+        AlertDialog.Builder(this)
+            .setTitle("¿Ocultar esta carpeta?")
+            .setMessage("📁 $folder dejará de salir en la biblioteca de CASTV. Los archivos no se borran. Se puede mostrar de nuevo en Ajustes › Biblioteca › Carpetas ocultas.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Ocultar") { _, _ ->
+                val sp = getSharedPreferences("castv", MODE_PRIVATE)
+                val now = HashSet(sp.getStringSet("hidden_folders", emptySet()) ?: emptySet())
+                now.add(folder)
+                sp.edit().putStringSet("hidden_folders", now).apply()
+                picker.dismiss()
+                selectedFolder = null
+                loadMedia(showingMusic)
+                toast("📁 Carpeta oculta")
             }
             .show()
     }
@@ -1495,6 +1525,10 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
         if (::adapter.isInitialized) adapter.notifyDataSetChanged()   // refresca "Continuar" al volver del reproductor
+        // [CARPETAS-1] si en Ajustes se mostraron carpetas de nuevo, relee la lista conservando los filtros
+        if (lastScanMs != 0L && actionMode == null && hiddenFolderSet().sorted().joinToString("|") != hiddenSig) {
+            loadMedia(showingMusic, keepFilters = true)
+        }
         // [BIBLIO-1] re-escaneo opcional (Ajustes › Biblioteca): solo si pasó más de un minuto y no hay selección activa
         if (getSharedPreferences("castv", MODE_PRIVATE).getBoolean("rescan_resume", false) &&
             lastScanMs != 0L && actionMode == null &&
