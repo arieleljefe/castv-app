@@ -10,9 +10,9 @@ object PortDialog {
         val err = ServerState.error ?: return
         if (activity.isFinishing) return
         AlertDialog.Builder(activity)
-            .setTitle("⚠️ Puerto 8000 ocupado")
+            .setTitle("⚠️ Sin puerto libre (8000-8010)")
             .setMessage(
-                "Otro programa está usando el puerto 8000, así que el TV no podrá leer tus archivos.\n\n" +
+                "Otro programa está usando todos los puertos del 8000 al 8010, así que el TV no podrá leer tus archivos.\n\n" +
                 "Si usas Termux, ciérralo con:\npkill -f castv_app.py\n\n" +
                 "Luego fuerza la detención de CASTV y ábrelo de nuevo.\n\n($err)"
             )

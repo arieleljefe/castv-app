@@ -197,6 +197,12 @@ class SettingsActivity : AppCompatActivity() {
             if (warnMobile()) "Sí: pregunta antes de reproducir un enlace en el móvil" else "No",
             { toggleWarnMobile() }))
 
+        // [PUERTO-1] Puerto real del servidor interno (solo informativo)
+        val srvErr = ServerState.error
+        l.add(Entry("Red", "Puerto del servidor",
+            if (srvErr != null) "Sin puerto libre (se prueba del 8000 al 8010)"
+            else "${ServerPort.port} (se busca uno libre del 8000 al 8010)", null))
+
         // [GESTO-1] Vídeo
         l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
 

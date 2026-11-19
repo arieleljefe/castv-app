@@ -61,10 +61,10 @@ class CastvService : Service() {
             ServerState.error = null
             DebugLog.add("Servidor iniciado en el puerto ${ServerPort.port}")
         } catch (e: Exception) {
-            ServerState.error = "Puerto 8000 ocupado: ${e.message}"
+            ServerState.error = "Sin puerto libre del 8000 al 8010: ${e.message}"
             DebugLog.add("ERROR al iniciar el servidor: ${e.javaClass.simpleName}: ${e.message}")
             val warn = NotificationCompat.Builder(this, channelId)
-                .setContentTitle("CASTV: puerto 8000 ocupado")
+                .setContentTitle("CASTV: sin puerto libre (8000-8010)")
                 .setContentText("Otro programa usa el puerto. Ciérralo y reinicia CASTV.")
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .build()

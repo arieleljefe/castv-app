@@ -1399,7 +1399,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         resetProgress()   // [PROG-1] barra en cero para el enlace nuevo
-        // Directo al TV por DLNA: no pasa por el servidor del puerto 8000
+        // Directo al TV por DLNA: no pasa por el servidor interno
         if (url.startsWith("https://")) setStatus("🚀 Enviando enlace https al TV (algunos TV lo rechazan)…")
         else setStatus("🚀 Enviando enlace al TV…")
         thread {
@@ -1525,7 +1525,7 @@ class MainActivity : AppCompatActivity() {
         }
         unsupportedSkips = 0
         if (ServerState.error != null) {
-            setStatus("⚠️ Puerto 8000 ocupado: el TV no podrá leer el archivo")
+            setStatus("⚠️ Sin puerto libre (8000-8010): el TV no podrá leer el archivo")
             warnIfPortBusy()
             return
         }
