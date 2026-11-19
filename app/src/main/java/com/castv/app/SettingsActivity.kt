@@ -213,6 +213,12 @@ class SettingsActivity : AppCompatActivity() {
             else "No: solo al abrir la app o cambiar de pestaña",
             { toggleRescan() }))
 
+        // [AUDIO-1] Audio
+        val bassOn = prefs().getBoolean("bassOn", false)
+        l.add(Entry("Audio", "Ecualizador (teléfono)",
+            "Graves reforzados: ${if (bassOn) "Sí" else "No"}. Pon una pista en el teléfono antes de abrirlo",
+            { sendAction("equalizer") }))
+
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))

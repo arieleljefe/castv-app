@@ -2648,6 +2648,7 @@ class MainActivity : AppCompatActivity() {
                     "backup" -> showBackupMenu()
                     "socials" -> showSocials()
                     "rescan" -> loadMedia(showingMusic)   // [BIBLIO-1]
+                    "equalizer" -> showEqualizer()   // [AUDIO-1]
                 }
             }
             reqM3u -> {
