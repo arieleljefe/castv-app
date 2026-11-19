@@ -10,6 +10,16 @@
         <item name="android:windowBackground">@color/vlc_bg</item>
         <item name="android:statusBarColor">@color/vlc_bg</item>
         <item name="android:navigationBarColor">@color/vlc_surface</item>
+        <!-- [PULIDO-1] Todos los AlertDialog de la app usan el estilo de abajo -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.Castv.Dialog</item>
+    </style>
+    <style name="ThemeOverlay.Castv.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:colorBackgroundFloating">@color/vlc_surface</item>
+        <item name="colorSurface">@color/vlc_surface</item>
+        <item name="colorOnSurface">@color/vlc_text</item>
+        <item name="android:textColorPrimary">@color/vlc_text</item>
+        <item name="android:textColorSecondary">@color/vlc_muted</item>
     </style>
     <style name="AccentOverlayCyan">
         <item name="castvAccent">@color/accent_cyan</item>
