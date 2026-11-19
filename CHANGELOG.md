@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v138)
+# Registro de cambios y guía de continuidad – CASTV (v144)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -38,10 +38,17 @@
 
 ---
 
-## 📍 Estado Actual (v138)
+## 📍 Estado Actual (v144)
 
+- ✅ **REGIONES-1c Logos de canales (19 nov 2026): Ariel confirmó "Waos los logos aparecen con sus canales y todo… que jevi ✅✅✅✅".** Parche `regiones_1c.patch` (4 archivos: `Logos.kt` nuevo, `M3uParser.kt`, `Store.kt`, `M3uActivity.kt`), aplicado, compiló y se probó en el teléfono. **Sin anotar:** favoritos con logo, 🌐 Toda la región y listas sin logos; pedir solo si Ariel ve algo raro. Detalle en "REGIONES-1c".
+- 🧪 **AJUSTES-2a:** el parche se aplicó en el mismo push que REGIONES-1c (el build compiló), pero **Ariel aún no dijo si el buscador 🔍 y la sección Subtítulos funcionan**; sigue 🧪.
+- **Hallazgo v143 (clon de GitHub de hoy, 12:43):** el código de **AVISO-HLS-2** (`playLink(..., skipCheck)`, `warnLink`) y de **SEL-2** (`bulkPlay`, `bulkShare`, ids 6 y 7) **ya está en `MainActivity.kt` del repo** (HEAD), aunque el `CHANGELOG.md` del repo seguía en v138. Por eso **no se vuelven a entregar esos dos parches**. Siguen 🧪: falta confirmar que compilan en verde y que funcionan (Ariel).
+- 🧪 **AJUSTES-2a Ajustes con buscador 🔍 y sección Subtítulos (parche `ajustes2a.patch` ENTREGADO en v142, 19 nov 2026; solo `SettingsActivity.kt` +122/-16; verificado con `git apply --check` sobre el `SettingsActivity_actual.kt` real; NO compilado; sin probar).** Primer paso de AJUSTES-2; detalle en "AJUSTES-2a". El chat anterior llegó a su límite de uso mientras empezaba a generar REGIONES-1c y AJUSTES-2 (captura de Ariel): **no se entregó ningún parche ni changelog de esos dos**, así que se tratan como no entregados.
+- 🧪 **UI-2a 🔒 Bloqueo de controles y 🔄 giro de pantalla en el reproductor de video (plan exacto v140, 19 nov 2026; SIN parche hasta el "Dale" de Ariel; solo `VideoPlayerActivity.kt`).** Primer paso de UI-2 (el HUD completo se parte en pasos chicos, ver abajo). Detalle en "UI-2a".
 - ✅ **OCULTAR-1 Quitar canales con confirmación (19 nov 2026, 00:05): Ariel confirmó "Todo va muy bien y aparece el ojo y todo super bien me gustó ✅".** Parche `ocultar1.patch` (entregado 18 nov 2026, 23:58; `Store.kt` y `M3uActivity.kt`; verificado con `git apply --check`; compiló y se probó).** Mantener pulsado el nombre de un canal → confirmación → queda oculto en todas las listas y regiones; botón **👁 N** (solo aparece si hay ocultos) para restaurar. Detalle exacto en "OCULTAR-1 y AVISO-HLS (v136)".
 - ✅ **AVISO-HLS Aviso claro si un canal no se puede preparar (parche `aviso_hls.patch`, entregado 18 nov 2026, 23:58; `MediaServer.kt` y `M3uActivity.kt`; verificado con `git apply --check`; compiló y se probó).** Antes de mandar un canal `.m3u8` al TV, el teléfono revisa la lista; si falla, avisa con el motivo y ofrece 📱 En el móvil / 📺 Enviar igual. Cubre Canales (Listas M3U); **Reproducir enlace** queda para AVISO-HLS-2 ⬜. **Ariel confirmó (19 nov 2026, 00:10): "✅ todo bien"**, con captura del aviso en «Cartoon Classics (Poland)»: "El canal ya no existe en ese enlace (404)" y botones 📱 En el móvil / Cancelar / 📺 Enviar igual (Android los apila en columna; se ve completo).
+- 🧪 **AVISO-HLS-2 Aviso en Reproducir enlace (parche `aviso_hls2.patch`, 19 nov 2026, 00:25; solo `MainActivity.kt`; verificado con `git apply --check`; NO compilado; sin probar).** Igual que AVISO-HLS pero en ⋮/Más › Reproducir enlace › 📺 Al TV con un enlace `.m3u8`. Detalle en "v139".
+- 🧪 **SEL-2 ▶ Reproducir selección y 📤 Compartir en la selección múltiple (parche `sel2.patch`, 19 nov 2026, 00:25; solo `MainActivity.kt`; verificado con `git apply --check`; NO compilado; sin probar).** Detalle en "v139".
 - ⏳ **CHECK-1 Revisar qué canales funcionan (en pausa):** Ariel prefiere **ocultar a mano** (falsos "caídos"); solo si lo pide más adelante. Se apoyaría en OCULTAR-1 (v135).
 - ✅ **Respaldo con favoritos de canales (18 nov 2026, 23:25):** Ariel probó el respaldo y dijo **"Backup funciona bien ✅"**; **BACKUP-FAV no hace falta** (no se tocó `Backup.kt`; si a algún favorito le faltara el nombre, se completa solo al abrir su lista, FAV-1).
 - ✅ **CANAL-BG Canal en la TV con la app en segundo plano (18 nov 2026, 23:29):** **sin parche**: el servicio en primer plano que ya existe (`CastvService`, notificación "CASTV activo") mantiene vivo el servidor `/live`. **Ariel confirmó:** cerró la app sin quitarla de recientes, Android la mostró activa 12 minutos y **"el canal sigue en emisión"** (✅👍). **Límite esperado (no es fallo):** al pulsar **Detener** en "Consultar actividad en segundo plano" (parada forzada; CASTV pasa a "Detenido") el canal se quitó de la TV a los ~20 s, porque el servidor vive dentro de la app y la TV solo conserva lo que ya tenía en su buffer. Android no permite seguir con una app detenida a la fuerza. **También probado (Ariel, 23:33):** deslizar la app fuera de recientes con un canal puesto: **el canal sigue en emisión**.
@@ -213,6 +220,131 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 #### Archivos que se necesitan (una línea, regla 9)
 `cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uActivity.kt ~/storage/downloads/M3uActivity_actual.kt && cp app/src/main/java/com/castv/app/Catalog.kt ~/storage/downloads/Catalog_actual.kt && cp app/src/main/java/com/castv/app/Regions.kt ~/storage/downloads/Regions_actual.kt && cp app/src/main/java/com/castv/app/M3uParser.kt ~/storage/downloads/M3uParser_actual.kt && cp app/src/main/java/com/castv/app/Store.kt ~/storage/downloads/Store_actual.kt && ls -l ~/storage/downloads/*_actual.kt`
+
+### ✅ REGIONES-1c — Logos de canales — confirmado por Ariel el 19 nov 2026 (`regiones_1c.patch`, v143)
+
+**Verificado en el código real (clon de hoy):** `M3uParser` solo guardaba `name`, `url` y `group`; el adaptador de canales (`M3uActivity.ChannelAdapter`) es un `BaseAdapter` con filas armadas en código (★ + dos textos); `Store` guarda nombre y grupo de los favoritos en `chfavmeta` y `backfillChFavs` completa los datos al abrir una lista; el manifest ya permite internet y tráfico http.
+
+**Qué hace:** cada canal muestra su logo (`tvg-logo` de la lista) a la izquierda del nombre, entre la ★ y el texto. Sin logo, el espacio queda vacío (alineado). El logo se baja solo cuando la fila se ve en pantalla, se guarda en memoria y no cambia nada más de la pantalla.
+
+**Cambios (código propio, sin librerías, regla 7 no aplica):**
+- `M3uParser.kt`: `M3uChannel` gana un cuarto dato `logo` **con valor por defecto ""** (todo el código que ya crea canales con 3 datos sigue compilando); nueva expresión para leer `tvg-logo="..."`.
+- `Logos.kt` (**nuevo**): `Logos.load(vista, enlace)`. Caché de 6 MB, 3 descargas a la vez, tiempos de 5 s y 8 s, sigue hasta 4 redirecciones (incluso http→https), tope de 400 KB por imagen, reduce la imagen a ~128 px, recuerda los enlaces que fallaron para no insistir. No lee SVG (Android no los decodifica): esos canales quedan sin logo. Si la fila se reutiliza para otro canal antes de que llegue la imagen, no se pone.
+- `M3uActivity.kt`: `ImageView` de 44×32 dp en cada fila (invisible si no hay logo) y `Logos.load(...)` en `getView`; los textos pasan a ser el hijo 2 de la fila (ajustado).
+- `Store.kt` (2 líneas, solo `chfavmeta`): los favoritos guardan también el logo (clave `l`); los favoritos viejos siguen leyéndose igual y reciben su logo al abrir una lista donde salgan (FAV-1 `backfillChFavs`). Los ocultos (`chhidden`) no cambian.
+
+**No se toca:** `MainActivity.kt`, `MediaServer.kt`, `Regions.kt`, `Catalog.kt`, `Backup.kt`, manifest ni layouts. `SettingsActivity.kt` es de AJUSTES-2a (parche aparte, compatible: verificado que se aplican los dos en cualquier orden).
+
+**Riesgos / límites (v1):** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba (si da error, pasar el mensaje); (2) gasta datos al deslizar listas con muchos logos (un 🌐 Toda la región con miles de canales baja solo los visibles); (3) no hay caché en disco: al cerrar la app se vuelven a bajar; (4) las listas sin `tvg-logo` (Free-TV, algunas de iptv-org) pierden 54 dp de ancho a la izquierda; (5) logos con servidores lentos tardan en aparecer; (6) un logo http bloqueado por el servidor queda sin imagen (se anota como fallido hasta cerrar la app).
+
+**Cómo probar:** (1) Canales → 📡 → 🌎 Latinoamérica → República Dominicana: salen logos a la izquierda de los nombres; (2) desliza rápido arriba y abajo: no se mezclan logos entre canales y no se traba; (3) abre otra lista y vuelve: los logos ya vistos salen al instante; (4) **☆ Favs**: los favoritos marcados **después** del parche conservan su logo; los viejos lo reciben al abrir la lista donde salen; (5) 🌐 Toda la región: logos en la lista unida; (6) buscador, filtro por grupo, ★, mantener pulsado para ocultar, 📺 Al TV y 📱 En el móvil siguen igual; (7) lista sin logos (Free-TV): se ve como antes, solo con el espacio vacío a la izquierda.
+
+**Aplicar (una línea; los dos parches pendientes, en este orden, como dos commits; si alguno no encaja no se aplica ninguno ni se sube nada; los `.patch` van en `~/storage/downloads/`):**
+`cd ~/castv-nuevo/castv-fresh && git apply --check ~/storage/downloads/regiones_1c.patch && git apply --check ~/storage/downloads/ajustes2a.patch && git apply ~/storage/downloads/regiones_1c.patch && git status --short && git add -A && git commit -m "REGIONES-1c logos de canales" && git apply ~/storage/downloads/ajustes2a.patch && git status --short && git add -A && git commit -m "AJUSTES-2a buscador y subtitulos en Ajustes" && git push origin main` (primer `status`: 3 `M` y `Logos.kt` nuevo; segundo: `SettingsActivity.kt`). **Si algo falla después de compilar:** `git log --oneline -4` → `git revert HASH` del commit afectado → `git push origin main`.
+
+### 🧪 AJUSTES-2a — Ajustes con buscador 🔍 y sección Subtítulos (plan v141; PARCHE ENTREGADO en v142: `ajustes2a.patch`, sin compilar, sin probar)
+
+**Verificado en `SettingsActivity_actual.kt` (209 líneas):** pantalla armada en código (`LinearLayout` + `ScrollView`); `render()` borra `content` y dibuja `section(...)` y `row(título, subtítulo) { acción }`: Interfaz (Tema, Color de acento), Almacenamiento (Borrado, solo Android 11+), Respaldo y Acerca de (Redes, Versión). Respaldo y Redes salen con `sendAction()` y cierran Ajustes. El estilo de subtítulos vive en las preferencias `castv_subs` (claves `style_size` 0-3 por defecto 1, `style_color` 0-3, `style_bg` 0-2, `style_bold` booleano; las lee `VideoPlayerActivity.applySubStyle()` al abrir un video).
+
+**Cambios previstos (solo `SettingsActivity.kt`, ~110 líneas nuevas, ~30 cambiadas; sin tocar `Store.kt`, `MainActivity.kt`, `VideoPlayerActivity.kt`, manifest ni layouts):**
+1. **Buscador:** un `EditText` con hint "🔍 Buscar ajustes" justo debajo del encabezado (fuera del `ScrollView`, así no pierde el foco al redibujar). Cada letra vuelve a llamar a `render()`. Coincide por título, subtítulo o nombre de sección, sin importar mayúsculas ni acentos (`java.text.Normalizer`). Las secciones sin filas coincidentes se ocultan; sin resultados sale "Sin resultados". Con el cuadro vacío todo se ve como hoy.
+2. **`render()` por datos:** las filas pasan a una lista interna (sección, título, subtítulo, acción) que se filtra y se dibuja con los mismos `section()` y `row()`. Las filas actuales y su comportamiento **no cambian**.
+3. **Sección nueva 🅰 Subtítulos** (entre Interfaz y Almacenamiento): filas **Tamaño**, **Negrita** (alterna), **Color del texto**, **Fondo** y **Restablecer estilo**, con los mismos nombres y valores que el menú 🎨 del reproductor, escribiendo en `castv_subs`. Se aplican la próxima vez que se abre un video (no hay vista previa aquí; la vista previa sigue en el 🎨 del reproductor).
+4. **No incluido (⬜, a propósito):** submenús de VLC (Emisión al TV, Control parental, Avanzado), historial y red: necesitan `Store.kt`/`MainActivity.kt` (no están en esta sesión) o decisiones de Ariel. Se hacen en AJUSTES-2b, uno por uno.
+
+**Riesgos:** (1) no compilado; el build de GitHub Actions es la prueba; (2) el teclado sube al escribir y la lista se desplaza (normal); (3) `recreate()` al cambiar el color borra lo escrito en el buscador; (4) los nombres de los estilos quedan duplicados en dos archivos (si se cambian en uno, hay que cambiar el otro); (5) regla 7: solo se toma la idea de organizar por secciones y buscar; textos y código son propios.
+
+**Cómo probar:** (1) ⋮ → Ajustes: arriba el cuadro 🔍 y abajo Interfaz · Subtítulos · Almacenamiento · Respaldo · Acerca de; (2) escribe "tema": queda solo Tema; "color": Color de acento y Color del texto; "xyz": "Sin resultados"; borrar: vuelve todo; (3) Subtítulos › Tamaño › Grande, Color › Amarillo, Fondo › Sin fondo, Negrita: abre un video con subtítulos y comprueba que salen así; el 🎨 del reproductor muestra los mismos valores; (4) Restablecer estilo: vuelve a Mediano/Blanco/Semitransparente/sin negrita; (5) Tema, Color, Borrado, Respaldo, Redes y Versión funcionan como antes.
+
+**Aplicar (una línea; el `.patch` va en `~/storage/downloads/ajustes2a.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/ajustes2a.patch && git status --short && git add -A && git commit -m "AJUSTES-2a buscador y subtitulos en Ajustes" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert HASH` → `git push origin main`.
+
+**Detalle de lo entregado (v142):** `render()` ahora dibuja una lista interna de `Entry(sección, título, subtítulo, acción)` filtrada por el buscador (`norm()` quita acentos y mayúsculas); las filas de Interfaz, Almacenamiento, Respaldo y Acerca de son las mismas de antes. Sección nueva "Subtítulos" entre Interfaz y Almacenamiento. Imports nuevos: `GradientDrawable`, `Editable`, `TextWatcher`, `EditText`, `Normalizer`. Fondo del cuadro: `R.color.vlc_surface` (ya existe). Si el build diera error de Kotlin, pasar el mensaje.
+
+**REGIONES-1c (logos) sigue bloqueado** por falta de `M3uActivity.kt` (el parser solo necesita un campo `logo` con valor por defecto). Archivo (una línea): `cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uActivity.kt ~/storage/downloads/M3uActivity_actual.kt && ls -l ~/storage/downloads/M3uActivity_actual.kt`
+
+### 🧪 UI-2a — 🔒 Bloqueo de controles y 🔄 giro de pantalla en el video (plan exacto v140, 19 nov 2026; SIN parche, SIN compilar; esperando el "Dale" de Ariel)
+
+**Por qué este paso primero:** Ariel subió `VideoPlayerActivity_actual.kt` (625 líneas, con gestos y UI-S1). Leído completo: el reproductor usa `VideoView` + el `MediaController` de Android (barra de abajo que no es nuestra) y una barra superior propia (`topBar`: título + 💬 + 📺 TV). Un HUD totalmente propio (UI-2 completo) obligaría a **quitar el `MediaController`** y rehacer la barra de progreso, tiempos y botones: es un cambio grande y riesgoso. Por regla 4 se parte en pasos; el primero es el más chico y no toca el `MediaController` ni los gestos que ya funcionan.
+
+**División de UI-2 (cada paso, un parche con su 🧪 y su "Dale"):**
+- **UI-2a (este):** 🔒 bloqueo de controles + 🔄 giro de pantalla (Automático → Horizontal → Vertical).
+- **UI-2b (⬜):** barra propia que reemplaza al `MediaController` (anterior / −10 s / ▶⏸ / +10 s / siguiente, tiempos y barra). Es el grande; se detalla recién después de probar 2a.
+- **UI-2c (⬜):** modos de tamaño de pantalla (ajustar / llenar / 16:9…): requiere una subclase de `VideoView` que cambie `onMeasure`.
+
+**Verificado en el código real (`VideoPlayerActivity_actual.kt`):**
+- `root` es un `FrameLayout`: `video` (VideoView) → `subText` → `topBar` → `hud`. El toque va por `video.setOnTouchListener { gesture.onTouchEvent(ev); true }` (línea ~314), así que **el `VideoView` no recibe toques propios**; mostrar/ocultar controles se hace en `onSingleTapConfirmed` (línea ~266).
+- `controller` es un `MediaController` con `show(timeout)` y `hide()` sobrescritos solo para mostrar u ocultar `topBar` (líneas ~176-186). El `VideoView` también llama a `controller.show()` por su cuenta cuando termina de preparar un video (por eso el bloqueo debe vivir **dentro de `show`**, no solo en el toque).
+- `requestedOrientation = SCREEN_ORIENTATION_SENSOR` (línea 92) y el manifest ya declara `android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"` para esta pantalla: **girar no recrea la actividad ni corta el video**. No hace falta tocar el manifest.
+- No hay `onBackPressed` propio hoy.
+
+**Cambios previstos (todos en `VideoPlayerActivity.kt`, ~55 líneas nuevas, 3 cambiadas; aditivo):**
+1. **Campos nuevos:** `private var locked = false`, `private var rotMode = 0` (0 automático, 1 horizontal, 2 vertical), `private lateinit var lockBtn: TextView`, `private val hideLockBtn = Runnable { if (::lockBtn.isInitialized) lockBtn.visibility = View.GONE }` y `private lateinit var backLock: OnBackPressedCallback` (import `androidx.activity.OnBackPressedCallback`).
+2. **`topBar` (en `onCreate`):** dos chips nuevos con `chip(...)`, delante de 💬: **🔄** (`rotate()`) y **🔒** (`lock()`). Orden final: título · 🔄 · 🔒 · 💬 · 📺 TV. Los dos chips nuevos son solo un emoji (más angostos que 📺 TV).
+3. **Botón 🔓 (en `onCreate`, junto a `hud`):** `lockBtn` = TextView "🔓" de 26 sp, fondo redondo `0x88000000`, `visibility = GONE`, puesto en el borde derecho al centro (`Gravity.END or Gravity.CENTER_VERTICAL`, margen derecho 24 dp). Un toque lo lleva a `unlock()`. Como es hermano del `video` en el `FrameLayout`, recibe su propio toque sin pasar por los gestos.
+4. **Bloqueo:** `lock()` pone `locked = true`, oculta los controles (`controller.hide()`), esconde el `hud`, activa `backLock` y avisa "🔒 Controles bloqueados · toca la pantalla para ver 🔓". `unlock()` hace lo contrario (`locked = false`, esconde 🔓, desactiva `backLock`, aviso "🔓 Controles desbloqueados" y `controller.show()`).
+5. **Mientras está bloqueado (3 puntos pequeños):** (a) en el `MediaController` sobrescrito, `show(timeout)` empieza con `if (locked) return` (así tampoco aparece solo al pasar al siguiente video); (b) en `onSingleTapConfirmed`: `if (locked) { lockBtn.visibility = View.VISIBLE; handler.removeCallbacks(hideLockBtn); handler.postDelayed(hideLockBtn, 2500); return true }`; (c) en `onDoubleTap` y `onScroll`: `if (locked) return true` (sin ±10 s, sin brillo ni volumen por deslizamiento). El **volumen físico del teléfono** sigue funcionando.
+6. **Botón Atrás:** `backLock = object : OnBackPressedCallback(false) { override fun handleOnBackPressed() { toast("🔒 Desbloquea primero: toca la pantalla y pulsa 🔓") } }`, registrado una vez con `onBackPressedDispatcher.addCallback(this, backLock)`; solo está activo mientras `locked`.
+7. **Giro (`rotate()`):** cicla `rotMode` 0→1→2→0 y aplica `requestedOrientation` = `SENSOR` / `SENSOR_LANDSCAPE` / `SENSOR_PORTRAIT`, con aviso "🔄 Giro automático" / "↔ Horizontal" / "↕ Vertical". No se guarda entre videos ni entre sesiones (v1; cada vez que se abre el reproductor vuelve a automático).
+8. **`onDestroy`:** `handler.removeCallbacks(hideLockBtn)`.
+
+**No se tocan:** `MainActivity.kt`, `Store.kt`, `Backup.kt`, el manifest, layouts, el `MediaController` (solo su `show`), los gestos (solo se ignoran al bloquear), UI-S1 (estilo de subtítulos), el envío al TV (`sendToTv`), `playAt`, el guardado de progreso ni los subtítulos. Regla 7: el candado y el giro son ideas comunes de reproductores; no se copia nada de VLC (su "deslizar para desbloquear" no se usa: aquí es tocar y pulsar 🔓).
+
+**Riesgos / límites (v1):**
+1. No puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba. Lo único menos seguro es `OnBackPressedCallback`: viene con `androidx.activity` que trae `AppCompatActivity`; si el build diera "unresolved reference", se pasa el mensaje y se cambia por `onBackPressed()` sobrescrito.
+2. En vertical la barra de arriba queda apretada (título + 4 botones): el título se acorta con "…". En horizontal sobra espacio.
+3. El bloqueo solo cubre lo de **esta pantalla**: el gesto de inicio/atrás del sistema, las barras que salen al deslizar desde el borde y el botón de encendido siguen funcionando (no se puede impedir desde la app).
+4. Si el teléfono se apaga con el video bloqueado, al volver sigue bloqueado.
+5. Con el giro forzado a Vertical, un video horizontal se ve pequeño (es lo esperado); volver a pulsar 🔄 hasta "Giro automático".
+
+**Cómo probar (cuando exista el parche):**
+1. Abre un video local y toca la pantalla: arriba debe verse **título · 🔄 · 🔒 · 💬 · 📺 TV** y abajo la barra de siempre.
+2. Pulsa **🔒**: desaparecen todos los controles y sale el aviso. Toca la pantalla: aparece **🔓** al borde derecho y se esconde solo a los ~2,5 s.
+3. Bloqueado: prueba doble toque (no salta), deslizar arriba/abajo (no cambia brillo ni volumen) y **Atrás** (solo avisa, no sale). El volumen físico sí cambia.
+4. Pulsa 🔓: vuelven los controles y todo (gestos, Atrás) funciona como antes.
+5. Bloquea y deja que termine el video con uno siguiente en la lista: el siguiente empieza **sin** mostrar la barra.
+6. **🔄**: Horizontal → Vertical → Automático, sin que el video se corte ni vuelva al inicio.
+7. Con un enlace (Reproducir enlace › 📱 En el móvil) y con un canal de Listas M3U: bloqueo y giro igual.
+8. 💬 (subtítulos y 🎨 estilo) y 📺 TV siguen igual; los gestos de siempre (brillo, volumen, ±10 s) siguen igual sin bloqueo.
+
+**Aplicar (una sola línea, cuando exista el `.patch`; nombre previsto `ui2a_bloqueo.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/ui2a_bloqueo.patch && git status --short && git add -A && git commit -m "UI-2a bloqueo de controles y giro en el video" && git push origin main` (debe salir 1 archivo `M`: `VideoPlayerActivity.kt`). **Si falla después de compilar:** `git log --oneline -4` → `git revert HASH` → `git push origin main`.
+
+**Otros pendientes y qué tienen ya (archivos recibidos en v140):**
+- **AJUSTES-2:** ya está `SettingsActivity_actual.kt` (construida en código; `section()` y `row()` listos para sumar filas). El primer paso (reorganizar lo que existe y añadir secciones nuevas) se puede planear con lo que hay; los ajustes nuevos reales necesitarían además `Store.kt`/`MainActivity.kt`.
+- **ACERCA-1:** ya está la pantalla y el manifest; **falta la decisión de licencia de CASTV** (Ariel) y saber qué librerías usa de verdad (`app/build.gradle`).
+- **REGIONES-1c (logos):** ya está `M3uParser_actual.kt`: hoy `M3uChannel(name, url, group)` y solo lee `group-title`; leer `tvg-logo` es sumar un cuarto campo con valor por defecto (`val logo: String = ""`), compatible con quien ya crea `M3uChannel` con 3 datos. **Falta `M3uActivity.kt` actual** para dibujar el logo en cada fila (cargar imágenes con código propio, sin librerías).
+- **UI-3 (mini reproductor expandible):** ya está `activity_main_actual.xml` (el mini reproductor es el `<include layout="@layout/player_bar" />`, línea 241); **faltan `player_bar.xml` y `MainActivity.kt` actual**.
+- **Caché de Gradle:** el `ls .github/workflows` no llegó como archivo; falta el `.yml` del workflow.
+- **Archivos que faltan (una línea, regla 9):** `cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uActivity.kt ~/storage/downloads/M3uActivity_actual.kt && cp app/src/main/java/com/castv/app/MainActivity.kt ~/storage/downloads/MainActivity_actual.kt && cp app/src/main/res/layout/player_bar.xml ~/storage/downloads/player_bar_actual.xml && cp app/build.gradle ~/storage/downloads/build_gradle_actual.txt && ls -l ~/storage/downloads/*_actual.* && ls .github/workflows` (si `app/build.gradle` no existe, probar `app/build.gradle.kts`).
+
+### 🧪 AVISO-HLS-2 y SEL-2 — detalle exacto y parches entregados (v139, 19 nov 2026, 00:25; SIN probar, SIN compilar)
+
+Ariel pidió "pasar todos para parchar todo de golpe". **Se entregan ahora los que se pueden hacer bien con los archivos que ya tengo** (`MainActivity.kt` real de hoy). Los demás pendientes necesitan archivos que aún no tengo o decisiones de Ariel (ver "Lo que falta" abajo). Dos parches, dos commits, ambos sobre `MainActivity.kt`; verificados con `git apply --check` sobre tu archivo real, en orden y cada uno por separado en el sentido de que cada uno se puede revertir solo.
+
+#### AVISO-HLS-2 — `aviso_hls2.patch` (`MainActivity.kt` +29/-1)
+- **Qué hace:** en **Reproducir enlace › 📺 Al TV** con un enlace `.m3u8` (que iría por `/live`), `playLink` primero revisa la lista con `MediaServer.probeLive` (el mismo del AVISO-HLS ✅) y dice "🔎 Revisando el canal…". Si está bien, sigue **exactamente** como antes. Si falla, **no toca nada** (ni historial, ni lo que suena, ni la barra) y muestra el mismo ⚠️ con el motivo y **📱 En el móvil / 📺 Enviar igual / Cancelar**. Se anota en el `/log` como `AVISO-HLS: <título>: <motivo>`.
+- **Cambios:** `playLink` gana el parámetro `skipCheck = false` (los llamadores actuales no cambian) y se añade `warnLink(...)`. Solo canales HLS; mp4 y 📱 En el móvil quedan igual.
+- **Riesgos:** (1) no compilado; (2) un fallo pasajero puede dar un falso aviso → existe **Enviar igual**; (3) el canal solo entra al 🕘 Historial si se sigue adelante (cancelar no lo guarda).
+- **Cómo probar:** (1) Reproducir enlace con un `.m3u8` bueno → 📺 Al TV: sale "🔎 Revisando…" y enseguida "✅ Enlace en el TV"; (2) con un `.m3u8` malo (por ejemplo `https://example.com/no-existe.m3u8`) → ⚠️ con motivo (404 o servidor), y lo que suena en el teléfono no se corta; (3) **Enviar igual** lo manda al TV; **📱 En el móvil** abre el reproductor del teléfono; (4) un mp4 → sin cambios.
+
+#### SEL-2 — `sel2.patch` (`MainActivity.kt` +42)
+- **Qué hace:** en la selección múltiple (mantener pulsado un archivo), el menú ⋮ de arriba suma dos opciones: **▶ Reproducir selección** (primera de la lista) y **📤 Compartir**.
+  - **▶ Reproducir selección:** empieza a sonar la primera seleccionada (en el orden en que se ven) y las demás van **al principio de la cola**, así suenan en orden aunque la repetición esté apagada; se quitan de la cola las que ya estaban para no repetirlas. Al acabar la cola, sigue la lista como siempre. Sale un aviso "▶ N elementos en reproducción (el resto, en la cola)".
+  - **📤 Compartir:** abre el selector de Android para mandar los archivos (uno o varios, hasta **50**) a WhatsApp, Drive, etc., con su enlace de MediaStore y permiso de lectura temporal.
+- **Cambios:** ids de menú 6 y 7, `bulkPlay()` y `bulkShare()` junto a las acciones de SEL-1. Nada de SEL-1 cambia.
+- **Riesgos:** (1) no compilado; (2) algunas apps pueden rechazar compartir audio/video grande; (3) con más de 50 avisa y no comparte; (4) ▶ Reproducir selección **reemplaza el orden** de lo ya puesto en cola para esos elementos (los pone al frente).
+- **Cómo probar:** (1) música: mantén pulsada una pista, marca 3-4 más → ⋮ → **▶ Reproducir selección**: suena la primera y 🕘 Cola muestra las demás; (2) al acabar una, pasa a la siguiente con la 🔁 apagada; (3) **📤 Compartir** con 1 y con 3 archivos hacia WhatsApp/Drive: llegan; (4) igual con videos; (5) **▶**/**📤** con la salida en Teléfono/TV.
+
+#### Aplicar (una sola línea cada una)
+- **Los dos parches, en orden, como dos commits** (si alguno no encaja, no se aplica ninguno ni se sube nada): `cd ~/castv-nuevo/castv-fresh && git apply --check ~/storage/downloads/aviso_hls2.patch && git apply --check ~/storage/downloads/sel2.patch && git apply ~/storage/downloads/aviso_hls2.patch && git status --short && git add -A && git commit -m "AVISO-HLS-2 aviso en Reproducir enlace" && git apply ~/storage/downloads/sel2.patch && git status --short && git add -A && git commit -m "SEL-2 reproducir y compartir la seleccion" && git push origin main` (en cada `status` debe salir 1 archivo `M`: `MainActivity.kt`).
+- **Changelog:** `cd ~/castv-nuevo/castv-fresh && git ls-files | grep -i changelog && cp ~/storage/downloads/CHANGELOG_v139.md CHANGELOG.md && git add CHANGELOG.md && git commit -m "Changelog v139 (AVISO-HLS-2 y SEL-2 entregados, sin probar)" && git push origin main`
+- **Si algo falla después de compilar:** `git log --oneline -4` → `git revert HASH` del commit afectado → `git push origin main`.
+
+#### Lo que falta de la lista de Ariel y por qué no va todavía (regla 1: verificar contra el código real; regla 4: un cambio a la vez)
+- **REGIONES-1c (logos):** necesita `M3uParser.kt` (hoy no lee `tvg-logo`) y cargar imágenes con código propio.
+- **UI-2 / UI-3 (HUD del video y mini reproductor expandible):** necesitan `VideoPlayerActivity.kt` y `activity_main.xml`; son rediseños que tocan las mismas pantallas, así que van **uno por uno**, no juntos.
+- **AJUSTES-2 / ACERCA-1:** necesitan `SettingsActivity.kt`, su layout y `AndroidManifest.xml`; para ACERCA-1 Ariel debe **decidir la licencia** de CASTV.
+- **Caché de Gradle:** necesita el archivo de `.github/workflows`.
+- **Archivos (una línea, regla 9):** `cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uParser.kt ~/storage/downloads/M3uParser_actual.kt && cp app/src/main/java/com/castv/app/VideoPlayerActivity.kt ~/storage/downloads/VideoPlayerActivity_actual.kt && cp app/src/main/java/com/castv/app/SettingsActivity.kt ~/storage/downloads/SettingsActivity_actual.kt && cp app/src/main/AndroidManifest.xml ~/storage/downloads/AndroidManifest_actual.xml && cp app/src/main/res/layout/activity_main.xml ~/storage/downloads/activity_main_actual.xml && ls -l ~/storage/downloads/*_actual.* && ls app/src/main/res/layout .github/workflows`
 
 ### ✅ OCULTAR-1 y AVISO-HLS (ambos ✅, v138) — detalle exacto y parches entregados (v136, 18 nov 2026, 23:58; SIN probar, SIN compilar; Ariel pidió los dos juntos para revisarlos de golpe)
 
@@ -652,7 +784,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 **Lista ordenada v125 (18 nov 2026), recomendada de arriba abajo (ninguno urgente; ACENTO-1, CATALOGO-2 y FAV-1 ya ✅):**
 1. ✅ **REGIONES-1b:** "🌐 Toda la región" sin repetidos (confirmado v128). ✅ **REGIONES-1b2:** diálogo de región sin cortes (confirmado v130).
 2. ⬜ **ACERCA-1** y **AJUSTES-2** (ideas con capturas de VLC; ver "Visión de interfaz"; para ACERCA-1 Ariel debe decidir la licencia de CASTV).
-3. ✅ **BACKUP-FAV** (no hace falta: el respaldo funciona, v131); ⬜ **REGIONES-1c** (logos), ✅ CANAL-BG (confirmado v132, sin parche), ✅ **OCULTAR-1** (confirmado v137) y ✅ **AVISO-HLS** (confirmado v138) → ⬜ **AVISO-HLS-2** (el mismo aviso en Reproducir enlace) → ⏳ **CHECK-1** (en pausa); plan v134, SEL-2, UI-2/UI-3, Caché de Gradle y Banco de ideas.
+3. ✅ **BACKUP-FAV** (no hace falta: el respaldo funciona, v131); ⬜ **REGIONES-1c** (logos), ✅ CANAL-BG (confirmado v132, sin parche), ✅ **OCULTAR-1** (confirmado v137) y ✅ **AVISO-HLS** (confirmado v138) → 🧪 **AVISO-HLS-2** (parche v139) · 🧪 **SEL-2** (parche v139) · 🧪 **UI-2a** (plan v140, sin parche) → ⏳ **CHECK-1** (en pausa); plan v134, SEL-2, UI-2/UI-3, Caché de Gradle y Banco de ideas.
 
 **Lista v123 (superada; historial)**
 
@@ -815,6 +947,18 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v144 (19 nov 2026):** Ariel aplicó `regiones_1c.patch` y `ajustes2a.patch`, el build compiló y probó los logos: **REGIONES-1c ✅** ("los logos aparecen con sus canales"). **AJUSTES-2a sigue 🧪** (sin reporte). AVISO-HLS-2 y SEL-2 (ya en el código) siguen 🧪 sin reporte. **Pendientes (⬜), a elección:** UI-2a (plan v140, esperando "Dale"), UI-3, ACERCA-1 (Ariel decide la licencia), caché de Gradle (solo si vuelve el 429), AJUSTES-2b, CHECK-1 ⏳ en pausa. **Para retomar:** pasar `CHANGELOG_v144.md`.
+
+- **v143 (19 nov 2026, 12:50):** Ariel borró todo del teléfono y empezó de cero: se clonó `castv-app` (`main`) en `~/castv-nuevo/castv-fresh` (la carpeta vieja quedó en `~/castv-viejo`) y se subió `castv-src.zip` (`git archive HEAD`). **Leído el zip completo:** los 5 archivos de v140 coinciden con los del repo; `AVISO-HLS-2` y `SEL-2` **ya están en el código** (ver Estado Actual). **Entregados:** `regiones_1c.patch` (REGIONES-1c, 🧪) y `ajustes2a.patch` (AJUSTES-2a, 🧪, re-verificado contra el repo de hoy). **Pendientes de Ariel:** el `git push` ahora pide token de GitHub (el acceso se perdió al borrar el teléfono). **Siguiente:** aplicar con la línea de REGIONES-1c, esperar el build en verde, probar y decir "ya funciona" (o pasar el error). Después: UI-2a (plan v140), UI-3, ACERCA-1 (decidir licencia), caché de Gradle. **Para retomar:** pasar `CHANGELOG_v143.md` (y `castv-src.zip` solo si cambió el código).
+
+- **v142 (19 nov 2026):** Ariel pidió (1) una línea con **todo el código para bajar** y (2) los archivos que el chat anterior no alcanzó a enviar (se acabaron los tokens). **Entregado:** `ajustes2a.patch` (AJUSTES-2a, 🧪) y este changelog. **Para no volver a gastar tokens pasando archivos sueltos:** una sola línea que empaqueta TODO el código fuente del repo en un zip (`git archive`, incluye lo ya subido con `git push`): `cd ~/castv-nuevo/castv-fresh && git archive --format=zip -o ~/storage/downloads/castv-src.zip HEAD && ls -l ~/storage/downloads/castv-src.zip`. Ariel sube **solo ese zip** (más el changelog) y la IA lo descomprime y lee solo lo que necesite (REGIONES-1c, UI-3, ACERCA-1, caché de Gradle, AJUSTES-2b). **REGIONES-1c** no se entregó: su parche necesita `M3uActivity.kt` y no está en esta sesión; saldrá con el zip. AVISO-HLS-2, SEL-2 y UI-2a (plan) siguen igual. **Siguiente:** Ariel aplica `ajustes2a.patch`, espera el build en verde, prueba (5 pasos) y dice "ya funciona" o pasa el error; sube `castv-src.zip`. **Para retomar:** pasar `CHANGELOG_v142.md` y `castv-src.zip`.
+
+- **v141 (19 nov 2026):** Ariel mandó captura del chat anterior: llegó al límite de uso justo cuando iba a generar **REGIONES-1c** y **AJUSTES-2**; no se entregó nada de eso. Se planeó **AJUSTES-2a** (solo `SettingsActivity.kt`, ver su sección). REGIONES-1c necesita `M3uActivity.kt`. UI-2a sigue como plan 🧪 sin parche. AVISO-HLS-2 y SEL-2 siguen 🧪. **Siguiente:** Ariel dice "Dale" a AJUSTES-2a o a UI-2a (uno a la vez) y/o sube `M3uActivity_actual.kt`. **Para retomar:** pasar solo `CHANGELOG_v141.md`.
+
+- **v140 (19 nov 2026):** Ariel pidió "ponerme al día, seguir las reglas y seguir donde me quedé" y subió `CHANGELOG_v139.md` y los 5 archivos pedidos en v139 (`VideoPlayerActivity`, `SettingsActivity`, `M3uParser`, `AndroidManifest`, `activity_main`). **Estado heredado sin cambios:** AVISO-HLS-2 y SEL-2 siguen 🧪 (entregados en v139; Ariel aún no dijo si los aplicó ni si funcionan; nada pasa a ✅ sin su "ya funciona"). **Nuevo:** leídos los 5 archivos; **UI-2a** (🔒 bloqueo + 🔄 giro en el video) quedó planeado con el detalle exacto (ver su sección, 🧪, **sin parche** por regla 2). UI-2 completo se parte en 2a/2b/2c. Lo demás (REGIONES-1c, UI-3, ACERCA-1, caché de Gradle) todavía necesita archivos o una decisión (listados al final de la sección UI-2a). **Siguiente:** Ariel dice **"Dale"** a UI-2a (o elige otro pendiente); entonces se entrega `ui2a_bloqueo.patch` con su línea de Termux. **Para retomar:** pasar solo `CHANGELOG_v140.md`.
+
+- **v139 (19 nov 2026, 00:25):** Ariel pidió "pasar todos para parchar todo de golpe". Se entregan los dos que se pueden hacer bien con los archivos de hoy: **AVISO-HLS-2** (`aviso_hls2.patch`) y **SEL-2** (`sel2.patch`), ambos 🧪, sin compilar. Los demás (REGIONES-1c, UI-2/UI-3, AJUSTES-2/ACERCA-1, caché de Gradle) necesitan archivos y, en ACERCA-1, la decisión de licencia; la línea de archivos está en v139. **Para retomar:** pasar solo `CHANGELOG_v139.md`.
 
 - **v138 (19 nov 2026, 00:10):** Ariel probó AVISO-HLS con un canal muerto (captura 00:08, 404) y dijo **"✅ todo bien"**: **AVISO-HLS ✅**. OCULTAR-1 y AVISO-HLS quedan cerrados. **Pendientes (⬜), a elección:** AVISO-HLS-2 (mismo aviso en Reproducir enlace, `MainActivity.playLink`; ya tengo `MainActivity.kt` de hoy), REGIONES-1c (logos), SEL-2, ACERCA-1 / AJUSTES-2, UI-2 / UI-3, caché de Gradle, banco de ideas; CHECK-1 ⏳ en pausa. **Para retomar:** pasar solo `CHANGELOG_v138.md`.
 
