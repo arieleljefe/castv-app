@@ -6,7 +6,7 @@ package com.castv.app
  * Al añadir listas nuevas en el futuro, se sube VERSION.
  */
 object Catalog {
-    const val VERSION = 1
+    const val VERSION = 2
 
     private const val BASE = "https://iptv-org.github.io/iptv/"
 
@@ -37,6 +37,20 @@ object Catalog {
         country("🇻🇪 Venezuela", "ve"),
         country("🇺🇸 Estados Unidos", "us"),
         country("🇪🇸 España", "es"),
+        country("🇨🇦 Canadá", "ca"),
+        country("🇬🇧 Reino Unido", "gb"),
+        country("🇫🇷 Francia", "fr"),
+        country("🇩🇪 Alemania", "de"),
+        country("🇮🇹 Italia", "it"),
+        country("🇵🇹 Portugal", "pt"),
+        country("🇷🇺 Rusia", "ru"),
+        country("🇯🇵 Japón", "jp"),
+        country("🇰🇷 Corea del Sur", "kr"),
+        country("🇨🇳 China", "cn"),
+        country("🇮🇳 India", "in"),
+        country("🇦🇪 Emiratos Árabes", "ae"),
+        country("🇿🇦 Sudáfrica", "za"),
+        country("🇦🇺 Australia", "au"),
         category("🎬 Películas", "movies"),
         category("📺 Series", "series"),
         category("⚽ Deportes", "sports"),
