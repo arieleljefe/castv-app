@@ -32,6 +32,7 @@ import java.text.Normalizer
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var content: LinearLayout
+    private var unlocked = false   // [PARENTAL-1] PIN ya escrito en esta sesión de Ajustes
     private var txtColor = Color.BLACK
     private var mutedColor = Color.GRAY
     private var lineColor = Color.GRAY
@@ -170,6 +171,23 @@ class SettingsActivity : AppCompatActivity() {
 
         setContentView(root)
         render()
+
+        // [PARENTAL-1] con PIN activo, Ajustes solo se abre con el PIN
+        unlocked = savedInstanceState?.getBoolean("unlocked") ?: false
+        if (pinSet() && !unlocked) {
+            content.visibility = View.INVISIBLE
+            askPin("Ajustes bloqueados", exitOnCancel = true) {
+                unlocked = true
+                content.visibility = View.VISIBLE
+            }
+        } else {
+            unlocked = true
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("unlocked", unlocked)
     }
 
     // ------------------------------------------------------------ Contenido
@@ -218,6 +236,12 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Audio", "Ecualizador (teléfono)",
             "Graves reforzados: ${if (bassOn) "Sí" else "No"}. Pon una pista en el teléfono antes de abrirlo",
             { sendAction("equalizer") }))
+
+        // [PARENTAL-1] Control parental
+        l.add(Entry("Control parental", "PIN de bloqueo",
+            if (pinSet()) "Activado: se pide para abrir Ajustes (toca para cambiarlo o quitarlo)"
+            else "Sin PIN (toca para crear uno de 4 a 6 números)",
+            { onPinRow() }))
 
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
@@ -502,6 +526,119 @@ class SettingsActivity : AppCompatActivity() {
         prefs().edit().putBoolean("rescan_resume", now).apply()
         toast(if (now) "🔄 Se actualizará la lista al volver a la app" else "🔄 Sin re-escaneo automático")
         render()
+    }
+
+    // ------------------------------------------------- [PARENTAL-1] Control parental
+
+    private fun pinHash(pin: String): String {
+        val b = java.security.MessageDigest.getInstance("SHA-256").digest(("castv:" + pin).toByteArray())
+        return b.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun pinSet(): Boolean = !prefs().getString("pin_hash", "").isNullOrEmpty()
+
+    private fun pinBox(): EditText {
+        val et = EditText(this)
+        et.inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+            android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        et.filters = arrayOf(android.text.InputFilter.LengthFilter(6))
+        et.hint = "PIN"
+        et.setSingleLine(true)
+        return et
+    }
+
+    /** Pide el PIN actual y, si es correcto, ejecuta onOk. Con exitOnCancel, Salir cierra Ajustes. */
+    private fun askPin(title: String, exitOnCancel: Boolean = false, onOk: () -> Unit) {
+        val et = pinBox()
+        val d = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage("Escribe tu PIN")
+            .setView(et)
+            .setCancelable(false)
+            .setPositiveButton("Entrar", null)
+            .setNegativeButton(if (exitOnCancel) "Salir" else "Cancelar") { _, _ ->
+                if (exitOnCancel) finish()
+            }
+            .setNeutralButton("Olvidé el PIN") { _, _ -> showForgotPin(exitOnCancel) }
+            .create()
+        d.setOnShowListener {
+            d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (pinHash(et.text.toString()) == prefs().getString("pin_hash", "")) {
+                    d.dismiss()
+                    onOk()
+                } else {
+                    et.setText("")
+                    toast("PIN incorrecto")
+                }
+            }
+        }
+        d.show()
+    }
+
+    private fun showForgotPin(exitAfter: Boolean) {
+        AlertDialog.Builder(this)
+            .setTitle("Olvidé el PIN")
+            .setMessage(
+                "CASTV no puede recuperar el PIN. Para quitarlo: Ajustes de Android › Apps › CASTV › " +
+                "Almacenamiento › Borrar datos. Se pierden favoritos, listas e historial " +
+                "(si tienes un respaldo exportado, impórtalo después)."
+            )
+            .setCancelable(false)
+            .setPositiveButton("Entendido") { _, _ -> if (exitAfter) finish() }
+            .show()
+    }
+
+    private fun onPinRow() {
+        if (!pinSet()) {
+            createPin()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("PIN de bloqueo")
+            .setItems(arrayOf("Cambiar PIN", "Quitar PIN")) { _, which ->
+                askPin(if (which == 0) "Cambiar PIN" else "Quitar PIN") {
+                    if (which == 0) {
+                        createPin()
+                    } else {
+                        prefs().edit().remove("pin_hash").apply()
+                        toast("🔓 PIN quitado")
+                        render()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun createPin() {
+        val a = pinBox()
+        a.hint = "PIN nuevo (4 a 6 números)"
+        val b = pinBox()
+        b.hint = "Repite el PIN"
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        box.addView(a)
+        box.addView(b)
+        AlertDialog.Builder(this)
+            .setTitle("Crear PIN")
+            .setMessage("CASTV no puede recuperar un PIN olvidado. Anótalo en un lugar seguro y, si quieres, exporta antes un respaldo.")
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ ->
+                val p1 = a.text.toString()
+                val p2 = b.text.toString()
+                when {
+                    p1.length < 4 -> toast("El PIN debe tener de 4 a 6 números")
+                    p1 != p2 -> toast("Los PIN no coinciden")
+                    else -> {
+                        prefs().edit().putString("pin_hash", pinHash(p1)).apply()
+                        toast("🔒 PIN guardado")
+                        render()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------------- [GESTO-1] Vídeo
