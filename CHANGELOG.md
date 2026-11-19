@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v125)
+# Registro de cambios y guía de continuidad – CASTV (v130)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -38,9 +38,10 @@
 
 ---
 
-## 📍 Estado Actual (v125)
+## 📍 Estado Actual (v126)
 
-- 🧪 **REGIONES-1b (🌐 Toda la región, 18 nov 2026): plan exacto escrito en v125; falta el "Dale" de Ariel; aún no hay parche.** Ver "Parche en Curso" (fase v120, punto 4).
+- ✅ **REGIONES-1b2 Diálogo de región sin cortes (18 nov 2026, 23:13):** parche `regiones_1b2.patch` (`M3uActivity.kt`, solo `showListsOf`), aplicado, compiló y **Ariel confirmó: "Todo bien de bien ✅"**. "🌐 Toda la región (N listas)" va como primera fila y **← Regiones** y **Cerrar** caben en una fila. Detalle en "Parche en Curso", punto 4b.
+- ✅ **REGIONES-1b 🌐 Toda la región (18 nov 2026, 23:07):** parche `regiones_1b.patch` (`M3uActivity.kt`), aplicado, compiló y **Ariel confirmó: "Todo bien de bien ✅"**. El `/log` (23:05) muestra un canal de Cartoon Network HD saliendo por `/live` con video + audio unidos (MUS-1) y la TV reproduciendo. **Sin anotar:** línea `M3U región ...` del `/log` (no vino en el texto pegado); pedir solo si Ariel la ve rara. Detalle en "Parche en Curso", punto 4.
 - ✅ **FAV-1 ⭐ Favoritos global (18 nov 2026):** parche `fav1.patch` (`Store.kt`, `M3uActivity.kt`), aplicado, compiló y **Ariel confirmó: "Todo va bien de bien ✅"**. Con ☆ Favs se ven los favoritos de todas las listas y siguen al cambiar de categoría; los favoritos viejos reciben su nombre al abrir su lista. **Sin anotar:** si el respaldo (`Backup.kt`) incluye los favoritos de canales (BACKUP-FAV, pedir `Backup.kt` solo si Ariel lo quiere).
 - ✅ **ACENTO-1 y CATALOGO-2 (18 nov 2026):** parches `acento1.patch` (`M3uActivity.kt`) y `catalogo2.patch` (`Catalog.kt`, `VERSION` 2, 14 países nuevos), aplicados, compilaron y **Ariel confirmó: "Todo bien de bien ✅ probé todo y va excelente"**. La ★ de Canales sigue el color de Ajustes y las regiones Norteamérica, Europa, Asia y África y Oceanía ya tienen listas. **Sin anotar:** cuántas listas añadió el aviso exacto; pedir solo si Ariel lo ve raro.
 - 🧪 **FASE v120 (18 nov 2026): ACENTO-1, CATALOGO-2, FAV-1 (⭐ Favoritos global) y REGIONES-1b**, pedidos de Ariel; plan en "Parche en Curso", un parche a la vez (orden propuesto en ese orden). Sin código todavía; faltan los archivos reales (línea en la fase).
@@ -179,7 +180,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 - **Riesgos:** favoritos viejos sin nombre; el respaldo JSON (`Backup.kt`) debería incluir los favoritos nuevos (se revisa antes de entregar); canales caídos siguen apareciendo hasta que Ariel los quite.
 - **Cómo probar:** marcar ★ en un canal de Deportes y otro de Argentina → abrir otra lista o región: ⭐ Favoritos muestra los dos; quitar una ★ desde cualquier sitio la quita de ⭐; reiniciar la app y seguir viéndolos; 📺 Al TV desde ⭐ funciona.
 
-#### 4) REGIONES-1b — Botón "Toda la región" (🧪 plan exacto v125, sin parche; el más pesado)
+#### 4) REGIONES-1b — Botón "Toda la región" (✅ confirmado por Ariel el 18 nov 2026, 23:07; parche `regiones_1b.patch` entregado en v126: `M3uActivity.kt` +88/-3; generado sobre tu `M3uActivity.kt` con ACENTO-1 y FAV-1 ya aplicados; verificado con `git apply --check`; no compilado)
 - **Qué:** en el selector de región, un botón que **descarga y une todas las listas de esa región sin repetidos** por enlace de stream, mostrando una sola lista con buscador y filtro por grupo.
 - **Riesgos:** varias descargas a la vez (Latinoamérica ~20 listas): se haría en hilos aparte con progreso y tope de memoria; si una falla, se sigue con las demás y se avisa; tarda más la primera vez (luego usa la copia guardada).
 - **PLAN EXACTO (v125; leídos `M3uActivity_actual.kt` y `M3uParser_actual.kt` reales; 1 archivo, todo aditivo):**
@@ -193,7 +194,17 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
   - **Riesgos:** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba; (2) Latinoamérica son 20 listas: la primera vez tarda (se ve el avance) y gasta datos; con las copias guardadas es más rápido; (3) memoria: hasta 40 000 canales en pantalla (ya hay tope de 25 MB por lista); (4) algunas listas pueden fallar o estar vacías: se sigue con las demás y se avisa; (5) al unir, un canal repetido entre países queda solo una vez (como se pidió); (6) 🗑 no hace nada mientras se ve una región (se avisa con un mensaje corto).
   - **Cómo probar (cuando exista):** (1) 📡 → 🌎 Latinoamérica → **🌐 Toda la región**: el estado avanza "Descargando N de 20…" y van saliendo canales; (2) al terminar dice "N canales de 20 listas (sin repetidos)"; (3) el buscador encuentra canales de varios países; (4) Grupo: filtra como siempre; (5) ★ en un canal de la región y ☆ Favs lo muestra (FAV-1); (6) 📺 Al TV de un canal de la región funciona y la barra muestra el nombre; (7) elegir otra lista con 📡 cancela y carga la nueva; (8) repetir con 🎬 Categorías → Toda la región; (9) sin internet: usa las copias guardadas de las listas ya abiertas; (10) abrir `http://192.168.100.43:8001/log` y pasar la línea `M3U región ...`.
   - **Aplicar (una línea, cuando exista el `.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/regiones_1b.patch && git status --short && git add -A && git commit -m "REGIONES-1b toda la región sin repetidos" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert` de ese commit.
-  - **Siguiente:** Ariel responde **"Dale"** (o ajusta algo, por ejemplo el tope de canales) y se entrega `regiones_1b.patch` (🧪).
+  - **Parche entregado (v126):** `regiones_1b.patch`, 1 archivo `M`, exactamente lo del plan. Detalle de diseño: las 4 descargas se unen siempre en el orden de las listas y la pantalla solo acepta la unión más reciente (si dos listas terminan casi a la vez, no se pisa un resultado nuevo con uno viejo); los nombres normalizados para el buscador se guardan en una caché por enlace para no recalcularlos en cada avance. Nada pasa a ✅ sin tu "ya funciona".
+
+#### 4b) REGIONES-1b2 — El diálogo de la región se corta abajo (✅ confirmado por Ariel el 18 nov 2026, 23:13; parche `regiones_1b2.patch`: `M3uActivity.kt`, solo `showListsOf`; verificado con `git apply --check`; no compilado)
+- **Síntoma (captura de Ariel, 18 nov 2026, 23:03):** en 🌎 Latinoamérica, el botón **🌐 TODA LA REGIÓN** sale en una fila propia y **CERRAR** queda **cortado** en el borde inferior; **← Regiones** ni se ve. Con 20 países en la lista y 3 botones, Android apila los botones (no caben en una fila) y la altura total se pasa de la pantalla.
+- **Causa verificada (en `showListsOf` tal como quedó con 1b):** el botón se añadió con `setPositiveButton("🌐 Toda la región")` junto a `setNegativeButton("Cerrar")` y `setNeutralButton("← Regiones")`. Tres botones de texto largo no caben en una sola fila.
+- **Arreglo propuesto (un solo cambio, `showListsOf`, ~6 líneas):** quitar `setPositiveButton` y poner **🌐 Toda la región (N listas)** como **primera fila de la lista** (siempre visible arriba, sin desplazarse). Quedan solo **← Regiones** y **Cerrar**, que caben juntos en una fila. Al tocar la primera fila se llama a `loadRegion(lists, regionName)`; el resto de filas llaman a `loadList(lists[which - 1])`. Sin región (Ver todas / Mis listas) la lista queda exacta como hoy.
+- **Cambio exacto:** `val all = regionName != null`; `val names = lists.map { it.name }.toMutableList(); if (all) names.add(0, "🌐 Toda la región (${lists.size} listas)")`; `setItems(names.toTypedArray()) { _, which -> if (all && which == 0) loadRegion(lists, regionName!!) else loadList(lists[if (all) which - 1 else which]) }`; se elimina la línea `if (regionName != null) b.setPositiveButton(...)`.
+- **No se toca:** `loadRegion`, `chooseList`, buscador, favoritos, 📺/📱, NOW-1, ningún otro archivo.
+- **Riesgos:** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba; (2) quien ya se acostumbró al botón tendrá que buscarlo arriba de la lista; (3) en categorías (8 listas) también sale como primera fila.
+- **Cómo probar (cuando exista):** (1) 📡 → 🌎 Latinoamérica: la primera fila dice "🌐 Toda la región (20 listas)" y abajo se ven **← Regiones** y **Cerrar** completos; (2) tocar esa fila une las 20 listas como hoy; (3) tocar un país abre solo esa lista; (4) repetir en 🎬 Categorías; (5) "📋 Ver todas" y "Mis listas" quedan igual (sin fila de región); (6) ← Regiones vuelve al nivel 1.
+- **Aplicar (una línea):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/regiones_1b2.patch && git status --short && git add -A && git commit -m "REGIONES-1b2 Toda la región como primera fila" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert` de ese commit.
 
 #### Archivos que se necesitan (una línea, regla 9)
 `cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uActivity.kt ~/storage/downloads/M3uActivity_actual.kt && cp app/src/main/java/com/castv/app/Catalog.kt ~/storage/downloads/Catalog_actual.kt && cp app/src/main/java/com/castv/app/Regions.kt ~/storage/downloads/Regions_actual.kt && cp app/src/main/java/com/castv/app/M3uParser.kt ~/storage/downloads/M3uParser_actual.kt && cp app/src/main/java/com/castv/app/Store.kt ~/storage/downloads/Store_actual.kt && ls -l ~/storage/downloads/*_actual.kt`
@@ -585,7 +596,7 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
 **Lista ordenada v125 (18 nov 2026), recomendada de arriba abajo (ninguno urgente; ACENTO-1, CATALOGO-2 y FAV-1 ya ✅):**
-1. 🧪 **REGIONES-1b:** "🌐 Toda la región" sin repetidos (plan exacto listo; espera el "Dale").
+1. ✅ **REGIONES-1b:** "🌐 Toda la región" sin repetidos (confirmado v128). ✅ **REGIONES-1b2:** diálogo de región sin cortes (confirmado v130).
 2. ⬜ **ACERCA-1** y **AJUSTES-2** (ideas con capturas de VLC; ver "Visión de interfaz"; para ACERCA-1 Ariel debe decidir la licencia de CASTV).
 3. ⬜ **BACKUP-FAV** (solo si el respaldo no guarda los favoritos de canales), **REGIONES-1c** (logos), CANAL-BG, AVISO-HLS, SEL-2, UI-2/UI-3, Caché de Gradle y Banco de ideas.
 
@@ -750,6 +761,16 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v130 (18 nov 2026, 23:15):** Ariel confirmó **REGIONES-1b2 ✅** ("Todo bien de bien"). **No queda nada por probar.** Hoy quedaron ✅: ACENTO-1, CATALOGO-2, FAV-1, REGIONES-1b y REGIONES-1b2. **Pendientes (⬜), a elección de Ariel:** ACERCA-1 y AJUSTES-2 (ideas con capturas de VLC; para ACERCA-1 Ariel debe decidir la licencia de CASTV), BACKUP-FAV (solo si el respaldo no guarda los favoritos de canales), REGIONES-1c (logos), CANAL-BG (canal en la TV con la app cerrada), AVISO-HLS, SEL-2, UI-2/UI-3, caché de Gradle y banco de ideas. Recomendado: **BACKUP-FAV** (protege tus ★ al reinstalar; pide solo `Backup.kt`). **Para retomar:** pasar solo `CHANGELOG_v130.md`.
+
+- **v129 (18 nov 2026, 23:12):** Ariel dijo **"Dale"** a REGIONES-1b2. Entregado `regiones_1b2.patch` (🧪, 1 archivo, solo `showListsOf`), exactamente lo del plan 4b. Siguiente: aplicar, esperar el build en verde y probar los 6 pasos (primera fila "🌐 Toda la región (20 listas)", **← Regiones** y **Cerrar** visibles). Nada pasa a ✅ sin su "ya funciona".
+
+- **v128 (18 nov 2026, 23:10):** Ariel aplicó `regiones_1b.patch`, compiló y probó: **"Todo bien de bien ✅"** (log 23:05 con Cartoon Network HD por `/live`, video + audio unidos). **REGIONES-1b pasa a ✅.** Con la captura se vio un defecto visual: en Latinoamérica el botón 🌐 queda en su propia fila y **Cerrar** y **← Regiones** se cortan abajo. Plan exacto en 4b (REGIONES-1b2, 🧪, sin parche). Siguiente: Ariel dice **"Dale"** y se entrega `regiones_1b2.patch`.
+
+- **v127 (18 nov 2026, 22:58):** Ariel no pudo aplicar `regiones_1b.patch` en el chat anterior porque se acabó el límite de uso (el parche y el v126 sí llegaron). Estado sin cambios: REGIONES-1b sigue 🧪 (entregado, sin aplicar ni compilar). Revisión del parche contra Kotlin: `return@execute`, `break@loop` dentro de `synchronized` y las variables capturadas son válidos; la unión usa `n` posterior a guardar el resultado, así que cada vista incluye al menos `n` listas. Siguiente: Ariel aplica con la línea de Termux, espera el build en verde y prueba los 10 pasos de REGIONES-1b; pasar la línea `M3U región ...` del `/log`. Nada pasa a ✅ sin su "ya funciona".
+
+- **v126 (18 nov 2026):** Ariel dijo **"Dale"** a REGIONES-1b. Entregado `regiones_1b.patch` (🧪, 1 archivo). Siguiente: aplicar, esperar el build en verde y probar los 10 pasos; pasar la línea `M3U región ...` del `/log`. Nada pasa a ✅ sin su "ya funciona".
 
 - **v125 (18 nov 2026):** Ariel confirmó **FAV-1** ("Todo va bien de bien ✅"): pasa a ✅. Se escribió el **plan exacto de REGIONES-1b** (🧪, sin parche) con lo ya visto en `M3uActivity_actual.kt` y `M3uParser_actual.kt`. Siguiente: Ariel dice **"Dale"** a REGIONES-1b.
 
