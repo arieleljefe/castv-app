@@ -399,7 +399,7 @@ class MainActivity : AppCompatActivity() {
 
         navVideo.setOnClickListener { showMovies() }
         navAudio.setOnClickListener { showMusic() }
-        navFolders.setOnClickListener { pickFolder() }
+        navFolders.setOnClickListener { runMenuAction(16) }   // [UI-5] Canales
         navQueue.setOnClickListener { showQueue() }
         navMore.setOnClickListener { showMoreSheet() }   // [UI-1]
         tabAll.setOnClickListener { viewMode = ViewMode.ALL; applyFilters() }
@@ -871,8 +871,7 @@ class MainActivity : AppCompatActivity() {
         }
         nav(navVideo, !showingMusic)
         nav(navAudio, showingMusic)
-        nav(navFolders, selectedFolder != null)
-        navFolders.text = selectedFolder?.substringAfterLast('/') ?: "Carpetas"
+        nav(navFolders, false)   // [UI-5] ahora es "Canales"; el filtro de carpeta lo avisa tvFilter
         fun tab(t: TextView, active: Boolean) {
             t.setBackgroundResource(if (active) R.drawable.tab_active else R.drawable.tab_off)
             t.setTextColor(if (active) on else off)
@@ -942,6 +941,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
         menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
         menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
+        menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -968,6 +968,7 @@ class MainActivity : AppCompatActivity() {
             15 -> askLinkAndPlay()
             16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
             17 -> showBackupMenu()
+            18 -> pickFolder()   // [UI-5]
         }
     }
 
@@ -986,11 +987,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         val groups = ArrayList<Pair<String, List<Int>>>()
-        groups.add("Reproducir y canales" to listOf(15, 16, 10, 3))
+        groups.add("Reproducir y canales" to listOf(15, 18, 10, 3))
         groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
-        val inSettings = setOf(11, 12, 13, 14, 17)   // [UI-1b] viven en la pantalla Ajustes
+        val inSettings = setOf(11, 12, 13, 14, 16, 17)   // [UI-1b] viven en la pantalla Ajustes
         val extra = titles.keys.filter { it !in known && it !in inSettings }.sorted()
         if (extra.isNotEmpty()) groups.add("Más" to extra)
 

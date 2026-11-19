@@ -292,7 +292,7 @@
             android:layout_weight="1"
             android:drawablePadding="2dp"
             android:drawableTint="@color/vlc_muted"
-            android:drawableTop="@drawable/ic_nav_folder"
+            android:drawableTop="@drawable/ic_nav_channels"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
@@ -300,7 +300,7 @@
             android:paddingTop="8dp"
             android:paddingEnd="4dp"
             android:paddingBottom="6dp"
-            android:text="Carpetas"
+            android:text="Canales"
             android:textColor="@color/vlc_muted"
             android:textSize="11sp" />
 
