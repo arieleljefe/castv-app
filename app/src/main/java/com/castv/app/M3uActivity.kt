@@ -53,6 +53,8 @@ class M3uActivity : AppCompatActivity() {
     private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
     private var favNorm: List<String> = emptyList()
     private lateinit var favBtn: TextView
+    private lateinit var hiddenBtn: TextView   // [OCULTAR-1] "👁 N": canales ocultos (solo se ve si hay alguno)
+    @Volatile private var hidden: Set<String> = emptySet()   // [OCULTAR-1] enlaces de los canales ocultos
     private val reqPlayer = 4715
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
 
@@ -100,6 +102,7 @@ class M3uActivity : AppCompatActivity() {
         }, true)
         Store.init(this)
         favs = Store.chFavs()
+        hidden = Store.hiddenUrls()   // [OCULTAR-1]
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
         mutedColor = ContextCompat.getColor(this, R.color.vlc_muted)
 
@@ -122,6 +125,9 @@ class M3uActivity : AppCompatActivity() {
         row1.addView(listBtn)
         favBtn = chip("☆ Favs") { toggleFavOnly() }
         row1.addView(favBtn)
+        hiddenBtn = chip("👁") { showHiddenDialog() }   // [OCULTAR-1]
+        row1.addView(hiddenBtn)
+        updateHiddenBtn()
         row1.addView(chip("＋") { addListDialog() })
         row1.addView(chip("🗑") { removeCurrent() })
         root.addView(row1)
@@ -157,6 +163,10 @@ class M3uActivity : AppCompatActivity() {
         channelList.divider = null
         channelList.setOnItemClickListener { _, _, pos, _ ->
             if (pos in shown.indices) openChannel(shown[pos])
+        }
+        channelList.setOnItemLongClickListener { _, _, pos, _ ->   // [OCULTAR-1] mantener pulsado el canal = quitarlo
+            if (pos in shown.indices) confirmHide(shown[pos])
+            true
         }
         root.addView(
             channelList,
@@ -338,8 +348,9 @@ class M3uActivity : AppCompatActivity() {
                     normNames = names
                     applyFilter()
                     if (!favOnly) {
-                        statusView.text = if (n < total) "Descargando $n de $total listas… · ${list.size} canales"
-                            else "${list.size} canales de $total listas (sin repetidos)" +
+                        val vn = visibleCount(list)   // [OCULTAR-1]
+                        statusView.text = if (n < total) "Descargando $n de $total listas… · $vn canales"
+                            else "$vn canales de $total listas (sin repetidos)" +
                                 (if (failed.get() > 0) " · ${failed.get()} sin conexión" else "") +
                                 (if (capped) " · tope de $regionMax" else "")
                     }
@@ -423,6 +434,7 @@ class M3uActivity : AppCompatActivity() {
         val baseNames = if (favOnly) favNorm else normNames
         for (i in base.indices) {
             val c = base[i]
+            if (hidden.isNotEmpty() && hidden.contains(c.url)) continue   // [OCULTAR-1]
             if (!favOnly && g != null && c.group != g) continue
             val n = baseNames[i]
             if (toks.all { n.contains(it) }) out.add(c)
@@ -434,20 +446,21 @@ class M3uActivity : AppCompatActivity() {
             statusView.text = if (favChannels.isEmpty()) "Aún no tienes favoritos: marca ★ en un canal"
                 else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)"
         } else if (channels.isNotEmpty()) {
-            statusView.text = "${shown.size} de ${channels.size} canales" +
+            statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
                 (if (fromCache) " · sin conexión (copia guardada)" else "")
         }
     }
 
     private fun pickGroup() {
-        val counts = channels.groupingBy { it.group }.eachCount()
+        val vis = visible(channels)   // [OCULTAR-1] los ocultos no cuentan
+        val counts = vis.groupingBy { it.group }.eachCount()
         val groups = counts.keys.sorted()
         if (groups.size <= 1) {
             toast("Esta lista no tiene grupos")
             return
         }
         val labels = ArrayList<String>()
-        labels.add("Todos (${channels.size})")
+        labels.add("Todos (${vis.size})")
         for (g in groups) labels.add("$g (${counts[g]})")
         AlertDialog.Builder(this)
             .setTitle("Filtrar por grupo")
@@ -457,6 +470,77 @@ class M3uActivity : AppCompatActivity() {
                 applyFilter()
             }
             .show()
+    }
+
+    // ------------------------------------------------------------ Ocultar canales [OCULTAR-1]
+
+    /** Los canales de [l] que no están ocultos. */
+    private fun visible(l: List<M3uChannel>): List<M3uChannel> {
+        val h = hidden
+        return if (h.isEmpty()) l else l.filter { !h.contains(it.url) }
+    }
+
+    private fun visibleCount(l: List<M3uChannel>): Int {
+        val h = hidden
+        return if (h.isEmpty()) l.size else l.count { !h.contains(it.url) }
+    }
+
+    private fun updateHiddenBtn() {
+        val n = hidden.size
+        hiddenBtn.text = "👁 $n"
+        hiddenBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
+    }
+
+    /** Siempre se pide confirmación antes de quitar un canal. */
+    private fun confirmHide(c: M3uChannel) {
+        val isFav = favs.contains(c.url)
+        AlertDialog.Builder(this)
+            .setTitle("¿Quitar este canal?")
+            .setMessage("«${c.name}» dejará de salir en tus listas, aunque la lista se vuelva a descargar." +
+                (if (isFav) "\n\nTambién se quitará de tus favoritos ★." else "") +
+                "\n\nPodrás devolverlo con el botón 👁.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Quitar") { _, _ -> hideChannel(c) }
+            .show()
+    }
+
+    private fun hideChannel(c: M3uChannel) {
+        Store.hideChannel(c)          // también le quita la ★ si la tenía
+        hidden = Store.hiddenUrls()
+        favs = Store.chFavs()
+        if (favOnly) reloadFavChannels()
+        applyFilter()
+        updateHiddenBtn()
+        toast("🗑 Canal quitado (👁 para restaurar)")
+    }
+
+    private fun showHiddenDialog() {
+        val hl = Store.hiddenChannels()
+        if (hl.isEmpty()) {
+            toast("No hay canales ocultos")
+            return
+        }
+        val labels = Array(hl.size) { i -> if (hl[i].group.isBlank()) hl[i].name else "${hl[i].name} · ${hl[i].group}" }
+        val checked = BooleanArray(hl.size)
+        AlertDialog.Builder(this)
+            .setTitle("Canales ocultos (${hl.size})")
+            .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
+            .setPositiveButton("Restaurar") { _, _ ->
+                val urls = ArrayList<String>()
+                for (i in hl.indices) if (checked[i]) urls.add(hl[i].url)
+                if (urls.isEmpty()) toast("Marca los canales que quieres devolver") else restoreChannels(urls)
+            }
+            .setNeutralButton("Todos") { _, _ -> restoreChannels(hl.map { it.url }) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun restoreChannels(urls: List<String>) {
+        Store.unhideChannels(urls)
+        hidden = Store.hiddenUrls()
+        applyFilter()
+        updateHiddenBtn()
+        toast("👁 Canales restaurados: ${urls.size}")
     }
 
     // ------------------------------------------------------------ Canales

@@ -328,6 +328,56 @@ object Store {
         if (changed) writeChFavMeta(meta)
     }
 
+    // ------------------------------------------------- Canales ocultos [OCULTAR-1]
+    // Clave nueva "chhidden" (JSON con enlace, nombre y grupo). Las listas no se modifican: la pantalla de
+    // canales solo deja de mostrar estos enlaces. Vive en castv_lib, así que el respaldo la incluye sola.
+
+    private fun readHidden(): MutableList<M3uChannel> {
+        val out = ArrayList<M3uChannel>()
+        try {
+            val raw = prefs.getString("chhidden", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", "")))
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun writeHidden(l: List<M3uChannel>) {
+        try {
+            val arr = JSONArray()
+            for (c in l) arr.put(JSONObject().put("u", c.url).put("n", c.name).put("g", c.group))
+            prefs.edit().putString("chhidden", arr.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Canales ocultos, en el orden en que se ocultaron. */
+    fun hiddenChannels(): List<M3uChannel> = readHidden()
+
+    /** Solo los enlaces ocultos (para filtrar rápido). */
+    fun hiddenUrls(): Set<String> {
+        val out = HashSet<String>()
+        for (c in readHidden()) out.add(c.url)
+        return out
+    }
+
+    /** Oculta un canal (por enlace de stream). Si era favorito, también se le quita la ★. */
+    fun hideChannel(c: M3uChannel) {
+        val l = readHidden()
+        if (l.none { it.url == c.url }) { l.add(c); writeHidden(l) }
+        if (chFavs().contains(c.url)) toggleChFav(c.url)
+        forgetChFav(c.url)
+    }
+
+    /** Devuelve a la vista los canales con esos enlaces. */
+    fun unhideChannels(urls: Collection<String>) {
+        val set = HashSet<String>(urls)
+        val l = readHidden()
+        if (l.removeAll { set.contains(it.url) }) writeHidden(l)
+    }
+
     // ------------------------------------------------- Listas de reproducción
 
     private fun loadLists() {
