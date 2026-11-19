@@ -284,7 +284,7 @@ class M3uActivity : AppCompatActivity() {
         current = null
         groupFilter = null
         groupBtn.text = "Grupo: Todos ▾"
-        listBtn.text = "🌐 $name · toda ▾"
+        listBtn.text = "🌐 ${name.trimStart { !it.isLetterOrDigit() }} · toda ▾"   // [PULIDO-3a] un solo icono
         channels = emptyList()
         normNames = emptyList()
         shown = emptyList()
@@ -436,7 +436,7 @@ class M3uActivity : AppCompatActivity() {
         for (i in base.indices) {
             val c = base[i]
             if (hidden.isNotEmpty() && hidden.contains(c.url)) continue   // [OCULTAR-1]
-            if (!favOnly && g != null && c.group != g) continue
+            if (!favOnly && g != null && !groupKeys(c).contains(g)) continue   // [GRUPOS-1]
             val n = baseNames[i]
             if (toks.all { n.contains(it) }) out.add(c)
         }
@@ -454,23 +454,46 @@ class M3uActivity : AppCompatActivity() {
 
     private fun pickGroup() {
         val vis = visible(channels)   // [OCULTAR-1] los ocultos no cuentan
-        val counts = vis.groupingBy { it.group }.eachCount()
-        val groups = counts.keys.sorted()
-        if (groups.size <= 1) {
+        // [GRUPOS-1] cada categoría aparece una sola vez (un canal puede estar en varias)
+        val counts = HashMap<String, Int>()
+        for (c in vis) for (k in groupKeys(c)) counts[k] = (counts[k] ?: 0) + 1
+        val keys = counts.keys.sortedWith(
+            compareByDescending<String> { counts[it] ?: 0 }.thenBy { groupLabel(it) })
+        if (keys.size <= 1) {
             toast("Esta lista no tiene grupos")
             return
         }
         val labels = ArrayList<String>()
         labels.add("Todos (${vis.size})")
-        for (g in groups) labels.add("$g (${counts[g]})")
+        for (k in keys) labels.add("${groupLabel(k)} (${counts[k]})")
         AlertDialog.Builder(this)
             .setTitle("Filtrar por grupo")
             .setItems(labels.toTypedArray()) { _, which ->
-                groupFilter = if (which == 0) null else groups[which - 1]
-                groupBtn.text = "Grupo: " + (groupFilter ?: "Todos") + " ▾"
+                groupFilter = if (which == 0) null else keys[which - 1]
+                groupBtn.text = "Grupo: " + (groupFilter?.let { groupLabel(it) } ?: "Todos") + " ▾"
                 applyFilter()
             }
             .show()
+    }
+
+    /** [GRUPOS-1] Las categorías sueltas de un canal ("Movies;Music" → Movies, Music); sin grupo → "". */
+    private fun groupKeys(c: M3uChannel): List<String> {
+        val l = c.group.split(';').map { it.trim() }.filter { it.isNotEmpty() }
+        return if (l.isEmpty()) listOf("") else l
+    }
+
+    /** [GRUPOS-1] / [PULIDO-3b] Nombre de la categoría en español para mostrar. */
+    private fun groupLabel(k: String): String =
+        if (k.isEmpty()) "Sin grupo" else (GROUP_ES[k.lowercase()] ?: k)
+
+    /** [PULIDO-3c] Separa del nombre las etiquetas "[Geo-blocked]", "[Not 24/7]" y "(720p)". */
+    private fun splitName(name: String): Pair<String, String> {
+        val tags = ArrayList<String>()
+        val clean = TAG_RE.replace(name) { m ->
+            tags.add((m.groups[1]?.value ?: m.groups[2]?.value ?: "").trim())
+            ""
+        }.trim()
+        return Pair(if (clean.isEmpty()) name else clean, tags.filter { it.isNotEmpty() }.joinToString(" · "))
     }
 
     // ------------------------------------------------------------ Ocultar canales [OCULTAR-1]
@@ -709,11 +732,36 @@ class M3uActivity : AppCompatActivity() {
             star.text = if (on) "★" else "☆"
             star.setTextColor(if (on) accent() else mutedColor)
             star.setOnClickListener { toggleFav(c) }
-            logo.visibility = if (c.logo.isEmpty()) View.INVISIBLE else View.VISIBLE
+            logo.visibility = View.VISIBLE
             Logos.load(logo, c.logo)
-            (box.getChildAt(0) as TextView).text = c.name
-            (box.getChildAt(1) as TextView).text = c.group
+            if (c.logo.isEmpty()) {   // [PULIDO-3d] sin logo: icono genérico de TV en gris
+                logo.setImageResource(R.drawable.ic_tv)
+                logo.setColorFilter(mutedColor)
+            } else {
+                logo.clearColorFilter()
+            }
+            // [PULIDO-3b/3c] nombre limpio; categorías en español y etiquetas en la línea gris
+            val (shownName, badges) = splitName(c.name)
+            val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
+            (box.getChildAt(0) as TextView).text = shownName
+            (box.getChildAt(1) as TextView).text =
+                listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
             return v
         }
     }
 }
+
+// [PULIDO-3b] Categorías de iptv-org en español (clave en minúsculas); las que no estén salen tal cual.
+private val GROUP_ES = mapOf(
+    "animation" to "Animación", "auto" to "Autos", "business" to "Negocios", "classic" to "Clásicos",
+    "comedy" to "Comedia", "cooking" to "Cocina", "culture" to "Cultura", "documentary" to "Documentales",
+    "education" to "Educación", "entertainment" to "Entretenimiento", "family" to "Familia",
+    "general" to "General", "kids" to "Infantil", "legislative" to "Legislativo",
+    "lifestyle" to "Estilo de vida", "movies" to "Películas", "music" to "Música", "news" to "Noticias",
+    "outdoor" to "Aire libre", "relax" to "Relax", "religious" to "Religión", "science" to "Ciencia",
+    "series" to "Series", "shop" to "Compras", "sports" to "Deportes", "travel" to "Viajes",
+    "weather" to "Clima", "undefined" to "Sin grupo"
+)
+
+// [PULIDO-3c] "[algo]" (cualquiera) o "(720p)" / "(1080i)" al nombre del canal.
+private val TAG_RE = Regex("""\s*(?:\[([^\]]+)]|\((\d{3,4}[pi])\))""")
