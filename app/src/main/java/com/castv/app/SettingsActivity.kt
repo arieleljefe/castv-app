@@ -85,6 +85,7 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applyThemeMode(savedTheme())
         super.onCreate(savedInstanceState)
+        Store.init(this)   // [AJUSTES-2b] por si Android recrea Ajustes sin pasar por MainActivity
         theme.applyStyle(when (savedAccent()) {
             1 -> R.style.AccentOverlayGreen
             2 -> R.style.AccentOverlayOrange
@@ -190,6 +191,26 @@ class SettingsActivity : AppCompatActivity() {
             { pickSub("Fondo", subBgNames, stBg(), "style_bg") }))
         l.add(Entry("Subtítulos", "Restablecer estilo",
             "Tamaño mediano, texto blanco, fondo semitransparente", { resetSubStyle() }))
+
+        // [AJUSTES-2b] Emisión al TV (solo informativo)
+        val tvIp = TvController.tvIp
+        l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
+        l.add(Entry("Emisión al TV", "IP del teléfono", CastvNet.localIpAddress(tvIp) ?: "Sin conexión Wi-Fi", null))
+
+        // [AJUSTES-2b] Historial
+        val recentLinks = Store.links().count { !it.fav }
+        val onLinks: (() -> Unit)? = if (recentLinks == 0) null else ({ confirmClearLinks(recentLinks) })
+        l.add(Entry("Historial", "Historial de enlaces",
+            if (recentLinks == 0) "Vacío (los favoritos se conservan)"
+            else "$recentLinks recientes (los favoritos se conservan)", onLinks))
+        val resumes = Store.resumeCount()
+        val onResume: (() -> Unit)? = if (resumes == 0) null else ({ confirmClearResume(resumes) })
+        l.add(Entry("Historial", "Continuar donde lo dejé",
+            if (resumes == 0) "Sin puntos guardados" else "$resumes puntos guardados en videos y canciones", onResume))
+        val hidden = Store.hiddenChannels().size
+        val onHidden: (() -> Unit)? = if (hidden == 0) null else ({ confirmUnhideAll(hidden) })
+        l.add(Entry("Historial", "Canales ocultos",
+            if (hidden == 0) "Ninguno" else "$hidden ocultos (tocar para mostrarlos todos)", onHidden))
 
         if (Build.VERSION.SDK_INT >= 30) {
             l.add(Entry("Almacenamiento", "Borrado",
@@ -344,6 +365,47 @@ class SettingsActivity : AppCompatActivity() {
             .remove("style_color").remove("style_bg").apply()
         toast("↩ Estilo de subtítulos restablecido")
         render()
+    }
+
+    // ------------------------------------------------- [AJUSTES-2b] Historial
+
+    private fun confirmClearLinks(n: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("Borrar historial de enlaces")
+            .setMessage("Se borrarán $n enlaces recientes. Los favoritos se conservan.")
+            .setPositiveButton("Borrar") { _, _ ->
+                Store.clearRecentLinks()
+                toast("🕘 Historial de enlaces borrado")
+                render()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmClearResume(n: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("Borrar puntos de reanudación")
+            .setMessage("Se olvidará dónde lo dejaste en $n videos y canciones; volverán a empezar desde el principio.")
+            .setPositiveButton("Borrar") { _, _ ->
+                Store.clearAllResume()
+                toast("⏱ Puntos de reanudación borrados")
+                render()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmUnhideAll(n: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("Mostrar canales ocultos")
+            .setMessage("Volverán a verse los $n canales que ocultaste.")
+            .setPositiveButton("Mostrar") { _, _ ->
+                Store.unhideChannels(Store.hiddenUrls())
+                toast("👁 Canales ocultos devueltos a la vista")
+                render()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */

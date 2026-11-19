@@ -70,6 +70,14 @@ object Store {
         if (resumePrefs.contains(k)) resumePrefs.edit().remove(k).apply()
     }
 
+    /** [AJUSTES-2b] Cuántos puntos guardados hay en "Continuar donde lo dejé". */
+    fun resumeCount(): Int = resumePrefs.all.size
+
+    /** [AJUSTES-2b] Borra todos los puntos guardados de "Continuar donde lo dejé". */
+    fun clearAllResume() {
+        resumePrefs.edit().clear().apply()
+    }
+
     /** Borra todo rastro de un archivo eliminado: favoritos, listas, punto guardado y estadísticas. */
     fun forget(item: MediaItem) {
         val k = key(item)
