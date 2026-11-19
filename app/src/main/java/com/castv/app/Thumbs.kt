@@ -10,6 +10,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.util.LruCache
 import android.util.Size
+import androidx.annotation.RequiresApi
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -24,6 +25,36 @@ object Thumbs {
     private val failed = ConcurrentHashMap.newKeySet<String>()
     private val pool = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
+
+    // [UI-3a] carátula grande (720×540) para el mini reproductor expandido; caché aparte de las miniaturas
+    private val bigCache = object : LruCache<String, Bitmap>(6 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+    }
+    private val failedBig = ConcurrentHashMap.newKeySet<String>()
+
+    fun cachedBig(item: MediaItem): Bitmap? = bigCache.get(key(item))
+
+    /** Devuelve null si no hay imagen grande (Android 9 o anterior, o sin carátula). */
+    fun loadBig(context: Context, item: MediaItem, onDone: (Bitmap?) -> Unit) {
+        val k = key(item)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || failedBig.contains(k)) {
+            onDone(null)
+            return
+        }
+        val app = context.applicationContext
+        pool.execute {
+            val bmp = try { fetchBig(app, item) } catch (e: Throwable) { null }
+            if (bmp != null) bigCache.put(k, bmp) else failedBig.add(k)
+            main.post { onDone(bmp) }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun fetchBig(ctx: Context, item: MediaItem): Bitmap {
+        val base = if (item.isMusic) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                   else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        return ctx.contentResolver.loadThumbnail(ContentUris.withAppendedId(base, item.id), Size(720, 540), null)
+    }
 
     fun key(item: MediaItem) = (if (item.isMusic) "a" else "v") + item.id
 

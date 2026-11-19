@@ -91,6 +91,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nowThumbBox: FrameLayout
     private lateinit var nowIcon: ImageView
     private lateinit var nowThumb: ImageView
+    private lateinit var nowBigArt: ImageView   // [UI-3a]
     private lateinit var tvFilter: TextView
     private lateinit var tvEmpty: TextView
     private lateinit var btnPlay: ImageButton
@@ -173,6 +174,7 @@ class MainActivity : AppCompatActivity() {
                     linkIsLive = intent?.getBooleanExtra("live", false) ?: false
                     resetProgress()
                     tvNowPlaying.text = t
+                    nowBigArt.tag = null; nowBigArt.visibility = View.GONE   // [UI-3a] un canal no tiene carátula
                     lastNotifKey = ""
                     refreshNotification()
                 }
@@ -353,6 +355,7 @@ class MainActivity : AppCompatActivity() {
         nowThumbBox = findViewById(R.id.nowThumbBox)
         nowIcon = findViewById(R.id.nowIcon)
         nowThumb = findViewById(R.id.nowThumb)
+        nowBigArt = findViewById(R.id.nowBigArt)   // [UI-3a]
         btnSearch = findViewById(R.id.btnSearch)
         btnMenu = findViewById(R.id.btnMenu)
         searchBar = findViewById(R.id.searchBar)
@@ -1391,6 +1394,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (ok) {
                     tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
+                    nowBigArt.tag = null; nowBigArt.visibility = View.GONE   // [UI-3a]
                     linkTitleNow = title; linkIsLive = live; lastNotifKey = ""   // [NOW-1] la notificación también lo muestra
                 }
                 setStatus(
@@ -2019,7 +2023,32 @@ class MainActivity : AppCompatActivity() {
         nowThumbBox.visibility = View.VISIBLE
         nowIcon.setImageResource(if (item.isMusic) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
         bindThumb(item, nowThumb)
+        bindBigArt(item)   // [UI-3a]
         updateNowFav()
+    }
+
+    /** [UI-3a] Carátula grande del panel expandido: la nítida si ya está, o la miniatura mientras llega. */
+    private fun bindBigArt(item: MediaItem) {
+        val tkey = Thumbs.key(item)
+        nowBigArt.tag = tkey
+        val big = Thumbs.cachedBig(item)
+        val first = big ?: Thumbs.cached(item)
+        if (first != null) {
+            nowBigArt.setImageBitmap(first)
+            nowBigArt.visibility = View.VISIBLE
+        } else {
+            nowBigArt.setImageDrawable(null)
+            nowBigArt.visibility = View.GONE
+        }
+        if (big != null) return
+        Thumbs.loadBig(this, item) { bmp ->
+            if (nowBigArt.tag != tkey) return@loadBig   // ya cambió la canción o llegó un canal
+            val show = bmp ?: Thumbs.cached(item)
+            if (show != null) {
+                nowBigArt.setImageBitmap(show)
+                nowBigArt.visibility = View.VISIBLE
+            }
+        }
     }
 
     private fun updateNowFav() {

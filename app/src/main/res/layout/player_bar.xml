@@ -108,6 +108,18 @@
         android:orientation="vertical"
         android:visibility="gone">
 
+    <!-- [UI-3a] carátula grande (solo se ve al expandir y si hay imagen) -->
+    <ImageView
+        android:id="@+id/nowBigArt"
+        android:layout_width="match_parent"
+        android:layout_height="190dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_thumb"
+        android:clipToOutline="true"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
