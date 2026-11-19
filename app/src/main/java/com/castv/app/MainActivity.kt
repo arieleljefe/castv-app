@@ -1343,9 +1343,10 @@ class MainActivity : AppCompatActivity() {
         return try {
             val cm = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
             val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-            caps != null &&
-                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
-                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+            caps != null &&   // [RED-1b] también datos móviles con VPN encima
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) &&
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) &&
+                (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) || cm.isActiveNetworkMetered)
         } catch (e: Exception) { false }
     }
 

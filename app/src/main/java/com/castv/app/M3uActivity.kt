@@ -584,7 +584,29 @@ class M3uActivity : AppCompatActivity() {
         if (toTv) sendToTv(c.url, c.name) else playOnPhone(c.url, c.name)
     }
 
-    private fun playOnPhone(url: String, title: String) {
+    /** [RED-1b] true si la conexión activa es de datos móviles (no Wi-Fi ni cable); también con VPN sobre datos. */
+    private fun onMobileData(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 23) return false
+        return try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+            !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) &&
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) &&
+                (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) || cm.isActiveNetworkMetered)
+        } catch (e: Exception) { false }
+    }
+
+    private fun playOnPhone(url: String, title: String, skipWarn: Boolean = false) {
+        // [RED-1b] con datos móviles se pregunta antes de gastar datos (Ajustes › Red)
+        if (!skipWarn && getSharedPreferences("castv", MODE_PRIVATE).getBoolean("warn_mobile", true) && onMobileData()) {
+            AlertDialog.Builder(this)
+                .setTitle("📶 Estás usando datos móviles")
+                .setMessage("Ver «$title» en el móvil gastará datos de tu plan. ¿Seguir?")
+                .setPositiveButton("Reproducir") { _, _ -> playOnPhone(url, title, true) }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            return
+        }
         val i = Intent(this, VideoPlayerActivity::class.java)
             .putExtra("url", url).putExtra("urlTitle", title)
         @Suppress("DEPRECATION")
