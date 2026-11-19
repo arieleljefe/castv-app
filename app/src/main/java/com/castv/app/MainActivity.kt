@@ -1083,17 +1083,61 @@ class MainActivity : AppCompatActivity() {
                 setPadding(dp(20), dp(14), dp(20), dp(4))
             })
             for (id in shown) {
-                root.addView(TextView(this).apply {
-                    text = titles[id]
-                    textSize = 16f
-                    setTextColor(col(R.color.vlc_text))
-                    setPadding(dp(20), dp(13), dp(20), dp(13))
+                // [MAS-1] Fila con icono propio, título y estado en texto gris pequeño debajo.
+                val full = (titles[id] ?: "").removePrefix("📁 ")
+                val cut = full.indexOf(": ")
+                val label = if (cut > 0) full.substring(0, cut) else full
+                val state = if (cut > 0) full.substring(cut + 2) else ""
+                val iconRes = when (id) {
+                    1 -> R.drawable.ic_mas_sort
+                    2 -> R.drawable.ic_mas_copy
+                    3 -> if (outPhone) R.drawable.ic_phone else R.drawable.ic_tv
+                    4 -> R.drawable.ic_mas_list
+                    5 -> R.drawable.ic_mas_person
+                    6 -> R.drawable.ic_mas_album
+                    7 -> R.drawable.ic_mas_timer
+                    8 -> R.drawable.ic_mas_speed
+                    9 -> R.drawable.ic_mas_eq
+                    10 -> R.drawable.ic_tv
+                    15 -> R.drawable.ic_mas_link
+                    18 -> R.drawable.ic_mas_folder
+                    else -> R.drawable.ic_nav_more
+                }
+                val row = android.widget.LinearLayout(this).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    minimumHeight = dp(56)
+                    setPadding(dp(20), dp(8), dp(20), dp(8))
                     setBackgroundResource(sel.resourceId)
                     setOnClickListener {
                         sheet.dismiss()
                         runMenuAction(id)
                     }
+                }
+                row.addView(android.widget.ImageView(this).apply {
+                    setImageResource(iconRes)
+                    setColorFilter(col(R.color.vlc_muted))
+                    layoutParams = android.widget.LinearLayout.LayoutParams(dp(24), dp(24))
                 })
+                val texts = android.widget.LinearLayout(this).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(18) }
+                }
+                texts.addView(TextView(this).apply {
+                    text = label
+                    textSize = 16f
+                    setTextColor(col(R.color.vlc_text))
+                })
+                if (state.isNotEmpty()) {
+                    texts.addView(TextView(this).apply {
+                        text = state
+                        textSize = 12f
+                        setTextColor(col(R.color.vlc_muted))
+                    })
+                }
+                row.addView(texts)
+                root.addView(row)
             }
         }
 
