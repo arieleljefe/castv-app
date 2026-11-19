@@ -242,6 +242,12 @@ class SettingsActivity : AppCompatActivity() {
             if (pinSet()) "Activado: se pide para abrir Ajustes (toca para cambiarlo o quitarlo)"
             else "Sin PIN (toca para crear uno de 4 a 6 números)",
             { onPinRow() }))
+        if (pinSet()) {   // [PARENTAL-2] qué protege el PIN además de Ajustes
+            l.add(Entry("Control parental", "Pedir PIN para borrar archivos",
+                if (pinFlag("pin_delete", true)) "Sí" else "No", { togglePinFlag("pin_delete", true) }))
+            l.add(Entry("Control parental", "Pedir PIN para abrir Canales",
+                if (pinFlag("pin_channels", false)) "Sí" else "No", { togglePinFlag("pin_channels", false) }))
+        }
 
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
@@ -639,6 +645,17 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------- [PARENTAL-2] Qué protege el PIN
+
+    private fun pinFlag(key: String, def: Boolean): Boolean = prefs().getBoolean(key, def)
+
+    private fun togglePinFlag(key: String, def: Boolean) {
+        val now = !pinFlag(key, def)
+        prefs().edit().putBoolean(key, now).apply()
+        toast(if (now) "🔒 Se pedirá el PIN" else "🔓 Ya no se pedirá el PIN aquí")
+        render()
     }
 
     // ------------------------------------------------- [GESTO-1] Vídeo

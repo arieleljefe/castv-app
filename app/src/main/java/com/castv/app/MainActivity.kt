@@ -978,7 +978,14 @@ class MainActivity : AppCompatActivity() {
             13 -> pickAccent()
             14 -> toggleTrash()
             15 -> askLinkAndPlay()
-            16 -> startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u)
+            16 -> {
+                val open = { startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u) }
+                if (ParentalPin.guardsChannels(this)) {   // [PARENTAL-2]
+                    ParentalPin.ask(this, "PIN para abrir Canales") { open() }
+                } else {
+                    open()
+                }
+            }
             17 -> showBackupMenu()
             18 -> pickFolder()   // [UI-5]
         }
@@ -2548,8 +2555,12 @@ class MainActivity : AppCompatActivity() {
               else "⚠️ Lo borrado se eliminará para siempre")
     }
 
-    private fun confirmDelete(items: List<MediaItem>) {
+    private fun confirmDelete(items: List<MediaItem>, pinOk: Boolean = false) {
         if (items.isEmpty()) return
+        if (!pinOk && ParentalPin.guardsDelete(this)) {   // [PARENTAL-2]
+            ParentalPin.ask(this, "PIN para borrar") { confirmDelete(items, pinOk = true) }
+            return
+        }
         val trash = useTrash()
         val what = if (items.size == 1) "«${prettyTitle(items[0])}»" else "${items.size} archivos"
         val msg = if (trash) "$what irá a la papelera de Android. Se puede recuperar desde Galería o Mis archivos durante unos 30 días."
