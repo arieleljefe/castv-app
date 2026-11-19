@@ -21,6 +21,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'   # [CACHE-1] guarda las dependencias entre builds (evita el error 429)
 
       - name: Configurar Android SDK y Licencias
         run: |
