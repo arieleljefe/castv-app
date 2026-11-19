@@ -2119,9 +2119,11 @@ class MainActivity : AppCompatActivity() {
                 menu.add(0, 1, 0, "Todo").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 menu.add(0, 2, 1, "🗑 Borrar").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 // [SEL-1] acciones en bloque (van al menú ⋮ de la barra)
+                menu.add(0, 6, 2, "▶ Reproducir selección").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
                 menu.add(0, 3, 2, "➕ Añadir a la cola").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 menu.add(0, 4, 3, "★ Añadir a favoritos").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 menu.add(0, 5, 4, "📃 Añadir a lista…").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                menu.add(0, 7, 5, "📤 Compartir").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
                 mode.title = "1 seleccionado"
                 return true
             }
@@ -2146,6 +2148,8 @@ class MainActivity : AppCompatActivity() {
                     3 -> bulkToQueue()   // [SEL-1]
                     4 -> bulkFav()       // [SEL-1]
                     5 -> bulkToList()    // [SEL-1]
+                    6 -> bulkPlay()      // [SEL-2]
+                    7 -> bulkShare()     // [SEL-2]
                 }
                 return true
             }
@@ -2226,6 +2230,46 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    /** [SEL-2] Suena la primera ya; las demás van al principio de la cola (suenan en orden aunque la repetición esté apagada). */
+    private fun bulkPlay() {
+        val sel = selectedItems()
+        if (sel.isEmpty()) return
+        val first = sel[0]
+        val rest = sel.drop(1)
+        actionMode?.finish()
+        queue.removeAll { q -> rest.any { it.id == q.id && it.isMusic == q.isMusic } }   // sin repetidos en la cola
+        queue.addAll(0, rest)
+        updateQueueBadge()
+        playlist = ArrayList(currentList)
+        playIndex = currentList.indexOfFirst { it.id == first.id }
+        playingFromQueue = false
+        startPlayback(first)
+        toast("▶ " + countText(sel.size, "elemento", "elementos") + " en reproducción" +
+            (if (rest.isNotEmpty()) " (el resto, en la cola)" else ""))
+    }
+
+    /** [SEL-2] Comparte los archivos seleccionados con otra app (WhatsApp, Drive…), por su enlace de MediaStore. */
+    private fun bulkShare() {
+        val sel = selectedItems()
+        if (sel.isEmpty()) return
+        if (sel.size > 50) {
+            toast("Se pueden compartir hasta 50 a la vez")
+            return
+        }
+        val uris = ArrayList<Uri>()
+        for (m in sel) uris.add(uriOf(m))
+        val type = if (sel.all { it.isMusic }) "audio/*" else if (sel.none { it.isMusic }) "video/*" else "*/*"
+        val i = if (uris.size == 1) Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uris[0])
+                else Intent(Intent.ACTION_SEND_MULTIPLE).setType(type).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            startActivity(Intent.createChooser(i, "Compartir " + countText(sel.size, "archivo", "archivos")))
+            actionMode?.finish()
+        } catch (e: Exception) {
+            toast("No se pudo compartir: ${e.message}")
+        }
     }
 
     private fun uriOf(item: MediaItem): Uri {
