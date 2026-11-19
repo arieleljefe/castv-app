@@ -92,6 +92,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nowIcon: ImageView
     private lateinit var nowThumb: ImageView
     private lateinit var nowBigArt: ImageView   // [UI-3a]
+    private var fullDialog: android.app.Dialog? = null   // [UI-3b] pantalla completa "Reproduciendo"
+    private val fullHandler = android.os.Handler(android.os.Looper.getMainLooper())   // [UI-3b]
     private lateinit var tvFilter: TextView
     private lateinit var tvEmpty: TextView
     private lateinit var btnPlay: ImageButton
@@ -426,6 +428,8 @@ class MainActivity : AppCompatActivity() {
         tvNowPlaying.setOnClickListener(toggleExpand)
         nowThumbBox.setOnClickListener(toggleExpand)
         setPlayerExpanded(false)
+        nowBigArt.setOnClickListener { showFullPlayer() }   // [UI-3b] tocar la carátula grande
+        btnExpand.setOnLongClickListener { showFullPlayer(); true }   // [UI-3b] o mantener la flecha ˄
 
         etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -545,6 +549,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        fullDialog?.dismiss()   // [UI-3b]
         monitoring = false
         stopLocal()
         if (notifReceiverRegistered) {
@@ -2049,6 +2054,197 @@ class MainActivity : AppCompatActivity() {
                 nowBigArt.visibility = View.VISIBLE
             }
         }
+    }
+
+    /**
+     * [UI-3b] Pantalla completa "Reproduciendo": una ventana propia que refleja el panel del mini reproductor
+     * (título, carátula, progreso, ▶/⏸, ★, repetir) y manda sus toques a los mismos botones, así que la
+     * reproducción no cambia. Se cierra con ⌄ o con "atrás".
+     */
+    private fun showFullPlayer() {
+        if (playingItem == null && !linkOnTv) { toast("No hay nada reproduciéndose"); return }
+        fullDialog?.dismiss()
+        fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+        val bgTv = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.colorBackground, bgTv, true)
+        val ripple = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true)
+        val lin = android.widget.LinearLayout.LayoutParams.MATCH_PARENT
+        val wrap = android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+
+        val root = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(bgTv.data)
+            setPadding(dp(20), dp(12), dp(20), dp(20))
+        }
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v, ins ->
+            val b = ins.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(dp(20) + b.left, dp(12) + b.top, dp(20) + b.right, dp(20) + b.bottom)
+            ins
+        }
+
+        fun imgBtn(res: Int, desc: String, h: Int, onClick: () -> Unit) = ImageButton(this).apply {
+            setImageResource(res)
+            contentDescription = desc
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundResource(ripple.resourceId)
+            setPadding(dp(11), dp(11), dp(11), dp(11))
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, dp(h), 1f)
+            setOnClickListener { onClick() }
+        }
+        fun txtBtn(t: String, onClick: () -> Unit) = TextView(this).apply {
+            text = t
+            gravity = android.view.Gravity.CENTER
+            textSize = 16f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(col(R.color.vlc_text))
+            setBackgroundResource(ripple.resourceId)
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, dp(48), 1f)
+            setOnClickListener { onClick() }
+        }
+
+        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar)
+
+        // Arriba: ⌄ para cerrar
+        val close = ImageButton(this).apply {
+            setImageResource(R.drawable.ic_expand)
+            rotation = 180f
+            contentDescription = "Cerrar"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundResource(ripple.resourceId)
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            layoutParams = android.widget.LinearLayout.LayoutParams(dp(44), dp(44))
+            setOnClickListener { dlg.dismiss() }
+        }
+        root.addView(close)
+
+        // Carátula grande (ocupa el espacio que sobra)
+        val art = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = null
+            setBackgroundResource(R.drawable.bg_thumb)
+            clipToOutline = true
+            layoutParams = android.widget.LinearLayout.LayoutParams(lin, 0, 1f).apply { setMargins(0, dp(8), 0, dp(16)) }
+        }
+        root.addView(art)
+
+        val title = TextView(this).apply {
+            gravity = android.view.Gravity.CENTER
+            textSize = 20f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(col(R.color.vlc_text))
+        }
+        root.addView(title, android.widget.LinearLayout.LayoutParams(lin, wrap))
+
+        // Progreso
+        val seek = SeekBar(this).apply {
+            max = 100
+            isEnabled = false
+            progressTintList = ColorStateList.valueOf(accentColor())
+            thumbTintList = ColorStateList.valueOf(accentColor())
+            progressBackgroundTintList = ColorStateList.valueOf(0xFF555555.toInt())
+            setPadding(0, 0, 0, 0)
+        }
+        root.addView(seek, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(16) })
+        val times = android.widget.RelativeLayout(this)
+        val el = TextView(this).apply { text = "0:00"; textSize = 12f; setTextColor(col(R.color.vlc_muted)) }
+        val du = TextView(this).apply { text = "--:--"; textSize = 12f; setTextColor(col(R.color.vlc_muted)) }
+        times.addView(el, android.widget.RelativeLayout.LayoutParams(wrap, wrap).apply { addRule(android.widget.RelativeLayout.ALIGN_PARENT_START) })
+        times.addView(du, android.widget.RelativeLayout.LayoutParams(wrap, wrap).apply { addRule(android.widget.RelativeLayout.ALIGN_PARENT_END) })
+        root.addView(times, android.widget.LinearLayout.LayoutParams(lin, wrap))
+
+        var dragging = false
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) el.text = fmt(progress)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) { dragging = true; userSeeking = true }
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                val target = sb.progress
+                dragging = false
+                userSeeking = false
+                if (localActive) withLocal { it.seekTo(target * 1000) }
+                else thread { TvController.seek(target) }
+            }
+        })
+
+        // Fila 1: −10, anterior, ▶/⏸, siguiente, +10
+        val row1 = android.widget.LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        row1.addView(txtBtn("−10") { findViewById<View>(R.id.btnBack10).performClick() })
+        row1.addView(imgBtn(R.drawable.ic_prev, "Anterior", 52) { findViewById<View>(R.id.btnPrev).performClick() })
+        val play = ImageButton(this).apply {
+            setBackgroundResource(R.drawable.ctrl_play)
+            contentDescription = "Reproducir o pausar"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            layoutParams = android.widget.LinearLayout.LayoutParams(dp(68), dp(68))
+            setOnClickListener { btnPlay.performClick() }
+        }
+        row1.addView(play)
+        row1.addView(imgBtn(R.drawable.ic_next, "Siguiente", 52) { findViewById<View>(R.id.btnNext).performClick() })
+        row1.addView(txtBtn("+10") { findViewById<View>(R.id.btnFwd10).performClick() })
+        root.addView(row1, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
+
+        // Fila 2: mezclar, detener, ★, repetir
+        val row2 = android.widget.LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        row2.addView(imgBtn(R.drawable.ic_shuffle, "Mezclar", 48) { findViewById<View>(R.id.btnShuffle).performClick() })
+        row2.addView(imgBtn(R.drawable.ic_stop, "Detener", 48) {
+            findViewById<View>(R.id.btnStop).performClick()
+            dlg.dismiss()
+        })
+        val fav = txtBtn("☆") { btnNowFav.performClick() }.apply { textSize = 24f }
+        row2.addView(fav)
+        val auto = imgBtn(R.drawable.ic_repeat, "Auto-avance", 48) { btnAuto.performClick() }
+        row2.addView(auto)
+        root.addView(row2, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
+
+        // Refleja el panel cada medio segundo mientras la ventana está abierta
+        var shownKey: Any? = null
+        val sync = object : Runnable {
+            override fun run() {
+                if (!dlg.isShowing) return
+                title.text = tvNowPlaying.text
+                val bmp = (nowBigArt.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    ?.takeIf { nowBigArt.visibility == View.VISIBLE }
+                val key: Any = bmp ?: (if (playingItem?.isMusic == true) "m" else "v")
+                if (key != shownKey) {
+                    shownKey = key
+                    if (bmp != null) {
+                        art.clearColorFilter()
+                        art.setPadding(0, 0, 0, 0)
+                        art.setImageBitmap(bmp)
+                    } else {
+                        art.setPadding(dp(64), dp(64), dp(64), dp(64))
+                        art.setColorFilter(col(R.color.vlc_muted))
+                        art.setImageResource(if (playingItem?.isMusic == true) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
+                    }
+                }
+                if (!dragging) {
+                    seek.isEnabled = seekBar.isEnabled
+                    seek.max = seekBar.max
+                    seek.progress = seekBar.progress
+                    el.text = tvElapsed.text
+                    du.text = tvDuration.text
+                }
+                btnPlay.drawable?.constantState?.newDrawable()?.let { play.setImageDrawable(it) }
+                fav.text = btnNowFav.text
+                fav.setTextColor(btnNowFav.currentTextColor)
+                btnAuto.background?.constantState?.newDrawable()?.let { auto.background = it }
+                fullHandler.postDelayed(this, 500)
+            }
+        }
+
+        dlg.setContentView(root)
+        dlg.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        dlg.setOnDismissListener {
+            fullHandler.removeCallbacks(sync)
+            if (fullDialog === dlg) fullDialog = null
+        }
+        fullDialog = dlg
+        dlg.show()
+        sync.run()
     }
 
     private fun updateNowFav() {
