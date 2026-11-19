@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v119)
+# Registro de cambios y guía de continuidad – CASTV (v125)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -38,8 +38,12 @@
 
 ---
 
-## 📍 Estado Actual (v119)
+## 📍 Estado Actual (v125)
 
+- 🧪 **REGIONES-1b (🌐 Toda la región, 18 nov 2026): plan exacto escrito en v125; falta el "Dale" de Ariel; aún no hay parche.** Ver "Parche en Curso" (fase v120, punto 4).
+- ✅ **FAV-1 ⭐ Favoritos global (18 nov 2026):** parche `fav1.patch` (`Store.kt`, `M3uActivity.kt`), aplicado, compiló y **Ariel confirmó: "Todo va bien de bien ✅"**. Con ☆ Favs se ven los favoritos de todas las listas y siguen al cambiar de categoría; los favoritos viejos reciben su nombre al abrir su lista. **Sin anotar:** si el respaldo (`Backup.kt`) incluye los favoritos de canales (BACKUP-FAV, pedir `Backup.kt` solo si Ariel lo quiere).
+- ✅ **ACENTO-1 y CATALOGO-2 (18 nov 2026):** parches `acento1.patch` (`M3uActivity.kt`) y `catalogo2.patch` (`Catalog.kt`, `VERSION` 2, 14 países nuevos), aplicados, compilaron y **Ariel confirmó: "Todo bien de bien ✅ probé todo y va excelente"**. La ★ de Canales sigue el color de Ajustes y las regiones Norteamérica, Europa, Asia y África y Oceanía ya tienen listas. **Sin anotar:** cuántas listas añadió el aviso exacto; pedir solo si Ariel lo ve raro.
+- 🧪 **FASE v120 (18 nov 2026): ACENTO-1, CATALOGO-2, FAV-1 (⭐ Favoritos global) y REGIONES-1b**, pedidos de Ariel; plan en "Parche en Curso", un parche a la vez (orden propuesto en ese orden). Sin código todavía; faltan los archivos reales (línea en la fase).
 - ⬜ **Ideas de Ariel (18 nov 2026, con capturas de VLC; solo plan):** **AJUSTES-2** (Ajustes por secciones con submenús y buscador) y **ACERCA-1** (pantalla Acerca de propia). Detalle en "Visión de interfaz". Solo como inspiración (regla 7): nada de VLC se copia.
 - ✅ **UI-5 Canales en la barra inferior y Carpetas en Más (18 nov 2026):** parche `ui5_canales.patch` (`MainActivity.kt`, `activity_main.xml`, `ic_nav_channels.xml` nuevo), aplicado, compiló y **Ariel confirmó: "✅ todo va bien de bien"**. La pestaña se llama **Canales** (abre Listas M3U) y Más trae "📁 Carpetas…" donde estaba Listas M3U.
 - ✅ **CATALOGO-1 Canales preinstalados de iptv-org (18 nov 2026):** parche `catalogo_listas.patch` (`Catalog.kt` nuevo, `Store.kt`, `M3uActivity.kt`), aplicado, compiló y **Ariel confirmó: "Ya está ✅… acabo de probar todo y todo está muy bien y organizado"** (18 nov 2026). Quedan 30 listas nuevas (20 países de Latinoamérica, EE.UU., España y 8 categorías) además de Free-TV. **Sin anotar (pedir solo si Ariel lo ve raro):** cuántos repetidos quitó el `/log`. Detalle en "Parche en Curso".
@@ -133,6 +137,66 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 ---
 
 ## 🛠️ Parche en Curso / Próximo Paso
+
+### 🧪 FASE v120 — Cuatro pedidos de Ariel (18 nov 2026), UN parche a la vez (regla 4). Orden propuesto: ACENTO-1 → CATALOGO-2 → FAV-1 → REGIONES-1b. Solo plan; sin código hasta el "Dale" de cada uno
+
+- **Pedido de Ariel (textual en esencia):** "vamos por CATALOGO-2, ACENTO-1 y REGIONES-1b", y además: **si marco un canal como favorito, que me aparezca en ⭐ Favoritos desde cualquier categoría o lista que abra**; es decir, que al cambiar entre categorías los favoritos se sigan viendo.
+- **Por qué ese orden:** ACENTO-1 es el más chico (1 archivo); CATALOGO-2 es aditivo (1 archivo) y deja más datos para probar; FAV-1 es lo que más usarás a diario; REGIONES-1b es el más pesado (descarga y une varias listas) y se beneficia de tener ya el catálogo ampliado y los favoritos globales.
+
+#### 1) ACENTO-1 — `M3uActivity` aplica el color de acento (✅ confirmado por Ariel el 18 nov 2026, "va excelente"; parche `acento1.patch`)
+- **Verificado en `MainActivity_actual.kt`:** el color se guarda en `getSharedPreferences("castv").getInt("accent", 0)` (0 Cian, 1 Verde, 2 Naranja, 3 Morado) y `MainActivity` lo aplica con `theme.applyStyle(R.style.AccentOverlay…)` antes de armar la pantalla (líneas ~302-308).
+- **Cambio previsto (1 archivo, `M3uActivity.kt`, ~8 líneas):** al inicio de `onCreate`, el mismo `theme.applyStyle(when (accent) {1 -> Green; 2 -> Orange; 3 -> Purple; else -> Cyan})`. Así la ★ y los acentos de Canales siguen el color elegido en Ajustes. Sin tocar `MainActivity.kt`, estilos ni layouts (los 4 `AccentOverlay*` ya existen).
+- **PLAN EXACTO (v121, verificado con `M3uActivity_actual.kt` real, 472 líneas):** `M3uActivity.accent()` (línea 65) **ya lee** `R.attr.castvAccent` del tema, y solo se usa en la ★ (línea 465). Pero la pantalla nunca aplica el estilo del color elegido, por eso sale siempre el cian por defecto. **Un solo cambio, en `M3uActivity.kt`, justo después de `super.onCreate(savedInstanceState)` (línea 89), +6 líneas:** `theme.applyStyle(when (getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)) { 1 -> R.style.AccentOverlayGreen; 2 -> R.style.AccentOverlayOrange; 3 -> R.style.AccentOverlayPurple; else -> R.style.AccentOverlayCyan }, true)` (igual que `MainActivity` líneas 302-307, en varias líneas). No se toca nada más. Sin imports nuevos (`R` y `MODE_PRIVATE` ya se usan). El cambio de Color solo se hace en Ajustes, así que al volver a abrir Canales ya sale con el color nuevo.
+- **Aplicar (una línea, cuando exista el `.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/acento1.patch && git status --short && git add -A && git commit -m "ACENTO-1 M3uActivity aplica el color de acento" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert` de ese commit.
+- **Cómo probar:** cambiar Color en Ajustes a Verde/Naranja/Morado → Canales: la ★ y los realces cambian; volver a Cian.
+
+#### 2) CATALOGO-2 — Más países y regiones (✅ confirmado por Ariel el 18 nov 2026, "va excelente"; parche `catalogo2.patch`)
+- **Qué:** sumar listas de iptv-org del Anexo para que aparezcan 🌏 Asia y Medio Oriente y 🌍 África y Oceanía (hoy vacías), más Canadá y Reino Unido para 🇺🇸/🇪🇺. Propuesta inicial (a confirmar con Ariel): 🇨🇦 Canadá · 🇬🇧 Reino Unido · 🇦🇺 Australia · 🇫🇷 Francia · 🇩🇪 Alemania · 🇮🇹 Italia · 🇵🇹 Portugal · 🇯🇵 Japón · 🇰🇷 Corea · 🇮🇳 India · 🇦🇪 Emiratos · 🇿🇦 Sudáfrica. Los códigos coinciden con los que `Regions.kt` ya reconoce (ca, gb, au, fr, de, it, pt, jp, kr, in, ae, za).
+- **Cómo funciona (por el diseño de CATALOGO-1):** `Catalog.items` suma las entradas nuevas y `Catalog.VERSION` pasa de 1 a **2**; `Store.installCatalog` añade **solo lo nuevo**, no repite lo ya guardado ni vuelve a ofrecer lo que Ariel quitó con 🗑.
+- **Archivos:** `Catalog.kt` (solo suma entradas y sube VERSION). `Regions.kt` solo si algún código no está en su tabla.
+- **PLAN EXACTO (v121, verificado con `Catalog_actual.kt` y `Regions_actual.kt` reales):** `Catalog.kt` usa `country("🇩🇴 Nombre", "do")` y `category(...)`; `Regions.regionOf` ya reconoce **todos** esos códigos (ca, gb, fr, de, it, pt, ru, jp, kr, cn, in, ae, za, au), así que **`Regions.kt` no se toca**. Cambios en `Catalog.kt` (solo ese archivo): (1) `const val VERSION = 1` pasa a `2`; (2) 14 líneas nuevas **antes** de las categorías (para que queden por país): `country("🇨🇦 Canadá", "ca")`, `🇬🇧 Reino Unido "gb"`, `🇫🇷 Francia "fr"`, `🇩🇪 Alemania "de"`, `🇮🇹 Italia "it"`, `🇵🇹 Portugal "pt"`, `🇷🇺 Rusia "ru"`, `🇯🇵 Japón "jp"`, `🇰🇷 Corea del Sur "kr"`, `🇨🇳 China "cn"`, `🇮🇳 India "in"`, `🇦🇪 Emiratos Árabes "ae"`, `🇿🇦 Sudáfrica "za"`, `🇦🇺 Australia "au"`. `Store.installCatalog` (ya existente) añade solo lo que no esté guardado ni se haya ofrecido antes, así que **no repite nada** ni vuelve a poner lo que quitaste con 🗑. Resultado: unas **14 listas nuevas** (≈45 en total) y las regiones Norteamérica (2), Europa (7), Asia (4), África y Oceanía (2). **Ariel puede quitar o sumar países antes del "Dale"** (si quiere, México/otros ya están; se pueden sumar más del Anexo).
+- **Aplicar (una línea, cuando exista el `.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/catalogo2.patch && git status --short && git add -A && git commit -m "CATALOGO-2 más países" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert` de ese commit.
+- **Riesgos:** más filas en "Ver todas" (~43); aviso "📡 Se añadieron N listas" una vez; algunos canales caídos o bloqueados por país.
+- **Cómo probar:** instalar encima: sale el aviso con N nuevas; el selector de regiones muestra Asia y África y Oceanía con sus cantidades; Latinoamérica y tus ★ siguen igual.
+
+#### 3) FAV-1 — ⭐ Favoritos que se ven desde cualquier lista o categoría (✅ confirmado por Ariel el 18 nov 2026, "Todo va bien de bien"; parche `fav1.patch`)
+- **Cómo entiendo el pedido (confirmar con "Dale"):** hoy los favoritos de canales se guardan solo como **enlaces** (`chfav`, sin nombre) y se ven dentro de la lista que está abierta. Ariel quiere que, estés en la categoría o país que estés, exista un **⭐ Favoritos global** con todos los canales marcados, y que al cambiar de lista **sigan ahí**.
+- **Cambio previsto (aditivo):** (1) al marcar ★ se guarda también el **nombre** del canal (y la lista de origen) además del enlace, en una clave nueva de `Store` (sin tocar `chfav` para que nada se rompa; los favoritos viejos se migran mostrando el enlace hasta que se abra su lista); (2) en el selector de regiones y en `M3uActivity`, una entrada fija **⭐ Favoritos (N)** que muestra **todos** los favoritos sin descargar listas, con 📺 Al TV / 📱 En el móvil como en cualquier lista; (3) el ★ de un canal sigue marcado en cualquier lista donde aparezca (ya se compara por enlace).
+- **PLAN EXACTO (v123; leídos `Store_actual.kt` y `M3uActivity_actual.kt` reales; 2 archivos, todo aditivo):**
+  - **Lo verificado hoy:** (1) los favoritos de canales son solo **enlaces** (`Store.chFavs()`, clave `chfav`, `toggleChFav(url)`; `Store.kt` líneas ~240-262); (2) el chip **☆ Favs** de `M3uActivity` (`favOnly`, `toggleFavOnly()`, `applyFilter()`) filtra **solo la lista abierta**: si abres otra lista o región, los favoritos de la anterior no salen; (3) `M3uChannel(name, url, group)` ya existe en `M3uParser.kt` y sirve tal cual para mostrar un favorito.
+  - **`Store.kt` (+~45 líneas, justo después de `toggleChFav`; `chfav` y todo lo demás NO cambian):** clave nueva `chfavmeta` (JSON con `{u: enlace, n: nombre, g: grupo}` por canal favorito, en el orden en que se marcaron). Funciones nuevas: `chFavChannels(): List<M3uChannel>` (devuelve los favoritos con su nombre; si un favorito viejo aún no tiene nombre, sale como "Canal guardado · <servidor>" hasta que se abra su lista), `rememberChFav(c)` (guarda o actualiza nombre y grupo), `forgetChFav(url)` (lo borra de `chfavmeta`) y `backfillChFavs(list)` (al cargar una lista, completa el nombre de los favoritos que aparezcan en ella, **una sola escritura** y solo si cambió algo).
+  - **`M3uActivity.kt` (+~35 líneas, 4 puntos):**
+    1. Campos nuevos `favChannels` y `favNorm` (la lista global y sus nombres normalizados para el buscador).
+    2. `toggleFavOnly()`: al **activar** ☆→★ Favs recarga `favChannels = Store.chFavChannels()` y `favNorm`; al desactivar vuelve a la lista de siempre.
+    3. `applyFilter()`: si `favOnly`, la base es `favChannels` (**de todas las listas**, sin importar cuál esté abierta ni su grupo), con el mismo buscador; si no, `channels` como hoy. El texto de estado dice "N favoritos" (y, si no hay ninguno, "Aún no tienes favoritos: marca ★ en un canal").
+    4. `toggleFav(c)`: además de `Store.toggleChFav`, llama a `rememberChFav(c)` al marcar o `forgetChFav(c.url)` al quitar, y si `favOnly` está activo recarga `favChannels`. En `loadList` (en el hilo de descarga, antes de `runOnUiThread`) se llama a `Store.backfillChFavs(list)` para que los favoritos antiguos vayan recibiendo su nombre.
+  - **Resultado para Ariel:** estés en Deportes, Argentina o cualquier región, tocas **☆ Favs** y ves **todos** tus favoritos juntos; al cambiar de lista el modo ★ Favs sigue activo y se siguen viendo. ★ se marca y quita desde cualquier lista. 📺 Al TV y 📱 En el móvil funcionan igual desde ahí.
+  - **No se tocan:** `M3uParser.kt`, `Regions.kt`, `Catalog.kt`, `MainActivity.kt`, `MediaServer.kt`, el manifest ni layouts; NOW-1 y LOCAL-1 (siguen usando `sendToTv`). **Respaldo (`Backup.kt`, no visto):** no se modifica; si el respaldo ya incluye los favoritos de canales, estos se restauran y reciben su nombre al abrir las listas; si no los incluía, se anota como mejora aparte (BACKUP-FAV) pasando `Backup.kt`.
+  - **Riesgos:** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba; (2) los favoritos viejos salen como "Canal guardado · servidor" hasta abrir su lista (se completan solos); (3) si un canal del favorito cambió de enlace en la lista, el favorito antiguo queda con el enlace viejo (como hoy); (4) con muchos favoritos la lista es larga (se desplaza bien; el buscador funciona).
+  - **Cómo probar (cuando exista):** (1) en República Dominicana marca ★ en 2 canales y en Deportes otros 2; (2) abre cualquier otra lista o región, toca **☆ Favs**: salen los 4, con su nombre; (3) con ★ Favs activo, abre otra lista desde 📡: siguen los 4; (4) el buscador filtra dentro de los favoritos; (5) quita una ★ desde ahí: desaparece; (6) toca ★ Favs otra vez: vuelve la lista normal; (7) 📺 Al TV desde ★ Favs: la barra y la notificación muestran el canal (NOW-1); (8) cierra y abre la app: los favoritos siguen.
+  - **Aplicar (una línea, cuando exista el `.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/fav1.patch && git status --short && git add -A && git commit -m "FAV-1 favoritos de canales visibles desde cualquier lista" && git push origin main` (deben salir 2 archivos `M`). **Si falla:** `git revert` de ese commit.
+  - **Parche entregado (v124):** `fav1.patch` (2 archivos `M`), exactamente lo del plan. Detalle a tener en cuenta: al abrir otra lista con ★ Favs activo, la pantalla muestra "Descargando lista…" un instante y enseguida vuelven los favoritos (la lista se sigue descargando por debajo). Nada pasa a ✅ sin tu "ya funciona".
+- **Riesgos:** favoritos viejos sin nombre; el respaldo JSON (`Backup.kt`) debería incluir los favoritos nuevos (se revisa antes de entregar); canales caídos siguen apareciendo hasta que Ariel los quite.
+- **Cómo probar:** marcar ★ en un canal de Deportes y otro de Argentina → abrir otra lista o región: ⭐ Favoritos muestra los dos; quitar una ★ desde cualquier sitio la quita de ⭐; reiniciar la app y seguir viéndolos; 📺 Al TV desde ⭐ funciona.
+
+#### 4) REGIONES-1b — Botón "Toda la región" (🧪 plan exacto v125, sin parche; el más pesado)
+- **Qué:** en el selector de región, un botón que **descarga y une todas las listas de esa región sin repetidos** por enlace de stream, mostrando una sola lista con buscador y filtro por grupo.
+- **Riesgos:** varias descargas a la vez (Latinoamérica ~20 listas): se haría en hilos aparte con progreso y tope de memoria; si una falla, se sigue con las demás y se avisa; tarda más la primera vez (luego usa la copia guardada).
+- **PLAN EXACTO (v125; leídos `M3uActivity_actual.kt` y `M3uParser_actual.kt` reales; 1 archivo, todo aditivo):**
+  - **Lo verificado hoy:** `loadList(l)` descarga con `M3uParser.download(url)` (con copia en `cacheDir/m3u_<hash>.txt` si no hay internet), parsea, quita repetidos con `distinctBy { it.url }` y llena `channels`/`normNames`; el resto de la pantalla (buscador, grupo, ★, 📺/📱) trabaja sobre `channels`. `current` es `null` cuando no hay una lista concreta, y `removeCurrent()` ya no hace nada en ese caso (`val cur = current ?: return`), así que 🗑 no puede borrar nada por error. `showListsOf(lists, title, canGoBack)` es el nivel 2 del selector (REGIONES-1a).
+  - **`M3uActivity.kt` (+~75 líneas, 3 puntos):**
+    1. **`showListsOf`** gana un parámetro `regionName: String? = null`. Cuando viene (solo al entrar a una región o categoría desde el nivel 1, **no** en "Ver todas" ni en la lista plana de respaldo), el diálogo suma el botón **🌐 Toda la región** (`setPositiveButton`), que llama a `loadRegion(lists, regionName)`. Los botones "← Regiones" y "Cerrar" quedan igual.
+    2. **`loadRegion(lists, name)` (nueva):** pone `current = null`, `groupFilter = null`, el botón de lista dice `🌐 <región> · toda ▾` y el estado "Descargando 0 de N listas…". Usa `++loadGen` (igual que `loadList`, para cancelar si Ariel elige otra cosa). Descarga con **4 hilos a la vez** (`Executors.newFixedThreadPool(4)`, se apaga al terminar o al cancelar); cada tarea usa la misma descarga + copia guardada de `loadList`, parsea y guarda su resultado **en la posición de su lista** (así el orden final es siempre el mismo). Después de cada lista terminada se une todo **en el orden de las listas, sin repetidos por enlace de stream** (el primero gana), se actualiza `channels`/`normNames`, se llama a `applyFilter()` y el estado dice "Descargando 7 de 20 listas… · 3 412 canales". Al final: "N canales de K listas (sin repetidos)" y, si alguna no se pudo bajar y no tenía copia, "· X sin conexión". Tope de seguridad: **40 000 canales** en total (si se pasa, se deja de añadir y se avisa). Se anota en el `/log`: `M3U región <nombre>: K listas, M canales, R repetidos quitados`. Al terminar se llama a `Store.backfillChFavs(...)` (FAV-1) para completar nombres de favoritos.
+    3. **`import java.util.concurrent.Executors`** (1 línea).
+  - **No se tocan:** `M3uParser.kt`, `Store.kt`, `Regions.kt`, `Catalog.kt`, `MainActivity.kt`, `MediaServer.kt`, el manifest ni layouts. Buscador, filtro por grupo, ★/☆ Favs (FAV-1), 📺 Al TV / 📱 En el móvil y NOW-1 funcionan igual sobre la lista unida.
+  - **Qué no hace (a propósito):** no guarda la lista unida (se arma al momento, y la siguiente vez usa las copias guardadas de cada lista); no cambia la lista "última abierta" (`Store.lastM3u`), así que al abrir la pantalla vuelve a cargar la última lista normal, como hoy.
+  - **Riesgos:** (1) no puedo compilar Kotlin aquí; el build de GitHub Actions es la prueba; (2) Latinoamérica son 20 listas: la primera vez tarda (se ve el avance) y gasta datos; con las copias guardadas es más rápido; (3) memoria: hasta 40 000 canales en pantalla (ya hay tope de 25 MB por lista); (4) algunas listas pueden fallar o estar vacías: se sigue con las demás y se avisa; (5) al unir, un canal repetido entre países queda solo una vez (como se pidió); (6) 🗑 no hace nada mientras se ve una región (se avisa con un mensaje corto).
+  - **Cómo probar (cuando exista):** (1) 📡 → 🌎 Latinoamérica → **🌐 Toda la región**: el estado avanza "Descargando N de 20…" y van saliendo canales; (2) al terminar dice "N canales de 20 listas (sin repetidos)"; (3) el buscador encuentra canales de varios países; (4) Grupo: filtra como siempre; (5) ★ en un canal de la región y ☆ Favs lo muestra (FAV-1); (6) 📺 Al TV de un canal de la región funciona y la barra muestra el nombre; (7) elegir otra lista con 📡 cancela y carga la nueva; (8) repetir con 🎬 Categorías → Toda la región; (9) sin internet: usa las copias guardadas de las listas ya abiertas; (10) abrir `http://192.168.100.43:8001/log` y pasar la línea `M3U región ...`.
+  - **Aplicar (una línea, cuando exista el `.patch`):** `cd ~/castv-nuevo/castv-fresh && git apply ~/storage/downloads/regiones_1b.patch && git status --short && git add -A && git commit -m "REGIONES-1b toda la región sin repetidos" && git push origin main` (debe salir 1 archivo `M`). **Si falla:** `git revert` de ese commit.
+  - **Siguiente:** Ariel responde **"Dale"** (o ajusta algo, por ejemplo el tope de canales) y se entrega `regiones_1b.patch` (🧪).
+
+#### Archivos que se necesitan (una línea, regla 9)
+`cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/M3uActivity.kt ~/storage/downloads/M3uActivity_actual.kt && cp app/src/main/java/com/castv/app/Catalog.kt ~/storage/downloads/Catalog_actual.kt && cp app/src/main/java/com/castv/app/Regions.kt ~/storage/downloads/Regions_actual.kt && cp app/src/main/java/com/castv/app/M3uParser.kt ~/storage/downloads/M3uParser_actual.kt && cp app/src/main/java/com/castv/app/Store.kt ~/storage/downloads/Store_actual.kt && ls -l ~/storage/downloads/*_actual.kt`
 
 ### ✅ CATALOGO-1 — Listas preinstaladas de iptv-org — confirmado por Ariel el 18 nov 2026 ("todo muy bien y organizado")
 
@@ -520,12 +584,14 @@ Prioridad actual: funciones probables en el **móvil** y mejoras de experiencia 
 
 ### ⏭️ Siguiente (por elegir uno; un cambio a la vez)
 
-**Lista ordenada v119 (18 nov 2026), recomendada de arriba abajo (ninguno urgente; REGIONES-1a y UI-5 ya ✅):**
-1. ⬜ **CATALOGO-2:** más países para que aparezcan Asia, África y Oceanía.
-2. ⬜ **ACENTO-1:** color de acento en `M3uActivity` (su ★ sale siempre cian).
-3. ⬜ **ACERCA-1:** pantalla Acerca de propia (pedido de Ariel; plan en "Visión de interfaz").
-4. ⬜ **AJUSTES-2:** Ajustes por secciones, submenús y buscador (pedido de Ariel; por pasos).
-5. ⬜ **REGIONES-1b / 1c / 1d**, CANAL-BG, AVISO-HLS, SEL-2, UI-2/UI-3, Caché de Gradle y Banco de ideas (en ese orden).
+**Lista ordenada v125 (18 nov 2026), recomendada de arriba abajo (ninguno urgente; ACENTO-1, CATALOGO-2 y FAV-1 ya ✅):**
+1. 🧪 **REGIONES-1b:** "🌐 Toda la región" sin repetidos (plan exacto listo; espera el "Dale").
+2. ⬜ **ACERCA-1** y **AJUSTES-2** (ideas con capturas de VLC; ver "Visión de interfaz"; para ACERCA-1 Ariel debe decidir la licencia de CASTV).
+3. ⬜ **BACKUP-FAV** (solo si el respaldo no guarda los favoritos de canales), **REGIONES-1c** (logos), CANAL-BG, AVISO-HLS, SEL-2, UI-2/UI-3, Caché de Gradle y Banco de ideas.
+
+**Lista v123 (superada; historial)**
+
+**Lista v120 (superada; historial)**
 
 **Lista v118 (superada; historial)**
 
@@ -684,6 +750,18 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v125 (18 nov 2026):** Ariel confirmó **FAV-1** ("Todo va bien de bien ✅"): pasa a ✅. Se escribió el **plan exacto de REGIONES-1b** (🧪, sin parche) con lo ya visto en `M3uActivity_actual.kt` y `M3uParser_actual.kt`. Siguiente: Ariel dice **"Dale"** a REGIONES-1b.
+
+- **v124 (18 nov 2026):** Ariel dijo **"Dale"** a FAV-1. Entregado `fav1.patch` (🧪, 2 archivos). Siguiente: aplicar, esperar el build en verde y probar los 8 pasos de FAV-1; si el respaldo (`Backup.kt`) no guardaba los favoritos de canales, se anota como BACKUP-FAV aparte.
+
+- **v123 (18 nov 2026):** Ariel confirmó **ACENTO-1 y CATALOGO-2** ("Todo bien de bien ✅ probé todo y va excelente"): pasan a ✅. Se leyó `Store_actual.kt` y `M3uActivity_actual.kt` y se escribió el **plan exacto de FAV-1** (🧪, sin parche). Siguiente: Ariel dice **"Dale"** a FAV-1.
+
+- **v122 (18 nov 2026):** Ariel dijo **"Por ahora DALE con eso"** (ACENTO-1 y CATALOGO-2). Entregados `acento1.patch` y `catalogo2.patch` (🧪), independientes y comprobados por separado y juntos sobre copias limpias de los archivos reales. **Cómo probar ACENTO-1:** Ajustes → Color Verde/Naranja/Morado → Canales: la ★ de un canal favorito cambia de color; volver a Cian. **Cómo probar CATALOGO-2:** instalar encima: sale "📡 Se añadieron 14 listas de canales"; el selector de regiones muestra Norteamérica (2), Europa (7), Asia (4) y África y Oceanía (2); Latinoamérica y tus ★ siguen igual. Nada pasa a ✅ sin su "ya funciona".
+
+- **v121 (18 nov 2026):** Ariel subió `M3uActivity_actual.kt`, `Catalog_actual.kt`, `Regions_actual.kt`, `M3uParser_actual.kt` y `Store_actual.kt`. Se verificó el código real y se escribieron los **planes exactos** de ACENTO-1 (1 archivo, +6 líneas) y CATALOGO-2 (1 archivo, 14 países, VERSION 2). Sin parche aún. FAV-1 y REGIONES-1b se detallan después, cuando les toque, con `Store.kt` y `M3uParser.kt` ya en esta sesión. Siguiente: Ariel dice **"Dale"** a ACENTO-1 (y confirma o ajusta la lista de países).
+
+- **v120 (18 nov 2026):** Ariel pidió seguir con **CATALOGO-2, ACENTO-1 y REGIONES-1b** y sumó un pedido nuevo: **favoritos de canales visibles desde cualquier categoría** (anotado como **FAV-1**, parte global de REGIONES-1d). Plan escrito en "Parche en Curso"; sin código. Siguiente: Ariel sube los 5 archivos (línea de la fase) y dice **"Dale"** a FAV-1 tal como se entiende, o corrige.
 
 - **v119 (18 nov 2026):** Ariel mandó capturas de **Preferencias** y **Acerca de** de VLC (y repitió la captura del chat anterior, ya anotada) y pidió que se agregue a las futuras actualizaciones "algo igual". Anotado como **AJUSTES-2** y **ACERCA-1** (solo plan, sin código), con la regla 7 por delante: se toma la organización, no el código, textos, icono ni nombre. Pendiente de Ariel: licencia que mostrará CASTV y orden de prioridad.
 
