@@ -192,6 +192,11 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Subtítulos", "Restablecer estilo",
             "Tamaño mediano, texto blanco, fondo semitransparente", { resetSubStyle() }))
 
+        // [RED-1] Red
+        l.add(Entry("Red", "Avisar con datos móviles",
+            if (warnMobile()) "Sí: pregunta antes de reproducir un enlace en el móvil" else "No",
+            { toggleWarnMobile() }))
+
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
@@ -453,6 +458,17 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------- [RED-1] Red
+
+    private fun warnMobile(): Boolean = prefs().getBoolean("warn_mobile", true)
+
+    private fun toggleWarnMobile() {
+        val now = !warnMobile()
+        prefs().edit().putBoolean("warn_mobile", now).apply()
+        toast(if (now) "📶 Se avisará al usar datos móviles" else "📶 Sin aviso con datos móviles")
+        render()
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */

@@ -1337,12 +1337,34 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /** [RED-1] true si la conexión activa es solo de datos móviles (no Wi-Fi). */
+    private fun onMobileData(): Boolean {
+        if (Build.VERSION.SDK_INT < 23) return false
+        return try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            caps != null &&
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
+                !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+        } catch (e: Exception) { false }
+    }
+
     private fun playLink(url: String, toTv: Boolean, titleOverride: String? = null, skipCheck: Boolean = false) {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             setStatus("⚠️ El enlace debe empezar con http:// o https://")
             return
         }
         val title = titleOverride?.takeIf { it.isNotBlank() } ?: linkTitle(url)
+        // [RED-1] enlace en el móvil con datos móviles: se pregunta antes de gastar datos (Ajustes › Red)
+        if (!toTv && !skipCheck && getSharedPreferences("castv", MODE_PRIVATE).getBoolean("warn_mobile", true) && onMobileData()) {
+            AlertDialog.Builder(this)
+                .setTitle("📶 Estás usando datos móviles")
+                .setMessage("Reproducir \"$title\" en el móvil gastará datos de tu plan. ¿Seguir?")
+                .setPositiveButton("Reproducir") { _, _ -> playLink(url, false, titleOverride, true) }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            return
+        }
         // [AVISO-HLS-2] canal HLS al TV: antes de tocar nada (historial, lo que suena), se revisa que se pueda preparar
         if (toTv && !skipCheck && isHls(url)) {
             setStatus("🔎 Revisando el canal…")
