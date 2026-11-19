@@ -1203,8 +1203,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // [PULIDO-2a] El aviso de estado ya no queda fijo: aparece y se esconde solo a los 6 s.
+    private val hideStatus = Runnable { tvStatus.visibility = View.GONE }
+    @Volatile private var tvMissingShown = false
+
     private fun setStatus(msg: String) {
-        tvStatus.text = msg
+        runOnUiThread {
+            tvStatus.text = msg
+            tvStatus.visibility = View.VISIBLE
+            tvStatus.removeCallbacks(hideStatus)
+            tvStatus.postDelayed(hideStatus, 6000)
+        }
     }
 
     private fun cycleRepeat() {
@@ -1627,12 +1636,16 @@ class MainActivity : AppCompatActivity() {
                         if (found) {
                             tvFails = 0
                             tvOnline = true
+                            tvMissingShown = false
                         }
                         val label = if (TvController.tvName.isNotEmpty()) TvController.tvName
                                     else (TvController.tvIp ?: "")
+                        // [PULIDO-2a] "No se encontró el TV" se avisa una sola vez, no cada 5 s.
+                        val say = found || !tvMissingShown
+                        if (!found) tvMissingShown = true
                         runOnUiThread {
                             if (found) updateOutputButton()
-                            setStatus(
+                            if (say) setStatus(
                                 if (found) "✅ TV encontrado: $label"
                                 else "⚠️ No se encontró el TV. Reintentando..."
                             )
