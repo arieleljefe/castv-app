@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -32,6 +33,11 @@ import java.text.Normalizer
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var content: LinearLayout
+    private lateinit var headerTitle: TextView
+    private var openSection: String? = null   // [AJUSTES-3] sección abierta (null = portada)
+    private val sectionBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() { showSection(null) }
+    }
     private var unlocked = false   // [PARENTAL-1] PIN ya escrito en esta sesión de Ajustes
     private var txtColor = Color.BLACK
     private var mutedColor = Color.GRAY
@@ -127,9 +133,10 @@ class SettingsActivity : AppCompatActivity() {
         back.gravity = Gravity.CENTER
         back.contentDescription = "Atrás"
         back.setPadding(dp(12), dp(4), dp(12), dp(4))
-        back.setOnClickListener { finish() }
+        back.setOnClickListener { if (openSection != null) showSection(null) else finish() }   // [AJUSTES-3]
         header.addView(back)
         val title = TextView(this)
+        headerTitle = title
         title.text = "Ajustes"
         title.textSize = 22f
         title.setTypeface(null, android.graphics.Typeface.BOLD)
@@ -170,6 +177,8 @@ class SettingsActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         setContentView(root)
+        onBackPressedDispatcher.addCallback(this, sectionBack)   // [AJUSTES-3]
+        openSection = savedInstanceState?.getString("section")   // se conserva al cambiar color o tema
         render()
 
         // [PARENTAL-1] con PIN activo, Ajustes solo se abre con el PIN
@@ -188,6 +197,7 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("unlocked", unlocked)
+        outState.putString("section", openSection)
     }
 
     // ------------------------------------------------------------ Contenido
@@ -287,17 +297,52 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
 
-        l.add(Entry("Acerca de", "Mis redes y contacto", "Creado por Ariel De Jesus Bueno",
-            { sendAction("socials") }))
+        l.add(Entry("Acerca de", "Acerca de CASTV", "Versión, redes y contacto, librerías y licencia",
+            { startActivity(Intent(this, AboutActivity::class.java)) }))   // [ACERCA-1]
         l.add(Entry("Acerca de", "Versión", versionText(), null))
         return l
+    }
+
+    /** [AJUSTES-3] Abre una sección (o vuelve a la portada con null). */
+    private fun showSection(name: String?) {
+        openSection = name
+        render()
+    }
+
+    private fun sectionSummary(name: String): String? = when (name) {
+        "Interfaz" -> "Tema y color de acento"
+        "Subtítulos" -> "Tamaño, color y fondo"
+        "Red" -> "Datos móviles y puerto del servidor"
+        "Vídeo" -> "Salto con doble toque"
+        "Biblioteca" -> "Re-escanear y carpetas ocultas"
+        "Audio" -> "Ecualizador"
+        "Control parental" -> "PIN de bloqueo"
+        "Emisión al TV" -> "TV detectada e IP del teléfono"
+        "Historial" -> "Enlaces, puntos guardados y canales ocultos"
+        "Almacenamiento" -> "Borrado: papelera o permanente"
+        "Avanzado" -> "Registro de la app"
+        "Respaldo" -> "Exportar o importar"
+        "Acerca de" -> "Versión, autor, redes y licencia"
+        else -> null
     }
 
     private fun render() {
         content.removeAllViews()
         val q = norm(query.trim())
-        val list = entries().filter {
-            q.isEmpty() || norm(it.section + " " + it.title + " " + (it.subtitle ?: "")).contains(q)
+        val all = entries()
+        val open = openSection
+        sectionBack.isEnabled = open != null
+        headerTitle.text = if (q.isEmpty() && open != null) open else "Ajustes"
+
+        // [AJUSTES-3] portada: una fila por sección (sin buscar y sin sección abierta)
+        if (q.isEmpty() && open == null) {
+            for (name in all.map { it.section }.distinct()) homeRow(name, sectionSummary(name))
+            return
+        }
+
+        val list = all.filter {
+            if (q.isEmpty()) it.section == open
+            else norm(it.section + " " + it.title + " " + (it.subtitle ?: "")).contains(q)
         }
         if (list.isEmpty()) {
             val tv = TextView(this)
@@ -310,12 +355,45 @@ class SettingsActivity : AppCompatActivity() {
         }
         var last = ""
         for (e in list) {
-            if (e.section != last) {
+            // con la búsqueda se siguen viendo los títulos de sección; dentro de una sección no hacen falta
+            if (q.isNotEmpty() && e.section != last) {
                 section(e.section, first = last.isEmpty())
                 last = e.section
             }
             row(e.title, e.subtitle, e.onClick)
         }
+    }
+
+    private fun homeRow(name: String, summary: String?) {
+        val box = LinearLayout(this)
+        box.gravity = Gravity.CENTER_VERTICAL
+        box.setPadding(dp(20), dp(14), dp(16), dp(14))
+        val sel = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, sel, true)
+        box.setBackgroundResource(sel.resourceId)
+        box.setOnClickListener { showSection(name) }
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        val t = TextView(this)
+        t.text = name
+        t.textSize = 16f
+        t.setTextColor(txtColor)
+        col.addView(t)
+        if (summary != null) {
+            val s = TextView(this)
+            s.text = summary
+            s.textSize = 13f
+            s.setTextColor(mutedColor)
+            s.setPadding(0, dp(2), 0, 0)
+            col.addView(s)
+        }
+        box.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val arrow = TextView(this)
+        arrow.text = "›"
+        arrow.textSize = 24f
+        arrow.setTextColor(accent())
+        box.addView(arrow)
+        content.addView(box)
     }
 
     private fun section(name: String, first: Boolean = false) {

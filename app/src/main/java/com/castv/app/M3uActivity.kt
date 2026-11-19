@@ -112,6 +112,27 @@ class M3uActivity : AppCompatActivity() {
         root.setBackgroundColor(ContextCompat.getColor(this, R.color.vlc_bg))
         root.setPadding(dp(12), dp(16), dp(12), 0)
 
+        // [PULIDO-3e] Encabezado: ← Canales (igual que Ajustes)
+        val header = LinearLayout(this)
+        header.gravity = Gravity.CENTER_VERTICAL
+        header.setPadding(0, 0, 0, dp(8))
+        val back = TextView(this)
+        back.text = "←"
+        back.textSize = 26f
+        back.setTextColor(txtColor)
+        back.gravity = Gravity.CENTER
+        back.contentDescription = "Atrás"
+        back.setPadding(dp(8), dp(4), dp(16), dp(4))
+        back.setOnClickListener { finish() }
+        header.addView(back)
+        val headerTitle = TextView(this)
+        headerTitle.text = "Canales"
+        headerTitle.textSize = 22f
+        headerTitle.setTypeface(null, android.graphics.Typeface.BOLD)
+        headerTitle.setTextColor(txtColor)
+        header.addView(headerTitle)
+        root.addView(header)
+
         // Fila 1: lista actual, añadir, quitar
         val row1 = LinearLayout(this)
         row1.gravity = Gravity.CENTER_VERTICAL
