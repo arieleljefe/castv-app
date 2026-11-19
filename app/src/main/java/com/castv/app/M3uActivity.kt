@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
@@ -657,6 +658,10 @@ class M3uActivity : AppCompatActivity() {
                     isFocusable = false
                     setPadding(dp(8), dp(8), dp(12), dp(8))
                 })
+                addView(ImageView(this@M3uActivity).apply {   // [REGIONES-1c] logo del canal
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    isFocusable = false
+                }, LinearLayout.LayoutParams(dp(44), dp(32)).apply { rightMargin = dp(10) })
                 addView(LinearLayout(this@M3uActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     setPadding(0, dp(10), dp(8), dp(10))
@@ -676,11 +681,14 @@ class M3uActivity : AppCompatActivity() {
             }
             val c = shown[position]
             val star = v.getChildAt(0) as TextView
-            val box = v.getChildAt(1) as LinearLayout
+            val logo = v.getChildAt(1) as ImageView
+            val box = v.getChildAt(2) as LinearLayout
             val on = favs.contains(c.url)
             star.text = if (on) "★" else "☆"
             star.setTextColor(if (on) accent() else mutedColor)
             star.setOnClickListener { toggleFav(c) }
+            logo.visibility = if (c.logo.isEmpty()) View.INVISIBLE else View.VISIBLE
+            Logos.load(logo, c.logo)
             (box.getChildAt(0) as TextView).text = c.name
             (box.getChildAt(1) as TextView).text = c.group
             return v

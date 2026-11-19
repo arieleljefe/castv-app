@@ -272,7 +272,7 @@ object Store {
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", "")))
+                out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", ""), o.optString("l", "")))
             }
         } catch (e: Exception) { }
         return out
@@ -281,7 +281,7 @@ object Store {
     private fun writeChFavMeta(l: List<M3uChannel>) {
         try {
             val arr = JSONArray()
-            for (c in l) arr.put(JSONObject().put("u", c.url).put("n", c.name).put("g", c.group))
+            for (c in l) arr.put(JSONObject().put("u", c.url).put("n", c.name).put("g", c.group).put("l", c.logo))
             prefs.edit().putString("chfavmeta", arr.toString()).apply()
         } catch (e: Exception) { }
     }

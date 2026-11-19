@@ -5,7 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Un canal de una lista M3U. */
-data class M3uChannel(val name: String, val url: String, val group: String)
+data class M3uChannel(val name: String, val url: String, val group: String, val logo: String = "")
 
 /** Lee listas .m3u / .m3u8 de canales (formato #EXTINF). Solo se aceptan enlaces http(s). */
 object M3uParser {
@@ -13,6 +13,7 @@ object M3uParser {
     private const val MAX_BYTES = 25 * 1024 * 1024
 
     private val groupRe = Regex("group-title=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
+    private val logoRe = Regex("tvg-logo=\"([^\"]*)\"", RegexOption.IGNORE_CASE)   // [REGIONES-1c]
     private val attrRe = Regex("[\\w-]+=\"[^\"]*\"")
 
     fun parse(text: String): List<M3uChannel> {
@@ -20,11 +21,13 @@ object M3uParser {
         var name = ""
         var group = ""
         var extGroup = ""
+        var logo = ""
         for (raw in text.lineSequence()) {
             val line = raw.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("#EXTINF", ignoreCase = true)) {
                 group = groupRe.find(line)?.groupValues?.get(1)?.trim().orEmpty()
+                logo = logoRe.find(line)?.groupValues?.get(1)?.trim().orEmpty()
                 name = line.replace(attrRe, "").substringAfter(',', "").trim()
             } else if (line.startsWith("#EXTGRP:", ignoreCase = true)) {
                 extGroup = line.substringAfter(':').trim()
@@ -36,11 +39,12 @@ object M3uParser {
                     val g = if (group.isNotEmpty()) group else extGroup
                     val n = if (name.isNotEmpty()) name
                             else line.substringBefore('?').trimEnd('/').substringAfterLast('/')
-                    out.add(M3uChannel(n, line, if (g.isEmpty()) "Sin grupo" else g))
+                    out.add(M3uChannel(n, line, if (g.isEmpty()) "Sin grupo" else g, logo))
                 }
                 name = ""
                 group = ""
                 extGroup = ""
+                logo = ""
             }
         }
         return out
