@@ -428,6 +428,7 @@ class MainActivity : AppCompatActivity() {
         tvNowPlaying.setOnClickListener(toggleExpand)
         nowThumbBox.setOnClickListener(toggleExpand)
         setPlayerExpanded(false)
+        updateMiniCompact()   // [PULIDO-2b]
         nowBigArt.setOnClickListener { showFullPlayer() }   // [UI-3b] tocar la carátula grande
         btnExpand.setOnLongClickListener { showFullPlayer(); true }   // [UI-3b] o mantener la flecha ˄
 
@@ -940,6 +941,20 @@ class MainActivity : AppCompatActivity() {
     private fun setPlayerExpanded(expanded: Boolean) {
         playerExpanded.visibility = if (expanded) View.VISIBLE else View.GONE
         btnExpand.rotation = if (expanded) 180f else 0f
+    }
+
+    // [PULIDO-2b] Mientras no haya sonado nada, el mini reproductor se compacta: sin barra de progreso ni ☆.
+    @Volatile private var lastMiniIdle: Boolean? = null
+
+    private fun updateMiniCompact() {
+        val idle = playingItem == null && !linkOnTv && !localActive
+        if (lastMiniIdle == idle) return
+        lastMiniIdle = idle
+        runOnUiThread {
+            val v = if (idle) View.GONE else View.VISIBLE
+            seekBar.visibility = v
+            btnNowFav.visibility = v
+        }
     }
 
     private fun pickSort() {
@@ -1654,6 +1669,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     poll(tick)
                 }
+                updateMiniCompact()   // [PULIDO-2b]
                 checkSleep()
             } catch (e: Exception) { }
             tick++
