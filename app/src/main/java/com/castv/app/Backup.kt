@@ -17,7 +17,7 @@ object Backup {
     private const val APP = "castv"
     private const val VERSION = 1
     private val FILES = listOf("castv_lib", "castv")
-    private val SKIP = setOf("tvIp")   // dato propio de cada red/TV: no se respalda
+    private val SKIP = setOf("tvIp", "pin_hash")   // [BACKUP-1] propios de cada teléfono/red: no se respaldan ni se tocan al importar
 
     /** Arma el JSON con las preferencias de la app. */
     fun build(ctx: Context): String {
