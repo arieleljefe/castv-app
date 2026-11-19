@@ -197,6 +197,9 @@ class SettingsActivity : AppCompatActivity() {
             if (warnMobile()) "Sí: pregunta antes de reproducir un enlace en el móvil" else "No",
             { toggleWarnMobile() }))
 
+        // [GESTO-1] Vídeo
+        l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
+
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
@@ -469,6 +472,24 @@ class SettingsActivity : AppCompatActivity() {
         prefs().edit().putBoolean("warn_mobile", now).apply()
         toast(if (now) "📶 Se avisará al usar datos móviles" else "📶 Sin aviso con datos móviles")
         render()
+    }
+
+    // ------------------------------------------------- [GESTO-1] Vídeo
+
+    private val dtapOptions = intArrayOf(5, 10, 15, 30)
+
+    private fun dtapSec(): Int = prefs().getInt("dtap_sec", 10).let { if (it in dtapOptions) it else 10 }
+
+    private fun pickDtap() {
+        val labels = dtapOptions.map { "$it segundos" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Salto con doble toque")
+            .setSingleChoiceItems(labels, dtapOptions.indexOf(dtapSec())) { d, which ->
+                prefs().edit().putInt("dtap_sec", dtapOptions[which]).apply()
+                d.dismiss()
+                render()
+            }
+            .show()
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */

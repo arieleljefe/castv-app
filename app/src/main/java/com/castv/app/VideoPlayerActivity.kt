@@ -263,6 +263,9 @@ class VideoPlayerActivity : AppCompatActivity() {
         } catch (e: Exception) { 0.5f }
     }
 
+    /** [GESTO-1] Segundos que salta el doble toque lateral (Ajustes › Vídeo); por defecto 10. */
+    private fun dtapSec(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("dtap_sec", 10).let { if (it in 5..30) it else 10 }
+
     private fun seekBy(sec: Int) {
         val dur = try { video.duration } catch (e: Exception) { -1 }
         if (dur <= 0) return   // canal en vivo: no se puede adelantar
@@ -313,7 +316,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                 if (locked) return true   // [UI-2a]
                 if (inEdge(e.x, e.y)) return false
                 val w = video.width.toFloat()
-                if (e.x < w / 3f) seekBy(-10) else if (e.x > w * 2f / 3f) seekBy(10)
+                if (e.x < w / 3f) seekBy(-dtapSec()) else if (e.x > w * 2f / 3f) seekBy(dtapSec())
                 return true
             }
 
