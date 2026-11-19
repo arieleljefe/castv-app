@@ -21,6 +21,35 @@ import java.net.URL
  *  por http al teléfono. */
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
+    companion object {
+        /** [AVISO-HLS] Revisa, antes de mandar un canal HLS al TV, si se puede preparar (misma lectura de lista que
+         *  usa /live). Devuelve null si todo va bien, o el motivo en español. No abre fragmentos ni deja nada abierto. */
+        fun probeLive(url: String): String? {
+            val s = LiveHlsStream(url)
+            return try {
+                s.prepare()
+                if (s.hasSegments()) null
+                else "La lista del canal no trae fragmentos ahora mismo (puede estar vacía o fuera de emisión)."
+            } catch (e: HttpFail) {
+                when (e.code) {
+                    401, 403 -> "El servidor rechazó la petición (${e.code}): el canal puede estar bloqueado para tu país o pedir permiso."
+                    404, 410 -> "El canal ya no existe en ese enlace (${e.code})."
+                    else -> "El servidor del canal respondió con error (${e.code})."
+                }
+            } catch (e: LiveUnsupported) {
+                "Este canal usa un formato que el TV no puede recibir por ahora (${e.message})."
+            } catch (e: java.net.SocketTimeoutException) {
+                "El servidor del canal tardó demasiado en responder."
+            } catch (e: java.net.UnknownHostException) {
+                "No se encontró el servidor del canal (¿sin internet o dirección caída?)."
+            } catch (e: java.io.IOException) {
+                "No se pudo conectar con el servidor del canal (${e.javaClass.simpleName})."
+            } catch (e: Exception) {
+                "No se pudo leer la lista del canal (${e.javaClass.simpleName}: ${e.message})."
+            }
+        }
+    }
+
     /** Lee solo [length] bytes de un archivo y cierra el descriptor al terminar. */
     private class BoundedStream(
         private val pfd: ParcelFileDescriptor,
@@ -341,6 +370,9 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
         /** Primera lectura de la lista (antes de contestarle al TV): lanza LiveUnsupported si no se puede. */
         fun prepare() { refresh() }
+
+        /** [AVISO-HLS] true si, tras la primera lectura, hay al menos un fragmento por entregar. */
+        fun hasSegments(): Boolean = pending.isNotEmpty()
 
         private fun resolveMedia() {
             val (text, base) = LiveHttp.text(startUrl)

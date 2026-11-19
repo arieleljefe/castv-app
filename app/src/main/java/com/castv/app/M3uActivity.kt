@@ -590,17 +590,37 @@ class M3uActivity : AppCompatActivity() {
         startActivityForResult(i, reqPlayer)
     }
 
-    private fun sendToTv(url: String, title: String) {
+    /** [AVISO-HLS] El canal no se pudo preparar: se dice por qué y se ofrece verlo en el móvil o probar igual en el TV. */
+    private fun warnChannel(url: String, title: String, why: String) {
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ Este canal puede no verse en el TV")
+            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el móvil o probar en el TV de todas formas.")
+            .setPositiveButton("📱 En el móvil") { _, _ -> playOnPhone(url, title) }
+            .setNeutralButton("📺 Enviar igual") { _, _ -> sendToTv(url, title, true) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun sendToTv(url: String, title: String, skipCheck: Boolean = false) {
         toast("🚀 Enviando al TV…")
         thread {
             if (TvController.tvIp == null) {
                 runOnUiThread { toast("⚠️ TV no encontrado todavía. Espera unos segundos o usa ⋮ › Elegir TV.") }
                 return@thread
             }
-            sendBroadcast(Intent(MainActivity.ACT_STOP_LOCAL).setPackage(packageName))   // [LOCAL-1] detiene lo local del teléfono
             val hls = isHls(url)
             val phoneIp = CastvNet.localIpAddress(TvController.tvIp)
             val live = hls && phoneIp != null
+            // [AVISO-HLS] antes de tocar nada (ni detener lo local), se revisa que el canal se pueda preparar
+            if (live && !skipCheck) {
+                val why = MediaServer.probeLive(url)
+                if (why != null) {
+                    DebugLog.add("AVISO-HLS: $title: $why")
+                    runOnUiThread { if (!isFinishing) warnChannel(url, title, why) }
+                    return@thread
+                }
+            }
+            sendBroadcast(Intent(MainActivity.ACT_STOP_LOCAL).setPackage(packageName))   // [LOCAL-1] detiene lo local del teléfono
             val mime = if (live) "video/mp2t" else if (hls) "application/vnd.apple.mpegurl" else "video/mp4"
             val sendUrl = if (phoneIp == null) url else if (live) TvSend.liveUrl(phoneIp, url) else TvSend.relayUrl(phoneIp, url, hls)
             DebugLog.add("ENLACE (M3U): $url -> $sendUrl")
