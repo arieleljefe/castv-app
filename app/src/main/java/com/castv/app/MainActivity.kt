@@ -3198,7 +3198,8 @@ class MainActivity : AppCompatActivity() {
             val section = v.findViewById<TextView>(R.id.itemSection)
             val byName = sortMode == Sort.NAME_ASC || sortMode == Sort.NAME_DESC
             val letter = sectionLetter(item.name)
-            if (byName && (position == 0 || sectionLetter(items[position - 1].name) != letter)) {
+            // [PULIDO-2e] La fila "#" (números y símbolos) no se muestra; las letras A-Z siguen igual.
+            if (byName && letter != "#" && (position == 0 || sectionLetter(items[position - 1].name) != letter)) {
                 section.text = letter
                 section.visibility = View.VISIBLE
             } else {
