@@ -252,11 +252,16 @@ class M3uActivity : AppCompatActivity() {
 
     /** [REGIONES-1a] Lista de listas; con "← Regiones" vuelve al nivel 1. */
     private fun showListsOf(lists: List<M3uList>, title: String, canGoBack: Boolean, regionName: String? = null) {
+        // [REGIONES-1b2] "Toda la región" va como primera fila (arriba) para que Cerrar y ← Regiones quepan en una fila
+        val names = lists.map { it.name }.toMutableList()
+        if (regionName != null) names.add(0, "🌐 Toda la región (${lists.size} listas)")
         val b = AlertDialog.Builder(this)
             .setTitle(title)
-            .setItems(lists.map { it.name }.toTypedArray()) { _, which -> loadList(lists[which]) }
+            .setItems(names.toTypedArray()) { _, which ->
+                if (regionName != null && which == 0) loadRegion(lists, regionName)
+                else loadList(lists[if (regionName != null) which - 1 else which])
+            }
             .setNegativeButton("Cerrar", null)
-        if (regionName != null) b.setPositiveButton("🌐 Toda la región") { _, _ -> loadRegion(lists, regionName) }   // [REGIONES-1b]
         if (canGoBack) b.setNeutralButton("← Regiones") { _, _ -> chooseList() }
         else b.setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
         b.show()
