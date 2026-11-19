@@ -26,6 +26,7 @@ import android.widget.MediaController
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -74,6 +75,13 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var gBright = 0.5f
     private var gVol = 0f
     private val hideHud = Runnable { if (::hud.isInitialized) hud.visibility = View.GONE }
+
+    // [UI-2a] bloqueo de controles y giro de pantalla
+    private var locked = false
+    private var rotMode = 0        // 0 automático, 1 horizontal, 2 vertical
+    private lateinit var lockBtn: TextView
+    private lateinit var backLock: OnBackPressedCallback
+    private val hideLockBtn = Runnable { if (::lockBtn.isInitialized) lockBtn.visibility = View.GONE }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -160,12 +168,38 @@ class VideoPlayerActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
+        topBar.addView(chip("🔒") { lock() })     // [UI-2a]
         topBar.addView(chip("💬") { showSubtitleMenu() })
         topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
             topBar,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        // [UI-2a] botón 🔓 (solo aparece al tocar la pantalla mientras está bloqueado)
+        lockBtn = TextView(this).apply {
+            text = "🔓"
+            textSize = 26f
+            gravity = Gravity.CENTER
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = GradientDrawable().apply {
+                setColor(0x88000000.toInt())
+                cornerRadius = dp(28).toFloat()
+            }
+            visibility = View.GONE
+            setOnClickListener { unlock() }
+        }
+        root.addView(
+            lockBtn,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = dp(24) })
+        backLock = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                toast("🔒 Desbloquea primero: toca la pantalla y pulsa 🔓")
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, backLock)
         setContentView(root)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -175,6 +209,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         controller = object : MediaController(this@VideoPlayerActivity) {
             override fun show(timeout: Int) {
+                if (locked) return   // [UI-2a]
                 super.show(timeout)
                 topBar.visibility = View.VISIBLE
             }
@@ -264,11 +299,18 @@ class VideoPlayerActivity : AppCompatActivity() {
 
             // El VideoView ya no recibe el toque: mostrar/ocultar controles se hace aquí
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (locked) {   // [UI-2a] solo muestra el 🔓 unos segundos
+                    lockBtn.visibility = View.VISIBLE
+                    handler.removeCallbacks(hideLockBtn)
+                    handler.postDelayed(hideLockBtn, 2500)
+                    return true
+                }
                 if (controller.isShowing) controller.hide() else controller.show()
                 return true
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (locked) return true   // [UI-2a]
                 if (inEdge(e.x, e.y)) return false
                 val w = video.width.toFloat()
                 if (e.x < w / 3f) seekBy(-10) else if (e.x > w * 2f / 3f) seekBy(10)
@@ -276,6 +318,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             }
 
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                if (locked) return true   // [UI-2a]
                 if (gMode == -1) return true
                 val h = video.height.toFloat()
                 val w = video.width.toFloat()
@@ -312,6 +355,34 @@ class VideoPlayerActivity : AppCompatActivity() {
             }
         })
         video.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev); true }
+    }
+
+    // ------------------------------------------------------------ [UI-2a] Bloqueo y giro
+
+    private fun lock() {
+        locked = true
+        controller.hide()
+        hud.visibility = View.GONE
+        backLock.isEnabled = true
+        toast("🔒 Controles bloqueados · toca la pantalla para ver 🔓")
+    }
+
+    private fun unlock() {
+        locked = false
+        handler.removeCallbacks(hideLockBtn)
+        lockBtn.visibility = View.GONE
+        backLock.isEnabled = false
+        toast("🔓 Controles desbloqueados")
+        controller.show()
+    }
+
+    private fun rotate() {
+        rotMode = (rotMode + 1) % 3
+        when (rotMode) {
+            1 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE; toast("↔ Horizontal") }
+            2 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT; toast("↕ Vertical") }
+            else -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR; toast("🔄 Giro automático") }
+        }
     }
 
     private fun chip(text: String, onClick: () -> Unit): TextView = TextView(this).apply {
@@ -617,6 +688,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         handler.removeCallbacks(tick)
         handler.removeCallbacks(hideHud)
         handler.removeCallbacks(hidePreview)
+        handler.removeCallbacks(hideLockBtn)   // [UI-2a]
         if (::video.isInitialized) {
             try { video.stopPlayback() } catch (e: Exception) { }
         }
