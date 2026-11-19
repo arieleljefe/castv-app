@@ -1318,12 +1318,41 @@ class MainActivity : AppCompatActivity() {
         return if (last.isBlank()) "Enlace" else last
     }
 
-    private fun playLink(url: String, toTv: Boolean, titleOverride: String? = null) {
+    /** [AVISO-HLS-2] El canal no se pudo preparar: se dice por qué y se ofrece verlo en el móvil o probar igual en el TV. */
+    private fun warnLink(url: String, title: String, why: String, titleOverride: String?) {
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ Este canal puede no verse en el TV")
+            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el móvil o probar en el TV de todas formas.")
+            .setPositiveButton("📱 En el móvil") { _, _ -> playLink(url, false, titleOverride) }
+            .setNeutralButton("📺 Enviar igual") { _, _ -> playLink(url, true, titleOverride, true) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun playLink(url: String, toTv: Boolean, titleOverride: String? = null, skipCheck: Boolean = false) {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             setStatus("⚠️ El enlace debe empezar con http:// o https://")
             return
         }
         val title = titleOverride?.takeIf { it.isNotBlank() } ?: linkTitle(url)
+        // [AVISO-HLS-2] canal HLS al TV: antes de tocar nada (historial, lo que suena), se revisa que se pueda preparar
+        if (toTv && !skipCheck && isHls(url)) {
+            setStatus("🔎 Revisando el canal…")
+            thread {
+                val why = if (TvController.tvIp != null && getLocalIpAddress() != null) MediaServer.probeLive(url) else null
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    if (why == null) {
+                        playLink(url, true, titleOverride, true)
+                    } else {
+                        DebugLog.add("AVISO-HLS: $title: $why")
+                        setStatus("⚠️ $title: no se pudo preparar")
+                        warnLink(url, title, why, titleOverride)
+                    }
+                }
+            }
+            return
+        }
         Store.addLink(url, title)   // historial de enlaces
         linkOnTv = false   // [PAUSA-1] se vuelve a marcar solo si el TV acepta este enlace
         linkDurSec = 0; val gen = ++linkGen   // [PROG-1d] enlace nuevo: duración en cero
