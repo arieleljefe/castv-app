@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -21,6 +23,7 @@ import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -93,6 +96,17 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var gVol = 0f
     private val hideHud = Runnable { if (::hud.isInitialized) hud.visibility = View.GONE }
 
+    // [GESTO-2] deslizar horizontal (gMode 3), mantener pulsado = 2x (gMode 4) y pellizco = zoom
+    private lateinit var scale: ScaleGestureDetector
+    private var gSeekStart = 0
+    private var gSeekTo = 0
+    private var mpRef: MediaPlayer? = null
+    private var fastOn = false
+    // [GESTO-2] temporizador de apagado
+    private lateinit var sleepChip: TextView
+    private var sleepAt = 0L           // uptimeMillis en que se detiene (0 = sin temporizador por tiempo)
+    private var sleepEnd = false       // detener al terminar este video
+
     // [UI-2a] bloqueo de controles y giro de pantalla
     private var locked = false
     private var sizeMode = 0       // [UI-2c] 0 ajustar, 1 llenar, 2 estirar, 3 16:9, 4 4:3
@@ -103,8 +117,10 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private val tick = object : Runnable {
         override fun run() {
+            if (sleepAt > 0L && SystemClock.uptimeMillis() >= sleepAt) { sleepNow(); return }   // [GESTO-2]
             updateSub()
             if (controlsShowing()) {   // [UI-2b]
+                updateSleepChip()   // [GESTO-2]
                 updateProgress()
                 updatePlayIcon()
                 if (!dragging && !locked && video.isPlaying && SystemClock.uptimeMillis() > hideAt) hideControls()
@@ -128,6 +144,16 @@ class VideoPlayerActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
         Store.init(this)
+        // [GESTO-2] brillo guardado del video (Ajustes › Vídeo › Recordar brillo)
+        val cp = getSharedPreferences("castv", MODE_PRIVATE)
+        if (cp.getBoolean("video_bright_on", true)) {
+            val sb = cp.getFloat("video_bright", -1f)
+            if (sb >= 0.01f) {
+                val blp = window.attributes
+                blp.screenBrightness = sb.coerceAtMost(1f)
+                window.attributes = blp
+            }
+        }
 
         // [Etapa 13-A] Enlace directo (mp4 / HLS .m3u8): un solo "video" con id 0 y la URL en uriString
         val streamUrl = intent.getStringExtra("url")
@@ -200,6 +226,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
         topBar.addView(chip("🔒") { lock() })     // [UI-2a]
         topBar.addView(chip("🖼") { cycleSize() })   // [UI-2c]
+        sleepChip = chip("😴") { showSleepMenu() }   // [GESTO-2]
+        topBar.addView(sleepChip)
         topBar.addView(chip("💬") { showSubtitleMenu() })
         topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
@@ -247,6 +275,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         setupGestures(root)
 
         video.setOnPreparedListener { mp ->
+            mpRef = mp   // [GESTO-2]
+            fastOn = false
             video.setVideoDims(mp.videoWidth, mp.videoHeight)   // [UI-2c]
             if (pendingStart > 0) video.seekTo(pendingStart * 1000)
             pendingStart = 0
@@ -255,6 +285,12 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
         video.setOnCompletionListener {
             Store.clearResume(items[index])
+            if (sleepEnd) {   // [GESTO-2] "al terminar este video"
+                sleepEnd = false
+                toast("😴 Temporizador: reproducción detenida")
+                finish()
+                return@setOnCompletionListener
+            }
             if (index + 1 < items.size) playAt(index + 1, saveCurrent = false) else finish()
         }
         video.setOnErrorListener { _, _, _ ->
@@ -268,9 +304,13 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------ Gestos
 
+    /** [GESTO-2] Con zoom la vista del video es más grande que la pantalla: los gestos se miden sobre la pantalla. */
+    private fun gw(): Float = if (video.zoom > 1f) (video.parent as View).width.toFloat() else video.width.toFloat()
+    private fun gh(): Float = if (video.zoom > 1f) (video.parent as View).height.toFloat() else video.height.toFloat()
+
     private fun inEdge(x: Float, y: Float): Boolean {
         val m = dp(32)   // márgenes seguros: evita toques accidentales y gestos del sistema
-        return x < m || y < m || x > video.width - m || y > video.height - m
+        return x < m || y < m || x > gw() - m || y > gh() - m
     }
 
     private fun showHud(text: String) {
@@ -297,6 +337,49 @@ class VideoPlayerActivity : AppCompatActivity() {
         val pos = try { video.currentPosition } catch (e: Exception) { return }
         video.seekTo((pos + sec * 1000).coerceIn(0, maxOf(dur - 500, 0)))
         showHud(if (sec > 0) "⏩ +$sec s" else "⏪ −${-sec} s")
+    }
+
+    /** [GESTO-2] Mensaje que se queda mientras el dedo sigue pulsado. */
+    private fun showHudHold(text: String) {
+        hud.text = text
+        hud.visibility = View.VISIBLE
+        handler.removeCallbacks(hideHud)
+    }
+
+    /** [GESTO-2] Velocidad 2x. Solo se activa con el video sonando (en pausa algunos teléfonos lo arrancan solo). */
+    private fun setFast(on: Boolean) {
+        val mp = mpRef ?: return
+        val playing = try { video.isPlaying } catch (e: Exception) { false }
+        if (on && !playing) return
+        if (!on && !fastOn) return
+        try {
+            mp.playbackParams = PlaybackParams().setSpeed(if (on) 2f else 1f)
+            if (!on && !playing) video.pause()
+            fastOn = on
+        } catch (e: Exception) { }
+    }
+
+    /** [GESTO-2] Al levantar el dedo: aplica el avance, guarda el brillo o vuelve a 1x. */
+    private fun endGesture(up: Boolean) {
+        when (gMode) {
+            3 -> {
+                if (up) {
+                    video.seekTo(gSeekTo)
+                    showHud(fmt(gSeekTo))
+                } else {
+                    hud.visibility = View.GONE
+                }
+            }
+            1 -> {
+                val p = getSharedPreferences("castv", MODE_PRIVATE)
+                if (p.getBoolean("video_bright_on", true)) p.edit().putFloat("video_bright", gBright).apply()
+            }
+            4 -> {
+                setFast(false)
+                showHud("▶ 1x")
+            }
+        }
+        gMode = 0
     }
 
     private fun setupGestures(root: FrameLayout) {
@@ -340,30 +423,59 @@ class VideoPlayerActivity : AppCompatActivity() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 if (locked) return true   // [UI-2a]
                 if (inEdge(e.x, e.y)) return false
-                val w = video.width.toFloat()
-                if (e.x < w / 3f) seekBy(-dtapSec()) else if (e.x > w * 2f / 3f) seekBy(dtapSec())
+                val w = gw()
+                if (e.x < w / 3f) seekBy(-dtapSec())
+                else if (e.x > w * 2f / 3f) seekBy(dtapSec())
+                else {   // [GESTO-2] centro: pausar / reanudar
+                    togglePlay()
+                    showHud(if (video.isPlaying) "▶ Reanudar" else "⏸ Pausa")
+                }
                 return true
+            }
+
+            // [GESTO-2] mantener pulsado: velocidad 2x hasta soltar
+            override fun onLongPress(e: MotionEvent) {
+                if (locked || gMode != 0 || inEdge(e.x, e.y)) return
+                val d = try { video.duration } catch (ex: Exception) { -1 }
+                if (d <= 0) return   // canal en vivo
+                setFast(true)
+                if (fastOn) {
+                    gMode = 4
+                    showHudHold("⏩ 2x")
+                }
             }
 
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
                 if (locked) return true   // [UI-2a]
-                if (gMode == -1) return true
-                val h = video.height.toFloat()
-                val w = video.width.toFloat()
+                if (gMode == -1 || gMode == 4) return true   // [GESTO-2] 4 = mantener pulsado
+                val h = gh()
+                val w = gw()
                 if (h <= 0f || w <= 0f) return true
                 if (gMode == 0) {
                     if (inEdge(gDownX, gDownY)) { gMode = -1; return true }
                     val tx = e2.x - gDownX
                     val ty = e2.y - gDownY
                     if (abs(tx) < dp(12) && abs(ty) < dp(12)) return true   // aún no se decide
-                    if (abs(ty) <= abs(tx)) { gMode = -1; return true }      // deslizar horizontal: se ignora
-                    if (gDownX >= w / 2f) {
+                    if (abs(ty) <= abs(tx)) {   // [GESTO-2] deslizar horizontal: adelantar / retroceder
+                        val d = try { video.duration } catch (ex: Exception) { -1 }
+                        if (d <= 0) { gMode = -1; return true }   // canal en vivo
+                        gMode = 3
+                        gSeekStart = try { video.currentPosition } catch (ex: Exception) { 0 }
+                        gSeekTo = gSeekStart
+                    } else if (gDownX >= w / 2f) {
                         gMode = 1
                         gBright = currentBrightness()
                     } else {
                         gMode = 2
                         gVol = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
                     }
+                }
+                if (gMode == 3) {   // [GESTO-2] la pantalla completa equivale a 90 segundos
+                    val d = try { video.duration } catch (ex: Exception) { -1 }
+                    gSeekTo = (gSeekStart + ((e2.x - gDownX) / w * 90000f).toInt()).coerceIn(0, maxOf(d - 500, 0))
+                    val diff = (gSeekTo - gSeekStart) / 1000
+                    showHud((if (diff >= 0) "⏩ +$diff s" else "⏪ −${-diff} s") + "\n" + fmt(gSeekTo))
+                    return true
                 }
                 val frac = dy / (h * 0.8f)   // dy > 0: el dedo sube
                 if (gMode == 1) {
@@ -382,7 +494,36 @@ class VideoPlayerActivity : AppCompatActivity() {
                 return true
             }
         })
-        video.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev); true }
+        // [GESTO-2] pellizco = zoom (se suma a los modos del 🖼); sin "zoom rápido" para no chocar con el doble toque
+        scale = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(d: ScaleGestureDetector): Boolean {
+                if (locked) return true
+                video.zoom = (video.zoom * d.scaleFactor).coerceIn(1f, 4f)
+                video.requestLayout()
+                showHud("🔍 " + String.format(Locale.US, "%.1f", video.zoom) + "x")
+                return true
+            }
+
+            override fun onScaleEnd(d: ScaleGestureDetector) {
+                if (video.zoom < 1.05f) {
+                    video.zoom = 1f
+                    video.requestLayout()
+                }
+            }
+        })
+        scale.isQuickScaleEnabled = false
+        video.setOnTouchListener { _, ev ->
+            // con zoom, las coordenadas se pasan a las de la pantalla (la vista es más grande que ella)
+            if (video.zoom > 1f) ev.offsetLocation(video.left.toFloat(), video.top.toFloat())
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_POINTER_DOWN -> { endGesture(false); gMode = -1 }   // segundo dedo: pellizco
+                MotionEvent.ACTION_UP -> endGesture(true)
+                MotionEvent.ACTION_CANCEL -> endGesture(false)
+            }
+            scale.onTouchEvent(ev)
+            gesture.onTouchEvent(ev)
+            true
+        }
     }
 
     // ------------------------------------------------------------ [UI-2b] Barra de control propia
@@ -585,6 +726,63 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ------------------------------------------------------------ [GESTO-2] Temporizador de apagado
+
+    private fun sleepLeftMin(): Long =
+        ((sleepAt - SystemClock.uptimeMillis() + 59_999L) / 60_000L).coerceAtLeast(1L)
+
+    private fun showSleepMenu() {
+        val labels = arrayOf(
+            "Desactivado", "En 15 minutos", "En 30 minutos", "En 45 minutos", "En 60 minutos",
+            "Al terminar este video")
+        val cur = if (sleepEnd) 5 else if (sleepAt > 0L) -1 else 0
+        AlertDialog.Builder(this)
+            .setTitle(if (sleepAt > 0L) "😴 Se detiene en ${sleepLeftMin()} min" else "😴 Temporizador de apagado")
+            .setSingleChoiceItems(labels, cur) { d, which ->
+                d.dismiss()
+                setSleep(which)
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun setSleep(which: Int) {
+        sleepEnd = false
+        sleepAt = 0L
+        when (which) {
+            0 -> toast("😴 Temporizador desactivado")
+            5 -> {
+                sleepEnd = true
+                toast("😴 Se detendrá al terminar este video")
+            }
+            else -> {
+                val min = which * 15
+                sleepAt = SystemClock.uptimeMillis() + min * 60_000L
+                toast("😴 Se detendrá en $min minutos")
+            }
+        }
+        updateSleepChip()
+        keepControls()
+    }
+
+    private fun updateSleepChip() {
+        if (!::sleepChip.isInitialized) return
+        val t = when {
+            sleepEnd -> "😴 fin"
+            sleepAt > 0L -> "😴 ${sleepLeftMin()}m"
+            else -> "😴"
+        }
+        if (sleepChip.text.toString() != t) sleepChip.text = t
+    }
+
+    /** Se acabó el tiempo: se cierra el video (onPause guarda el punto de reanudación). */
+    private fun sleepNow() {
+        sleepAt = 0L
+        sleepEnd = false
+        toast("😴 Temporizador: reproducción detenida")
+        finish()
+    }
+
     // ------------------------------------------------------------ [UI-2c] Tamaño de pantalla
 
     private fun cycleSize() {
@@ -603,6 +801,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** VideoView que además puede llenar, estirar o forzar una proporción. Modo 0 = comportamiento de siempre. */
     private class SizedVideoView(ctx: android.content.Context) : VideoView(ctx) {
         var sizeMode = 0
+        var zoom = 1f   // [GESTO-2] pellizco; se suma al modo de tamaño
         private var vw = 0
         private var vh = 0
 
@@ -612,7 +811,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            if (sizeMode == 0 || vw <= 0 || vh <= 0) {
+            if ((sizeMode == 0 && zoom == 1f) || vw <= 0 || vh <= 0) {
                 super.onMeasure(widthMeasureSpec, heightMeasureSpec)
                 return
             }
@@ -621,6 +820,11 @@ class VideoPlayerActivity : AppCompatActivity() {
             var w = pw
             var h = ph
             when (sizeMode) {
+                0 -> {   // ajustar (solo se llega aquí con zoom)
+                    val sc = minOf(pw.toFloat() / vw, ph.toFloat() / vh)
+                    w = (vw * sc).toInt()
+                    h = (vh * sc).toInt()
+                }
                 1 -> {   // llenar: escala hasta cubrir todo y recorta lo que sobre
                     val sc = maxOf(pw.toFloat() / vw, ph.toFloat() / vh)
                     w = (vw * sc).toInt()
@@ -631,6 +835,10 @@ class VideoPlayerActivity : AppCompatActivity() {
                     if (pw.toFloat() / ph > ar) { h = ph; w = (ph * ar).toInt() } else { w = pw; h = (pw / ar).toInt() }
                 }
             }
+            if (zoom != 1f) {   // [GESTO-2]
+                w = (w * zoom).toInt()
+                h = (h * zoom).toInt()
+            }
             setMeasuredDimension(w, h)
         }
     }
@@ -640,7 +848,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         setTextColor(Color.WHITE)
         textSize = 15f
         gravity = Gravity.CENTER
-        setPadding(dp(14), dp(8), dp(14), dp(8))
+        setPadding(dp(10), dp(8), dp(10), dp(8))   // [GESTO-2] más compactos: ahora caben 6 chips
         background = GradientDrawable().apply {
             setColor(0x55FFFFFF)
             cornerRadius = dp(18).toFloat()
@@ -648,7 +856,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            leftMargin = dp(8)
+            leftMargin = dp(6)
         }
     }
 
@@ -668,6 +876,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         shownCue = null
         subText.visibility = View.GONE
         titleView.text = it.name.substringBeforeLast('.')
+        mpRef = null   // [GESTO-2]
+        fastOn = false
         video.setVideoURI(Uri.parse(it.uriString))
         loadSavedSub(it)
     }
@@ -920,6 +1130,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     override fun onPause() {
         saveProgress()
         if (::video.isInitialized) {
+            if (fastOn) setFast(false)   // [GESTO-2] vuelve a 1x antes de pausar
             resumeOnReturn = try { video.isPlaying } catch (e: Exception) { false }
             try { video.pause() } catch (e: Exception) { }
         }

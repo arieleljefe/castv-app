@@ -233,6 +233,9 @@ class SettingsActivity : AppCompatActivity() {
 
         // [GESTO-1] Vídeo
         l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
+        l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
+            if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
+            else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
 
         // [BIBLIO-1] Biblioteca
         l.add(Entry("Biblioteca", "Re-escanear ahora", "Vuelve a leer tus videos y tu música", { sendAction("rescan") }))
@@ -313,7 +316,7 @@ class SettingsActivity : AppCompatActivity() {
         "Interfaz" -> "Tema y color de acento"
         "Subtítulos" -> "Tamaño, color y fondo"
         "Red" -> "Datos móviles y puerto del servidor"
-        "Vídeo" -> "Salto con doble toque"
+        "Vídeo" -> "Salto con doble toque y brillo"
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
@@ -779,6 +782,18 @@ class SettingsActivity : AppCompatActivity() {
                 render()
             }
             .show()
+    }
+
+    // [GESTO-2] Recordar el brillo que se ajusta deslizando en el video
+    private fun rememberBright(): Boolean = prefs().getBoolean("video_bright_on", true)
+
+    private fun toggleRememberBright() {
+        val now = !rememberBright()
+        val ed = prefs().edit().putBoolean("video_bright_on", now)
+        if (!now) ed.remove("video_bright")
+        ed.apply()
+        toast(if (now) "☀ Se recordará el brillo del video" else "☀ El video usará el brillo del teléfono")
+        render()
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */
