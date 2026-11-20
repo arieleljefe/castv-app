@@ -394,7 +394,7 @@ class MainActivity : AppCompatActivity() {
             getSharedPreferences("castv", MODE_PRIVATE).getInt("repeat", 0)) { Repeat.OFF }
         eqPreset = getSharedPreferences("castv", MODE_PRIVATE).getInt("eqPreset", -1)
         bassOn = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("bassOn", false)
-        tvIncog.setOnClickListener { toast("🕶 Incógnito activado. Para quitarlo: Más › Modo incógnito") }   // [INCOG-2]
+        tvIncog.setOnClickListener { toast("🕵️‍♂️ Incógnito activado. Para quitarlo: Más › Modo incógnito") }   // [INCOG-2]
         updateIncogBadge()
         updateOutputButton()
         btnOutput.setOnClickListener {
@@ -1044,7 +1044,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
         menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
         menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
-        menu.add(0, 19, 11, "🕶 Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
+        menu.add(0, 19, 11, "🕵️‍♂️ Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
         if (!showingMusic) menu.add(0, 20, 11, "👁 No vistos: " + (if (onlyUnseen) "Solo no vistos" else "Todos"))   // [NOVISTOS-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
@@ -1082,8 +1082,8 @@ class MainActivity : AppCompatActivity() {
             18 -> pickFolder()   // [UI-5]
             19 -> {   // [INCOG-1]
                 Store.incognito = !Store.incognito
-                toast(if (Store.incognito) "🕶 Incógnito activado: no se guardan reproducciones, puntos de reanudación, historial de enlaces ni «visto»"
-                      else "🕶 Incógnito desactivado")
+                toast(if (Store.incognito) "🕵️‍♂️ Incógnito activado: no se guardan reproducciones, puntos de reanudación, historial de enlaces ni «visto»"
+                      else "🕵️‍♂️ Incógnito desactivado")
                 updateIncogBadge()   // [INCOG-2]
             }
             20 -> {   // [NOVISTOS-1]
@@ -2075,7 +2075,7 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------- Reproducción en el teléfono
 
-    /** [INCOG-2] Muestra u oculta el 🕶 de la barra superior según el modo incógnito. */
+    /** [INCOG-2] Muestra u oculta el 🕵️‍♂️ de la barra superior según el modo incógnito. */
     private fun updateIncogBadge() {
         if (::tvIncog.isInitialized) tvIncog.visibility = if (Store.incognito) View.VISIBLE else View.GONE
     }
