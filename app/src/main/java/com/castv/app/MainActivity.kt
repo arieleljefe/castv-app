@@ -77,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tabAll: TextView
     private lateinit var tabFavs: TextView
     private lateinit var tabResume: TextView
+    private lateinit var tvIncog: TextView   // [INCOG-2]
     private lateinit var navVideo: TextView
     private lateinit var navAudio: TextView
     private lateinit var navFolders: TextView
@@ -365,6 +366,7 @@ class MainActivity : AppCompatActivity() {
         tabAll = findViewById(R.id.tabAll)
         tabFavs = findViewById(R.id.tabFavs)
         tabResume = findViewById(R.id.tabResume)
+        tvIncog = findViewById(R.id.tvIncog)   // [INCOG-2]
         navVideo = findViewById(R.id.navVideo)
         navAudio = findViewById(R.id.navAudio)
         navFolders = findViewById(R.id.navFolders)
@@ -392,6 +394,8 @@ class MainActivity : AppCompatActivity() {
             getSharedPreferences("castv", MODE_PRIVATE).getInt("repeat", 0)) { Repeat.OFF }
         eqPreset = getSharedPreferences("castv", MODE_PRIVATE).getInt("eqPreset", -1)
         bassOn = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("bassOn", false)
+        tvIncog.setOnClickListener { toast("🕶 Incógnito activado. Para quitarlo: Más › Modo incógnito") }   // [INCOG-2]
+        updateIncogBadge()
         updateOutputButton()
         btnOutput.setOnClickListener {
             outPhone = !outPhone
@@ -1080,6 +1084,7 @@ class MainActivity : AppCompatActivity() {
                 Store.incognito = !Store.incognito
                 toast(if (Store.incognito) "🕶 Incógnito activado: no se guardan reproducciones, puntos de reanudación, historial de enlaces ni «visto»"
                       else "🕶 Incógnito desactivado")
+                updateIncogBadge()   // [INCOG-2]
             }
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
@@ -1644,6 +1649,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
+        updateIncogBadge()   // [INCOG-2]
         if (::adapter.isInitialized) {   // refresca "Continuar" (y "No vistos") al volver del reproductor
             if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
         }
@@ -2068,6 +2074,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ------------------------------------- Reproducción en el teléfono
+
+    /** [INCOG-2] Muestra u oculta el 🕶 de la barra superior según el modo incógnito. */
+    private fun updateIncogBadge() {
+        if (::tvIncog.isInitialized) tvIncog.visibility = if (Store.incognito) View.VISIBLE else View.GONE
+    }
 
     private fun updateOutputButton() {
         btnOutput.setImageResource(if (outPhone) R.drawable.ic_phone else R.drawable.ic_tv)

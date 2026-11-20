@@ -39,6 +39,17 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <!-- [INCOG-2] Aviso visible del modo incógnito (solo aparece con el modo activado) -->
+        <TextView
+            android:id="@+id/tvIncog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:contentDescription="Modo incógnito activado"
+            android:text="🕶"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="1dp"
