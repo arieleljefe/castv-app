@@ -233,6 +233,16 @@ class SettingsActivity : AppCompatActivity() {
 
         // [GESTO-1] Vídeo
         l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
+        // [GESTOS-AJ-1] cada gesto se puede activar o desactivar; velocidad, controles y botones
+        l.add(Entry("Vídeo", "Deslizar de lado: adelantar", gState("g_seek"), { toggleG("g_seek", "Deslizar de lado") }))
+        l.add(Entry("Vídeo", "Deslizar a la derecha: brillo", gState("g_bright"), { toggleG("g_bright", "Brillo") }))
+        l.add(Entry("Vídeo", "Deslizar a la izquierda: volumen", gState("g_vol"), { toggleG("g_vol", "Volumen") }))
+        l.add(Entry("Vídeo", "Doble toque", gState("g_dtap") + " (con el doble toque apagado, dos toques muestran u ocultan los controles)", { toggleG("g_dtap", "Doble toque") }))
+        l.add(Entry("Vídeo", "Mantener pulsado: acelerar", gState("g_hold"), { toggleG("g_hold", "Mantener pulsado") }))
+        l.add(Entry("Vídeo", "Velocidad al mantener pulsado", fastNames[fastIdx()], { pickFast() }))
+        l.add(Entry("Vídeo", "Zoom con pellizco", gState("g_pinch"), { toggleG("g_pinch", "Zoom con pellizco") }))
+        l.add(Entry("Vídeo", "Tiempo de los controles", "Se esconden a los ${hideLabels[hideIdx()]}", { pickHide() }))
+        l.add(Entry("Vídeo", "Salto de los botones −N / +N", btnLabel(btnSecPref()), { pickBtn() }))
         l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
             if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
             else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
@@ -317,7 +327,7 @@ class SettingsActivity : AppCompatActivity() {
         "Interfaz" -> "Tema y color de acento"
         "Subtítulos" -> "Tamaño, color y fondo"
         "Red" -> "Datos móviles y puerto del servidor"
-        "Vídeo" -> "Salto con doble toque y brillo"
+        "Vídeo" -> "Gestos, velocidad, controles y brillo"
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
@@ -795,6 +805,66 @@ class SettingsActivity : AppCompatActivity() {
         ed.apply()
         toast(if (now) "☀ Se recordará el brillo del video" else "☀ El video usará el brillo del teléfono")
         render()
+    }
+
+    // ------------------------------------------------- [GESTOS-AJ-1] Gestos y controles del video
+
+    private val fastNames = arrayOf("1.5x", "2x", "3x")
+    private val hideOptions = intArrayOf(2000, 3500, 5000, 8000)
+    private val hideLabels = arrayOf("2 s", "3,5 s", "5 s", "8 s")
+    private val btnOptions = intArrayOf(0, 5, 10, 15, 30)   // 0 = igual que el doble toque
+
+    private fun gOn(key: String): Boolean = prefs().getBoolean(key, true)
+    private fun gState(key: String): String = if (gOn(key)) "Activado" else "Desactivado"
+
+    private fun toggleG(key: String, name: String) {
+        val now = !gOn(key)
+        prefs().edit().putBoolean(key, now).apply()
+        toast(if (now) "✅ $name: activado" else "🚫 $name: desactivado")
+        render()
+    }
+
+    private fun fastIdx(): Int = prefs().getInt("fast_i", 1).coerceIn(0, 2)
+
+    private fun pickFast() {
+        AlertDialog.Builder(this)
+            .setTitle("Velocidad al mantener pulsado")
+            .setSingleChoiceItems(fastNames, fastIdx()) { d, which ->
+                prefs().edit().putInt("fast_i", which).apply()
+                d.dismiss()
+                render()
+            }
+            .show()
+    }
+
+    private fun hideIdx(): Int = hideOptions.indexOf(prefs().getInt("hide_ms", 3500)).let { if (it < 0) 1 else it }
+
+    private fun pickHide() {
+        AlertDialog.Builder(this)
+            .setTitle("Tiempo de los controles")
+            .setSingleChoiceItems(hideLabels, hideIdx()) { d, which ->
+                prefs().edit().putInt("hide_ms", hideOptions[which]).apply()
+                d.dismiss()
+                render()
+            }
+            .show()
+    }
+
+    private fun btnSecPref(): Int = prefs().getInt("btn_sec", 0).let { if (it in btnOptions) it else 0 }
+
+    private fun btnLabel(v: Int): String =
+        if (v == 0) "Igual que el doble toque (${dtapSec()} s)" else "$v segundos"
+
+    private fun pickBtn() {
+        val labels = btnOptions.map { btnLabel(it) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Salto de los botones")
+            .setSingleChoiceItems(labels, btnOptions.indexOf(btnSecPref())) { d, which ->
+                prefs().edit().putInt("btn_sec", btnOptions[which]).apply()
+                d.dismiss()
+                render()
+            }
+            .show()
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */

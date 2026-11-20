@@ -67,7 +67,10 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var fwdSkip: TextView
     private var dragging = false
     private var hideAt = 0L
-    private val hideControlsMs = 3500L
+    // [GESTOS-AJ-1] tiempo que tardan en esconderse los controles (Ajustes › Vídeo); por defecto 3,5 s
+    private val hideControlsMs: Long
+        get() = getSharedPreferences("castv", MODE_PRIVATE).getInt("hide_ms", 3500)
+            .let { if (it in 2000..8000) it.toLong() else 3500L }
 
     private var items: List<MediaItem> = emptyList()
     private var index = 0
@@ -331,6 +334,18 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** [GESTO-1] Segundos que salta el doble toque lateral (Ajustes › Vídeo); por defecto 10. */
     private fun dtapSec(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("dtap_sec", 10).let { if (it in 5..30) it else 10 }
 
+    /** [GESTOS-AJ-1] Gesto activado en Ajustes › Vídeo (todos vienen activados). */
+    private fun gOn(key: String): Boolean = getSharedPreferences("castv", MODE_PRIVATE).getBoolean(key, true)
+
+    /** [GESTOS-AJ-1] Salto de los botones −N / +N; sin elegir, igual que el doble toque. */
+    private fun btnSec(): Int =
+        getSharedPreferences("castv", MODE_PRIVATE).getInt("btn_sec", 0).let { if (it in 5..30) it else dtapSec() }
+
+    /** [GESTOS-AJ-1] Velocidad al mantener pulsado: 1.5x, 2x o 3x (por defecto 2x). */
+    private val fastVals = floatArrayOf(1.5f, 2f, 3f)
+    private val fastLabels = arrayOf("1.5x", "2x", "3x")
+    private fun fastIdx(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("fast_i", 1).coerceIn(0, 2)
+
     private fun seekBy(sec: Int) {
         val dur = try { video.duration } catch (e: Exception) { -1 }
         if (dur <= 0) return   // canal en vivo: no se puede adelantar
@@ -353,7 +368,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (on && !playing) return
         if (!on && !fastOn) return
         try {
-            mp.playbackParams = PlaybackParams().setSpeed(if (on) 2f else 1f)
+            mp.playbackParams = PlaybackParams().setSpeed(if (on) fastVals[fastIdx()] else 1f)
             if (!on && !playing) video.pause()
             fastOn = on
         } catch (e: Exception) { }
@@ -422,6 +437,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 if (locked) return true   // [UI-2a]
+                if (!gOn("g_dtap")) return onSingleTapConfirmed(e)   // [GESTOS-AJ-1] sin doble toque: dos toques = uno
                 if (inEdge(e.x, e.y)) return false
                 val w = gw()
                 if (e.x < w / 3f) seekBy(-dtapSec())
@@ -435,13 +451,13 @@ class VideoPlayerActivity : AppCompatActivity() {
 
             // [GESTO-2] mantener pulsado: velocidad 2x hasta soltar
             override fun onLongPress(e: MotionEvent) {
-                if (locked || gMode != 0 || inEdge(e.x, e.y)) return
+                if (locked || gMode != 0 || inEdge(e.x, e.y) || !gOn("g_hold")) return   // [GESTOS-AJ-1]
                 val d = try { video.duration } catch (ex: Exception) { -1 }
                 if (d <= 0) return   // canal en vivo
                 setFast(true)
                 if (fastOn) {
                     gMode = 4
-                    showHudHold("⏩ 2x")
+                    showHudHold("⏩ " + fastLabels[fastIdx()])
                 }
             }
 
@@ -458,14 +474,16 @@ class VideoPlayerActivity : AppCompatActivity() {
                     if (abs(tx) < dp(12) && abs(ty) < dp(12)) return true   // aún no se decide
                     if (abs(ty) <= abs(tx)) {   // [GESTO-2] deslizar horizontal: adelantar / retroceder
                         val d = try { video.duration } catch (ex: Exception) { -1 }
-                        if (d <= 0) { gMode = -1; return true }   // canal en vivo
+                        if (d <= 0 || !gOn("g_seek")) { gMode = -1; return true }   // canal en vivo / [GESTOS-AJ-1] desactivado
                         gMode = 3
                         gSeekStart = try { video.currentPosition } catch (ex: Exception) { 0 }
                         gSeekTo = gSeekStart
                     } else if (gDownX >= w / 2f) {
+                        if (!gOn("g_bright")) { gMode = -1; return true }   // [GESTOS-AJ-1]
                         gMode = 1
                         gBright = currentBrightness()
                     } else {
+                        if (!gOn("g_vol")) { gMode = -1; return true }   // [GESTOS-AJ-1]
                         gMode = 2
                         gVol = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
                     }
@@ -497,7 +515,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         // [GESTO-2] pellizco = zoom (se suma a los modos del 🖼); sin "zoom rápido" para no chocar con el doble toque
         scale = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(d: ScaleGestureDetector): Boolean {
-                if (locked) return true
+                if (locked || !gOn("g_pinch")) return true   // [GESTOS-AJ-1]
                 video.zoom = (video.zoom * d.scaleFactor).coerceIn(1f, 4f)
                 video.requestLayout()
                 showHud("🔍 " + String.format(Locale.US, "%.1f", video.zoom) + "x")
@@ -551,8 +569,8 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun showControls() {
         if (locked) return
-        backSkip.text = "−${dtapSec()}"
-        fwdSkip.text = "+${dtapSec()}"
+        backSkip.text = "−${btnSec()}"   // [GESTOS-AJ-1]
+        fwdSkip.text = "+${btnSec()}"
         bottomBar.visibility = View.VISIBLE
         topBar.visibility = View.VISIBLE
         keepControls()
@@ -664,7 +682,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         // Fila 2: anterior · −N · play/pausa · +N · siguiente
         val btnRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
         btnRow.addView(iconBtn(R.drawable.ic_prev) { playAt(index - 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        backSkip = skipBtn { seekBy(-dtapSec()) }
+        backSkip = skipBtn { seekBy(-btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(backSkip)
         playBtn = ImageView(this).apply {
             setImageResource(R.drawable.ic_play_w)
@@ -676,7 +694,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         btnRow.addView(playBtn, LinearLayout.LayoutParams(dp(56), dp(56)).apply {
             leftMargin = dp(8); rightMargin = dp(8)
         })
-        fwdSkip = skipBtn { seekBy(dtapSec()) }
+        fwdSkip = skipBtn { seekBy(btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(fwdSkip)
         btnRow.addView(iconBtn(R.drawable.ic_next) { playAt(index + 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
         bottomBar.addView(btnRow)
