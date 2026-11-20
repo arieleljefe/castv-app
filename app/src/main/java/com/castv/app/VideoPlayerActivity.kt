@@ -87,6 +87,9 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var subOffset = 0          // ms; positivo = los subtítulos salen más tarde
     private var shownCue: Cue? = null
     private var resumeOnReturn = false
+    // [FOCO-1] foco de audio: pausa con llamadas/alarmas y cuando otra app toma el sonido
+    private var pausedByFocus = false
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change -> onFocusChange(change) }
     private val handler = Handler(Looper.getMainLooper())
     private val reqSub = 5101
     // [IA-3] generación de subtítulos con IA
@@ -221,6 +224,9 @@ class VideoPlayerActivity : AppCompatActivity() {
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         video = SizedVideoView(this)   // [UI-2c]
+        // [FOCO-1] el foco de audio lo maneja esta actividad (no el VideoView), para no pelearse con su propio pedido
+        if (Build.VERSION.SDK_INT >= 26) { try { video.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE) } catch (e: Exception) { } }
+        video.onStartHook = { focusRequest() }
         root.addView(
             video,
             FrameLayout.LayoutParams(
@@ -636,8 +642,49 @@ class VideoPlayerActivity : AppCompatActivity() {
         subText.layoutParams = lp
     }
 
+    // ------------------------------------------------------------ [FOCO-1] Foco de audio
+
+    @Suppress("DEPRECATION")
+    private fun focusRequest() {
+        pausedByFocus = false
+        try {
+            (getSystemService(AUDIO_SERVICE) as AudioManager)
+                .requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        } catch (e: Exception) { }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun focusAbandon() {
+        pausedByFocus = false
+        try { (getSystemService(AUDIO_SERVICE) as AudioManager).abandonAudioFocus(focusListener) } catch (e: Exception) { }
+    }
+
+    private fun onFocusChange(change: Int) {
+        if (!::video.isInitialized) return
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS -> {   // otra app de música o video: pausa y no reanuda sola
+                resumeOnReturn = false
+                pausedByFocus = false
+                try { if (video.isPlaying) video.pause() } catch (e: Exception) { }
+                updatePlayIcon()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {   // llamada, alarma: pausa y reanuda al volver el foco
+                try { if (video.isPlaying) { pausedByFocus = true; video.pause() } } catch (e: Exception) { }
+                updatePlayIcon()
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                if (pausedByFocus) {
+                    pausedByFocus = false
+                    try { video.start() } catch (e: Exception) { }
+                    updatePlayIcon()
+                }
+            }
+        }
+    }
+
     private fun togglePlay() {
-        if (video.isPlaying) video.pause() else video.start()
+        pausedByFocus = false   // [FOCO-1] si pausa o reanuda a mano, el foco ya no decide
+        if (video.isPlaying) { video.pause(); focusAbandon() } else video.start()
         updatePlayIcon()
         keepControls()
     }
@@ -864,12 +911,18 @@ class VideoPlayerActivity : AppCompatActivity() {
     private class SizedVideoView(ctx: android.content.Context) : VideoView(ctx) {
         var sizeMode = 0
         var zoom = 1f   // [GESTO-2] pellizco; se suma al modo de tamaño
+        var onStartHook: (() -> Unit)? = null   // [FOCO-1] se llama antes de cada start()
         private var vw = 0
         private var vh = 0
 
         fun setVideoDims(w: Int, h: Int) {
             vw = w; vh = h
             requestLayout()
+        }
+
+        override fun start() {   // [FOCO-1]
+            try { onStartHook?.invoke() } catch (e: Exception) { }
+            super.start()
         }
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -1700,6 +1753,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (::video.isInitialized) {
             try { video.stopPlayback() } catch (e: Exception) { }
         }
+        focusAbandon()   // [FOCO-1]
         super.onDestroy()
     }
 }
