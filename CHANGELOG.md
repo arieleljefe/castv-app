@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v192)
+# Registro de cambios y guía de continuidad – CASTV (v193)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -38,7 +38,16 @@
 
 ---
 
-## 📍 Estado Actual (v192)
+## 📍 Estado Actual (v193)
+
+- 📋 **PARA MAÑANA (20 nov 2026), en este orden (anotado el 19 nov, 21:15):**
+  1. **Aplicar lo entregado en v192 si falta** (aún no se sabe si Ariel lo aplicó): `gestos2.patch` → `novedades1.patch` → `CHANGELOG_v193.md` (una línea cada uno, reglas 5 y 6; si `git apply` falla, probar `--ignore-whitespace`).
+  2. **Mirar GitHub Actions.** Si sale en rojo, pasar el mensaje de error (lo más probable: tipos de Kotlin en `setupGestures` de `VideoPlayerActivity.kt`).
+  3. **Probar GESTO-2 y NOVEDADES-1** con los 7 pasos de la entrada de v192 (deslizar, 2x, doble toque centro, brillo, pellizco, 😴 y 6 chips en vertical, cuadro de novedades). Riesgo conocido: la velocidad 2x depende del `MediaPlayer` del teléfono.
+  4. **Probar lo viejo que sigue 🧪:** versión 3.0, PUERTO-1, BIBLIO-1, AUDIO-1, PARENTAL-1/2, CARPETAS-1, BACKUP-1, AVISO-HLS-2 y SEL-2 (pasos en v139).
+  5. **Con el "ya funciona" de Ariel:** pasar esos 🧪 a ✅ y dar la etiqueta `git tag v3.0 && git push origin v3.0` (publica `CASTV-v3.0.apk`).
+  6. **Después, a elección:** repetición A-B, saltar a un tiempo, picture-in-picture, estadísticas de video, confirmar antes de reanudar; limpieza de restos en la raíz del repo; CHECK-1 sigue ⏳ en pausa.
+  - **Para retomar:** pasar solo `CHANGELOG_v193.md` (y los `*_actual.kt` que se pidan en una línea, regla 9).
 
 - 🧪 **GESTO-2 + NOVEDADES-1 Gestos y extras del reproductor de video (v192, 19 nov 2026, ~21:30; DOS parches en cadena; verificados con `git apply --check` sobre tus tres `*_actual.kt` reales (VideoPlayerActivity 947 líneas, SettingsActivity 789, MainActivity 3282); NO compilados (no hay SDK de Android aquí); SIN probar).** Ariel pidió "Hazlo todo" (gestos y extras del banco de ideas). Regla 4: por eso van **dos parches y dos commits**, para poder revertir cada uno solo. **Orden obligatorio: primero `gestos2.patch`, después `novedades1.patch`** (el segundo agrega una fila en Ajustes justo debajo de la que crea el primero).
   - **Parche 1 `gestos2.patch` (2 archivos: `VideoPlayerActivity.kt` +223/−12, `SettingsActivity.kt` +16/−1; cero XML nuevo):**
@@ -1098,6 +1107,8 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v193 (19 nov 2026, 21:15):** Ariel pidió anotar todo para seguir mañana. **Sin código nuevo**; solo se agregó "PARA MAÑANA" en Estado Actual. **Para retomar:** pasar solo `CHANGELOG_v193.md`.
 
 - **v192 (19 nov 2026, ~21:30):** Ariel pidió ponerse al día con el changelog v191 y seguir; eligió **"Hazlo todo"** para los gestos y extras del video. Se leyeron `VideoPlayerActivity.kt`, `SettingsActivity.kt` y `MainActivity.kt` reales. **Entregado (🧪, sin compilar):** `gestos2.patch` (GESTO-2: deslizar horizontal, 2x al mantener, doble toque al centro, brillo guardado, zoom con pellizco, temporizador 😴 + interruptor "Recordar brillo") y `novedades1.patch` (NOVEDADES-1: cuadro de novedades y consejos; fila "Consejos de gestos" en Ajustes). Orden: primero `gestos2.patch`. **Sin cambios de estado en lo anterior:** las pruebas de la 3.0 siguen pendientes (versión 3.0, PUERTO-1, BIBLIO-1, AUDIO-1, PARENTAL-1/2, CARPETAS-1, BACKUP-1, AVISO-HLS-2, SEL-2). **Nota:** el historial de v177 a v191 vive en "Estado Actual". **Para retomar:** pasar solo `CHANGELOG_v192.md`.
 
