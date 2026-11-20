@@ -1239,19 +1239,47 @@ class VideoPlayerActivity : AppCompatActivity() {
         val w = try { mp?.videoWidth ?: 0 } catch (e: Exception) { 0 }
         val h = try { mp?.videoHeight ?: 0 } catch (e: Exception) { 0 }
         val dur = try { video.duration } catch (e: Exception) { -1 }
-        val txt = "Archivo: " + (items.getOrNull(index)?.name ?: "?") +
+        val cur = items.getOrNull(index)
+        val local = cur != null && cur.id != 0L
+        // [STATS-2] tamaño del archivo, tasa de bits aproximada y estadísticas de uso (solo videos del teléfono)
+        val size = if (local) fileSize(cur!!.id) else -1L
+        var txt = "Archivo: " + (cur?.name ?: "?") +
             "\nResolución: " + (if (w > 0 && h > 0) "$w × $h" else "?") +
             "\nDuración: " + (if (dur > 0) fmt(dur) else "?") +
-            "\nPosición: " + fmt(curPos()) +
-            "\nVolumen extra: " + boostPct() + " %" +
+            "\nPosición: " + fmt(curPos())
+        if (size > 0) {
+            txt += "\nTamaño: " + fmtSize(size)
+            if (dur > 0) txt += "\nTasa de bits aprox.: " +
+                String.format(Locale.US, "%.1f Mb/s", size * 8.0 / (dur / 1000.0) / 1_000_000.0)
+        }
+        txt += "\nVolumen extra: " + boostPct() + " %" +
             "\nRetraso de subtítulos: " + offText() +
             "\nRepetición: " + abText()
+        if (local) {
+            val last = Store.lastPlayed(cur!!)
+            txt += "\nVeces reproducido: " + Store.playCount(cur) +
+                "\nÚltima vez: " + (if (last > 0L)
+                    java.text.SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(java.util.Date(last))
+                    else "—") +
+                "\nVisto: " + (if (Store.isSeen(cur)) "Sí" else "No")
+        }
         AlertDialog.Builder(this)
             .setTitle("ℹ️ Información del video")
             .setMessage(txt)
             .setPositiveButton("Cerrar", null)
             .show()
     }
+
+    /** [STATS-2] Tamaño en bytes de un video del teléfono, o -1 si no se pudo leer. */
+    private fun fileSize(id: Long): Long = try {
+        contentResolver.query(uriFor(id), arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getLong(0) else -1L
+        } ?: -1L
+    } catch (e: Exception) { -1L }
+
+    private fun fmtSize(b: Long): String =
+        if (b >= 1_073_741_824L) String.format(Locale.US, "%.2f GB", b / 1_073_741_824.0)
+        else String.format(Locale.US, "%.1f MB", b / 1_048_576.0)
 
     // [VOL-1] volumen extra con LoudnessEnhancer (100 / 150 / 200 / 300 %)
     private val boostVals = intArrayOf(100, 150, 200, 300)
