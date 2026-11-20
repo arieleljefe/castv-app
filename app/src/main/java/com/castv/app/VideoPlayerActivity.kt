@@ -18,6 +18,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
+import android.text.InputType
 import android.text.TextUtils
 import android.view.GestureDetector
 import android.view.Gravity
@@ -27,6 +28,7 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ImageView
@@ -231,6 +233,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         topBar.addView(chip("🖼") { cycleSize() })   // [UI-2c]
         sleepChip = chip("😴") { showSleepMenu() }   // [GESTO-2]
         topBar.addView(sleepChip)
+        topBar.addView(chip("🛠") { showToolsMenu() })   // [SALTO-1]
         topBar.addView(chip("💬") { showSubtitleMenu() })
         topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
@@ -866,7 +869,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         setTextColor(Color.WHITE)
         textSize = 15f
         gravity = Gravity.CENTER
-        setPadding(dp(10), dp(8), dp(10), dp(8))   // [GESTO-2] más compactos: ahora caben 6 chips
+        setPadding(dp(8), dp(8), dp(8), dp(8))   // [SALTO-1] un poco más compactos: ahora caben 7 chips
         background = GradientDrawable().apply {
             setColor(0x55FFFFFF)
             cornerRadius = dp(18).toFloat()
@@ -874,7 +877,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            leftMargin = dp(6)
+            leftMargin = dp(4)
         }
     }
 
@@ -1185,6 +1188,64 @@ class VideoPlayerActivity : AppCompatActivity() {
             subText.text = cue.text
             subText.visibility = View.VISIBLE
         }
+    }
+
+    // ------------------------------------------------------------ [SALTO-1] Herramientas del video
+
+    private fun curPos(): Int = try { video.currentPosition } catch (e: Exception) { 0 }
+
+    private fun showToolsMenu() {
+        val labels = arrayOf("⏱ Saltar a un tiempo…")
+        AlertDialog.Builder(this)
+            .setTitle("Herramientas")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> showJumpDialog()
+                }
+            }
+            .show()
+    }
+
+    /** Acepta "90", "12:30" o "1:05:30". Devuelve milisegundos o null si no se entiende. */
+    private fun parseTime(s: String): Int? {
+        val parts = s.trim().split(":")
+        if (parts.isEmpty() || parts.size > 3) return null
+        var total = 0L
+        for (p in parts) {
+            val n = p.trim().toLongOrNull() ?: return null
+            if (n < 0) return null
+            total = total * 60 + n
+        }
+        return if (total > 172800L) null else (total * 1000).toInt()
+    }
+
+    private fun showJumpDialog() {
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        val input = EditText(this).apply {
+            hint = "Ej.: 12:30"
+            inputType = InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_TIME
+            setSingleLine(true)
+        }
+        val box = FrameLayout(this).apply {
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Saltar a… (dura " + (if (dur > 0) fmt(dur) else "?") + ")")
+            .setView(box)
+            .setPositiveButton("Ir") { _, _ ->
+                val ms = parseTime(input.text.toString())
+                if (ms == null) {
+                    toast("Escribe el tiempo como 12:30 o 1:05:00")
+                } else {
+                    val d2 = try { video.duration } catch (e: Exception) { -1 }
+                    val target = if (d2 > 0) ms.coerceIn(0, maxOf(d2 - 500, 0)) else ms
+                    video.seekTo(target)
+                    showHud("⏩ " + fmt(target))
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------------------------ Ciclo de vida
