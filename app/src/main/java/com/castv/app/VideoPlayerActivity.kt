@@ -1,9 +1,12 @@
 package com.castv.app
 
+import android.app.PictureInPictureParams
 import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
+import android.content.res.Configuration
+import android.util.Rational
 import android.util.TypedValue
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,6 +16,7 @@ import android.media.MediaPlayer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.PlaybackParams
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -1211,7 +1215,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "🔁 Marcar B (fin) aquí",
             "❌ Quitar repetición A-B",
             "🔊 Volumen extra: " + boostPct() + " %",
-            "ℹ️ Información del video")
+            "ℹ️ Información del video",
+            "🪟 Ventana flotante (PiP)")
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
@@ -1222,6 +1227,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                     3 -> clearAb()
                     4 -> showBoostDialog()
                     5 -> showInfo()
+                    6 -> if (!enterPip()) toast("Este teléfono no permite la ventana flotante")
                 }
             }
             .show()
@@ -1359,12 +1365,61 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------ Ciclo de vida
 
+    // [PIP-1] ventana flotante (picture-in-picture)
+    private var inPip = false
+    private var pipEntering = false
+
+    private fun enterPip(): Boolean {
+        if (Build.VERSION.SDK_INT < 26 || !::video.isInitialized) return false
+        if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) return false
+        return try {
+            val mp = mpRef
+            var w = try { mp?.videoWidth ?: 0 } catch (e: Exception) { 0 }
+            var h = try { mp?.videoHeight ?: 0 } catch (e: Exception) { 0 }
+            if (w <= 0 || h <= 0) { w = 16; h = 9 }
+            val ratio = (w.toFloat() / h).coerceIn(0.5f, 2.3f)
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
+                .build()
+            pipEntering = true
+            enterPictureInPictureMode(params)
+            true
+        } catch (e: Exception) {
+            pipEntering = false
+            false
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        val playing = try { video.isPlaying } catch (e: Exception) { false }
+        if (playing && !locked) enterPip()   // al salir con Inicio, el video sigue en una ventana flotante
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip = isInPictureInPictureMode
+        pipEntering = false
+        if (inPip) {
+            hideControls()
+            if (::hud.isInitialized) hud.visibility = View.GONE
+        }
+    }
+
+    override fun onStop() {
+        // Si se cierra la ventana flotante (o se apaga la pantalla), se detiene el sonido
+        if (inPip && ::video.isInitialized) { try { video.pause() } catch (e: Exception) { } }
+        super.onStop()
+    }
+
     override fun onPause() {
         saveProgress()
         if (::video.isInitialized) {
             if (fastOn) setFast(false)   // [GESTO-2] vuelve a 1x antes de pausar
             resumeOnReturn = try { video.isPlaying } catch (e: Exception) { false }
-            try { video.pause() } catch (e: Exception) { }
+            if (!(pipEntering || inPip)) {   // [PIP-1] en la ventana flotante sigue reproduciendo
+                try { video.pause() } catch (e: Exception) { }
+            }
         }
         super.onPause()
     }
