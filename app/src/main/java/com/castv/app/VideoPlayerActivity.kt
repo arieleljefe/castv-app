@@ -294,10 +294,15 @@ class VideoPlayerActivity : AppCompatActivity() {
             applyBoost(mp)   // [VOL-1]
             fastOn = false
             video.setVideoDims(mp.videoWidth, mp.videoHeight)   // [UI-2c]
-            if (pendingStart > 0) video.seekTo(pendingStart * 1000)
+            val st = pendingStart
             pendingStart = 0
-            video.start()
-            updatePlayIcon()
+            if (st > 0 && getSharedPreferences("castv", MODE_PRIVATE).getBoolean("resume_ask", false)) {
+                askResume(st)   // [CONFIRMAR-1] no arranca hasta que se elija
+            } else {
+                if (st > 0) video.seekTo(st * 1000)
+                video.start()
+                updatePlayIcon()
+            }
         }
         video.setOnCompletionListener {
             items[index].let { if (it.id != 0L && !Store.incognito) Store.markSeen(it, true) }   // [VISTO-1]
@@ -1392,6 +1397,26 @@ class VideoPlayerActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------------------ [CONFIRMAR-1] Confirmar antes de reanudar
+
+    private fun askResume(sec: Int) {
+        val d = AlertDialog.Builder(this)
+            .setTitle("Continuar")
+            .setMessage("¿Continuar desde " + fmt(sec * 1000) + "?")
+            .setPositiveButton("Continuar") { _, _ ->
+                video.seekTo(sec * 1000)
+                video.start()
+                updatePlayIcon()
+            }
+            .setNegativeButton("Desde el inicio") { _, _ ->
+                video.start()
+                updatePlayIcon()
+            }
+            .setOnCancelListener { finish() }   // Atrás en la pregunta: se sale del reproductor
+            .show()
+        d.setCanceledOnTouchOutside(false)
     }
 
     // ------------------------------------------------------------ [MARCAS-1] Marcadores

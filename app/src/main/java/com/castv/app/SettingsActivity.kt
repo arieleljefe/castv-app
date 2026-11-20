@@ -246,6 +246,9 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
             if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
             else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
+        l.add(Entry("Vídeo", "Preguntar antes de continuar",   // [CONFIRMAR-1]
+            if (resumeAsk()) "Sí: al abrir un video con punto guardado pregunta si seguir o empezar de nuevo"
+            else "No: continúa solo desde donde lo dejaste", { toggleResumeAsk() }))
         l.add(Entry("Vídeo", "Ventana flotante al pulsar Inicio",   // [PIP-2]
             if (pipAuto()) "Sí: el video sigue en una ventana flotante al salir con Inicio"
             else "No: el video se pausa al salir (la ventana manual sigue en 🛠 › 🪟)", { togglePipAuto() }))
@@ -801,6 +804,16 @@ class SettingsActivity : AppCompatActivity() {
 
     // [GESTO-2] Recordar el brillo que se ajusta deslizando en el video
     private fun rememberBright(): Boolean = prefs().getBoolean("video_bright_on", true)
+
+    // [CONFIRMAR-1] preguntar antes de reanudar un video
+    private fun resumeAsk(): Boolean = prefs().getBoolean("resume_ask", false)
+
+    private fun toggleResumeAsk() {
+        val now = !resumeAsk()
+        prefs().edit().putBoolean("resume_ask", now).apply()
+        toast(if (now) "⏩ Se preguntará antes de continuar un video" else "⏩ Los videos continúan solos")
+        render()
+    }
 
     // [PIP-2] ventana flotante automática al pulsar Inicio
     private fun pipAuto(): Boolean = prefs().getBoolean("pip_auto", true)
