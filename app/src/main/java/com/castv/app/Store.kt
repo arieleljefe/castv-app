@@ -97,7 +97,7 @@ object Store {
         for (l in lists.values) if (l.remove(k)) changed = true
         if (changed) saveLists()
         resumePrefs.edit().remove(k).apply()
-        statsPrefs.edit().remove("c|$k").remove("t|$k").remove("v|$k").apply()
+        statsPrefs.edit().remove("c|$k").remove("t|$k").remove("v|$k").remove("w|$k").apply()
         if (prefs.contains("bm|$k")) prefs.edit().remove("bm|$k").apply()   // [MARCAS-1]
     }
 
@@ -167,6 +167,17 @@ object Store {
             .putInt("c|$k", statsPrefs.getInt("c|$k", 0) + 1)
             .putLong("t|$k", System.currentTimeMillis())
             .apply()
+    }
+
+    // ------------------------------------------------- [TIEMPO-1] Tiempo total visto de un video
+
+    /** Segundos que se ha estado reproduciendo este video (suma de todas las veces). */
+    fun watchSec(item: MediaItem): Int = statsPrefs.getInt("w|" + key(item), 0)
+
+    fun addWatch(item: MediaItem, sec: Int) {
+        if (incognito || sec <= 0) return
+        val k = "w|" + key(item)
+        statsPrefs.edit().putInt(k, statsPrefs.getInt(k, 0) + sec).apply()
     }
 
     // ------------------------------------------------- Historial de enlaces

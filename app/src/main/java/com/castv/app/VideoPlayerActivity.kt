@@ -128,10 +128,31 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var backLock: OnBackPressedCallback
     private val hideLockBtn = Runnable { if (::lockBtn.isInitialized) lockBtn.visibility = View.GONE }
 
+    // [TIEMPO-1] tiempo realmente reproducido (reloj de pared) de cada video del teléfono
+    private var watchLastMs = 0L
+    private var watchAccMs = 0L
+
+    private fun trackWatch() {
+        val playing = ::video.isInitialized && (try { video.isPlaying } catch (e: Exception) { false })
+        val now = SystemClock.uptimeMillis()
+        if (playing && watchLastMs > 0L) watchAccMs += minOf(now - watchLastMs, 1000L)
+        watchLastMs = if (playing) now else 0L
+        if (watchAccMs >= 10_000L) flushWatch()
+    }
+
+    private fun flushWatch() {
+        val sec = (watchAccMs / 1000L).toInt()
+        if (sec <= 0) return
+        watchAccMs -= sec * 1000L
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id != 0L && !Store.incognito) Store.addWatch(cur, sec)
+    }
+
     private val tick = object : Runnable {
         override fun run() {
             if (sleepAt > 0L && SystemClock.uptimeMillis() >= sleepAt) { sleepNow(); return }   // [GESTO-2]
             abLoop()   // [AB-1]
+            trackWatch()   // [TIEMPO-1]
             updateSub()
             if (controlsShowing()) {   // [UI-2b]
                 updateSleepChip()   // [GESTO-2]
@@ -905,6 +926,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private fun playAt(i: Int, startAt: Int = 0, saveCurrent: Boolean = true) {
         if (i !in items.indices) return
         if (saveCurrent) saveProgress()
+        flushWatch(); watchAccMs = 0L; watchLastMs = 0L   // [TIEMPO-1] lo visto va al video que termina
         index = i
         val it = items[i]
         pendingStart = startAt
@@ -1243,6 +1265,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     // [INFO-1] información del video (versión sencilla de "estadísticas")
     private fun showInfo() {
+        flushWatch()   // [TIEMPO-1] incluye lo que va de esta sesión
         val mp = mpRef
         val w = try { mp?.videoWidth ?: 0 } catch (e: Exception) { 0 }
         val h = try { mp?.videoHeight ?: 0 } catch (e: Exception) { 0 }
@@ -1269,6 +1292,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                 "\nÚltima vez: " + (if (last > 0L)
                     java.text.SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(java.util.Date(last))
                     else "—") +
+                "\nTiempo total visto: " + fmtWatch(Store.watchSec(cur)) +
                 "\nVisto: " + (if (Store.isSeen(cur)) "Sí" else "No")
         }
         AlertDialog.Builder(this)
@@ -1284,6 +1308,12 @@ class VideoPlayerActivity : AppCompatActivity() {
             if (c.moveToFirst()) c.getLong(0) else -1L
         } ?: -1L
     } catch (e: Exception) { -1L }
+
+    private fun fmtWatch(sec: Int): String = when {   // [TIEMPO-1]
+        sec >= 3600 -> String.format(Locale.US, "%d h %02d min", sec / 3600, (sec % 3600) / 60)
+        sec >= 60 -> String.format(Locale.US, "%d min %02d s", sec / 60, sec % 60)
+        else -> "$sec s"
+    }
 
     private fun fmtSize(b: Long): String =
         if (b >= 1_073_741_824L) String.format(Locale.US, "%.2f GB", b / 1_073_741_824.0)
@@ -1528,6 +1558,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        flushWatch()   // [TIEMPO-1]
         saveProgress()
         if (::video.isInitialized) {
             if (fastOn) setFast(false)   // [GESTO-2] vuelve a 1x antes de pausar
@@ -1548,6 +1579,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        flushWatch()   // [TIEMPO-1]
         handler.removeCallbacks(tick)
         handler.removeCallbacks(hideHud)
         handler.removeCallbacks(hidePreview)
