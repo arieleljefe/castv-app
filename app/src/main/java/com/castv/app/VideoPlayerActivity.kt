@@ -10,6 +10,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.audiofx.LoudnessEnhancer
 import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Bundle
@@ -106,6 +107,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var gSeekStart = 0
     private var gSeekTo = 0
     private var mpRef: MediaPlayer? = null
+    private var enhancer: LoudnessEnhancer? = null   // [VOL-1] volumen extra (más de 100 %)
     private var abA = -1               // [AB-1] inicio de la repetición A-B (ms; -1 = sin marcar)
     private var abB = -1               // [AB-1] fin (ms; -1 = sin marcar)
     private var fastOn = false
@@ -285,6 +287,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         video.setOnPreparedListener { mp ->
             mpRef = mp   // [GESTO-2]
+            applyBoost(mp)   // [VOL-1]
             fastOn = false
             video.setVideoDims(mp.videoWidth, mp.videoHeight)   // [UI-2c]
             if (pendingStart > 0) video.seekTo(pendingStart * 1000)
@@ -1204,7 +1207,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "⏱ Saltar a un tiempo…",
             "🔁 Marcar A (inicio) aquí",
             "🔁 Marcar B (fin) aquí",
-            "❌ Quitar repetición A-B")
+            "❌ Quitar repetición A-B",
+            "🔊 Volumen extra: " + boostPct() + " %")
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
@@ -1213,8 +1217,44 @@ class VideoPlayerActivity : AppCompatActivity() {
                     1 -> markA()
                     2 -> markB()
                     3 -> clearAb()
+                    4 -> showBoostDialog()
                 }
             }
+            .show()
+    }
+
+    // [VOL-1] volumen extra con LoudnessEnhancer (100 / 150 / 200 / 300 %)
+    private val boostVals = intArrayOf(100, 150, 200, 300)
+
+    private fun boostPct(): Int =
+        getSharedPreferences("castv", MODE_PRIVATE).getInt("vboost", 100).let { if (it in boostVals) it else 100 }
+
+    private fun applyBoost(mp: MediaPlayer?) {
+        try { enhancer?.release() } catch (e: Exception) { }
+        enhancer = null
+        val pct = boostPct()
+        if (pct <= 100 || mp == null) return
+        try {
+            val e = LoudnessEnhancer(mp.audioSessionId)
+            e.setTargetGain((2000 * Math.log10(pct / 100.0)).toInt())
+            e.setEnabled(true)
+            enhancer = e
+        } catch (ex: Exception) {
+            toast("Este teléfono no permite subir más el volumen")
+        }
+    }
+
+    private fun showBoostDialog() {
+        val labels = Array(boostVals.size) { i -> if (boostVals[i] == 100) "100 % (normal)" else boostVals[i].toString() + " %" }
+        AlertDialog.Builder(this)
+            .setTitle("🔊 Volumen extra (puede distorsionar)")
+            .setSingleChoiceItems(labels, boostVals.indexOf(boostPct())) { d, which ->
+                d.dismiss()
+                getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("vboost", boostVals[which]).apply()
+                applyBoost(mpRef)
+                showHud("🔊 Volumen extra: " + boostVals[which] + " %")
+            }
+            .setNegativeButton("Cerrar", null)
             .show()
     }
 
@@ -1318,6 +1358,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         handler.removeCallbacks(hideHud)
         handler.removeCallbacks(hidePreview)
         handler.removeCallbacks(hideLockBtn)   // [UI-2a]
+        try { enhancer?.release() } catch (e: Exception) { }   // [VOL-1]
+        enhancer = null
         if (::video.isInitialized) {
             try { video.stopPlayback() } catch (e: Exception) { }
         }
