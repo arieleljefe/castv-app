@@ -9,15 +9,23 @@ import java.io.InputStream
 /**
  * Respaldo de los datos del usuario en un archivo JSON (favoritos, listas, historial de enlaces,
  * listas M3U, favoritos de canales y ajustes). No incluye la IP del TV, ni los puntos de
- * reanudación ni las estadísticas de uso.
+ * reanudación ni las estadísticas de uso (salvo las marcas de «visto»; el modo incógnito y los
+ * presets propios del ecualizador ya viajaban en las preferencias).
  *
  * Importar REEMPLAZA los datos actuales. Antes de tocar nada, todo el archivo se lee y se valida.
  */
 object Backup {
     private const val APP = "castv"
     private const val VERSION = 1
-    private val FILES = listOf("castv_lib", "castv")
+    private val FILES = listOf("castv_lib", "castv", "castv_stats")   // [BACKUP-2] castv_stats: solo las marcas "visto"
     private val SKIP = setOf("tvIp", "pin_hash")   // [BACKUP-1] propios de cada teléfono/red: no se respaldan ni se tocan al importar
+
+    /** [BACKUP-2] Qué claves de cada archivo se respaldan: en castv_stats solo las marcas "visto" (v|...). */
+    private fun keep(name: String, k: String): Boolean = when (name) {
+        "castv" -> k !in SKIP
+        "castv_stats" -> k.startsWith("v|")
+        else -> true
+    }
 
     /** Arma el JSON con las preferencias de la app. */
     fun build(ctx: Context): String {
@@ -30,7 +38,7 @@ object Backup {
             val sp = ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
             val o = JSONObject()
             loop@ for ((k, v) in sp.all) {
-                if (name == "castv" && k in SKIP) continue@loop
+                if (!keep(name, k)) continue@loop
                 val e = JSONObject()
                 when (v) {
                     is String -> e.put("t", "s").put("v", v)
@@ -82,7 +90,7 @@ object Backup {
                 val keys = o.keys()
                 while (keys.hasNext()) {
                     val k = keys.next()
-                    if (name == "castv" && k in SKIP) continue
+                    if (!keep(name, k)) continue
                     val e = o.getJSONObject(k)
                     val v: Any = when (e.getString("t")) {
                         "s" -> e.getString("v")
@@ -112,7 +120,7 @@ object Backup {
             val sp = ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
             val ed = sp.edit()
             for (k in sp.all.keys) {
-                if (name == "castv" && k in SKIP) continue
+                if (!keep(name, k)) continue
                 ed.remove(k)
             }
             for ((k, v) in m) {
