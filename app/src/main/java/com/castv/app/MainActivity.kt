@@ -3112,7 +3112,15 @@ class MainActivity : AppCompatActivity() {
             val eq = Equalizer(0, mp.audioSessionId)
             val n = eq.numberOfPresets.toInt()
             eqNames = (0 until n).map { i -> eq.getPresetName(i.toShort()) }
-            if (eqPreset in 0 until n) {
+            val up = activeUserPreset()   // [EQ-PRE-1] preset propio activo
+            if (up != null) {
+                eq.setEnabled(true)
+                val lo = eq.bandLevelRange[0].toInt()
+                val hi = eq.bandLevelRange[1].toInt()
+                for (b in 0 until eq.numberOfBands.toInt()) {
+                    if (b < up.second.size) eq.setBandLevel(b.toShort(), up.second[b].coerceIn(lo, hi).toShort())
+                }
+            } else if (eqPreset in 0 until n) {
                 eq.usePreset(eqPreset.toShort())
                 eq.setEnabled(true)
             } else {
@@ -3144,19 +3152,179 @@ class MainActivity : AppCompatActivity() {
         val labels = ArrayList<String>()
         labels.add("Sin ecualizador")
         labels.addAll(eqNames)
+        val upName = activeUserPreset()?.first   // [EQ-PRE-1]
+        labels.add("🎛 Mis presets" + (if (upName != null) ": $upName" else "") + "…")
         labels.add(if (bassOn) "🔊 Graves reforzados: SÍ (toca para quitar)" else "🔊 Reforzar graves")
         AlertDialog.Builder(this)
             .setTitle("🎚 Ecualizador")
-            .setSingleChoiceItems(labels.toTypedArray(), eqPreset + 1) { d, which ->
+            .setSingleChoiceItems(labels.toTypedArray(), if (upName != null) eqNames.size + 1 else eqPreset + 1) { d, which ->
                 if (which == labels.size - 1) {
                     bassOn = !bassOn
+                } else if (which == labels.size - 2) {   // [EQ-PRE-1]
+                    d.dismiss()
+                    showUserPresets()
+                    return@setSingleChoiceItems
                 } else {
                     eqPreset = which - 1
+                    getSharedPreferences("castv", MODE_PRIVATE).edit().putString("eq_user_on", "").apply()   // [EQ-PRE-1] uno del sistema apaga el propio
                 }
                 getSharedPreferences("castv", MODE_PRIVATE).edit()
                     .putInt("eqPreset", eqPreset).putBoolean("bassOn", bassOn).apply()
                 if (localActive && localPrepared) localPlayer?.let { attachEffects(it) }
                 d.dismiss()
+            }
+            .show()
+    }
+
+    // ------------------------------------------- [EQ-PRE-1] Presets propios del ecualizador
+
+    private fun eqPrefs() = getSharedPreferences("castv", MODE_PRIVATE)
+
+    /** Lee los presets propios: nombre y nivel (en milibelios) de cada banda. */
+    private fun readUserPresets(): MutableList<Pair<String, IntArray>> {
+        val out = ArrayList<Pair<String, IntArray>>()
+        try {
+            val arr = org.json.JSONArray(eqPrefs().getString("eq_user", "[]") ?: "[]")
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val l = o.getJSONArray("l")
+                out.add(o.getString("n") to IntArray(l.length()) { j -> l.getInt(j) })
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun writeUserPresets(list: List<Pair<String, IntArray>>) {
+        val arr = org.json.JSONArray()
+        for (p in list) {
+            val o = org.json.JSONObject()
+            o.put("n", p.first)
+            val la = org.json.JSONArray()
+            for (v in p.second) la.put(v)
+            o.put("l", la)
+            arr.put(o)
+        }
+        eqPrefs().edit().putString("eq_user", arr.toString()).apply()
+    }
+
+    private fun activeUserPreset(): Pair<String, IntArray>? {
+        val name = eqPrefs().getString("eq_user_on", "") ?: ""
+        if (name.isEmpty()) return null
+        return readUserPresets().firstOrNull { it.first == name }
+    }
+
+    private fun setActiveUserPreset(name: String) {
+        eqPrefs().edit().putString("eq_user_on", name).apply()
+        if (localActive && localPrepared) localPlayer?.let { attachEffects(it) }
+    }
+
+    private fun showUserPresets() {
+        val list = readUserPresets()
+        val on = activeUserPreset()?.first
+        val labels = ArrayList<String>()
+        for (p in list) labels.add((if (p.first == on) "✓ " else "") + p.first)
+        labels.add("➕ Nuevo preset…")
+        if (on != null) labels.add("⏹ Dejar de usar mi preset")
+        AlertDialog.Builder(this)
+            .setTitle("🎛 Mis presets")
+            .setItems(labels.toTypedArray()) { _, which ->
+                when {
+                    which < list.size -> userPresetMenu(list[which].first)
+                    which == list.size -> editUserPreset(null)
+                    else -> { setActiveUserPreset(""); toast("Mi preset desactivado") }
+                }
+            }
+            .show()
+    }
+
+    private fun userPresetMenu(name: String) {
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setItems(arrayOf("✅ Usar", "✏ Editar", "🗑 Eliminar")) { _, which ->
+                when (which) {
+                    0 -> { setActiveUserPreset(name); toast("🎛 Usando «$name»") }
+                    1 -> editUserPreset(name)
+                    else -> {
+                        writeUserPresets(readUserPresets().filter { it.first != name })
+                        if (eqPrefs().getString("eq_user_on", "") == name) setActiveUserPreset("")
+                        toast("Preset eliminado")
+                    }
+                }
+            }
+            .show()
+    }
+
+    /** Crea (name == null) o edita un preset propio con un deslizador por banda; se oye mientras lo mueves. */
+    private fun editUserPreset(name: String?) {
+        val eq = equalizer
+        if (eq == null) {
+            toast("Pon una pista en el teléfono y vuelve a abrir el ecualizador")
+            return
+        }
+        val bands = eq.numberOfBands.toInt()
+        val lo = eq.bandLevelRange[0].toInt()
+        val hi = eq.bandLevelRange[1].toInt()
+        val old = if (name != null) readUserPresets().firstOrNull { it.first == name }?.second else null
+        val levels = IntArray(bands) { b ->
+            old?.getOrNull(b) ?: try { eq.getBandLevel(b.toShort()).toInt() } catch (e: Exception) { 0 }
+        }
+        fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+        val box = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+        }
+        val nameEt = EditText(this)
+        nameEt.hint = "Nombre del preset"
+        nameEt.setSingleLine(true)
+        nameEt.setText(name ?: "")
+        box.addView(nameEt)
+        for (b in 0 until bands) {
+            val hz = try { eq.getCenterFreq(b.toShort()) / 1000 } catch (e: Exception) { 0 }
+            val tv = TextView(this)
+            tv.setPadding(0, dp(12), 0, 0)
+            val upd = {
+                val f = if (hz >= 1000) java.util.Locale.US.let { String.format(it, "%.1f kHz", hz / 1000.0) } else "$hz Hz"
+                tv.text = f + "  ·  " + String.format(java.util.Locale.US, "%+.1f dB", levels[b] / 100.0)
+            }
+            val sb = SeekBar(this)
+            sb.max = hi - lo
+            sb.progress = (levels[b] - lo).coerceIn(0, hi - lo)
+            sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                    levels[b] = lo + p
+                    upd()
+                    if (fromUser) {
+                        try { eq.setEnabled(true); eq.setBandLevel(b.toShort(), levels[b].toShort()) } catch (e: Exception) { }
+                    }
+                }
+                override fun onStartTrackingTouch(s: SeekBar) {}
+                override fun onStopTrackingTouch(s: SeekBar) {}
+            })
+            upd()
+            box.addView(tv)
+            box.addView(sb)
+        }
+        val scroll = android.widget.ScrollView(this)
+        scroll.addView(box)
+        AlertDialog.Builder(this)
+            .setTitle(if (name == null) "🎛 Nuevo preset" else "🎛 Editar preset")
+            .setView(scroll)
+            .setPositiveButton("Guardar") { _, _ ->
+                val n = nameEt.text.toString().trim()
+                if (n.isEmpty()) {
+                    toast("Escribe un nombre para guardarlo")
+                } else {
+                    val all = readUserPresets().filter { it.first != name && it.first != n }.toMutableList()
+                    all.add(n to levels.copyOf())
+                    writeUserPresets(all)
+                    setActiveUserPreset(n)
+                    toast("🎛 Preset «$n» guardado y activado")
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .setOnDismissListener {
+                // vuelve al sonido guardado (si se canceló, deshace lo que se oyó mientras se movían los deslizadores)
+                if (localActive && localPrepared) localPlayer?.let { attachEffects(it) }
             }
             .show()
     }
