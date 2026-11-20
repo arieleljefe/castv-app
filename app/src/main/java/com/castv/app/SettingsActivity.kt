@@ -322,6 +322,9 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Avanzado", "Probar extracción de audio (IA)",
             "Prueba para los subtítulos con IA: saca el audio de un video y mide cuánto tarda",
             { pickIaVideo.launch(arrayOf("video/*")) }))   // [IA-1]
+        l.add(Entry("Avanzado", "Probar Whisper (IA)",
+            "Comprueba que el motor de subtítulos con IA carga en este teléfono (todavía no transcribe)",
+            { runWhisperTest() }))   // [IA-2a]
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
@@ -692,6 +695,39 @@ class SettingsActivity : AppCompatActivity() {
                     .show()
             }
         }.start()
+    }
+
+    // ------------------------------------------------- [IA-2a] Prueba de Whisper
+
+    private fun runWhisperTest() {
+        val ok: Boolean
+        val info: String
+        try {
+            info = WhisperLib.systemInfo()
+            ok = true
+        } catch (t: Throwable) {
+            val msg = "${t.javaClass.simpleName}: ${t.message}"
+            try { DebugLog.add("IA-2a: no cargó Whisper: $msg") } catch (e: Exception) { }
+            AlertDialog.Builder(this)
+                .setTitle("⚠️ Whisper no cargó")
+                .setMessage(msg)
+                .setPositiveButton("Cerrar", null)
+                .show()
+            return
+        }
+        try { DebugLog.add("IA-2a: Whisper cargó. ${info.trim()}") } catch (e: Exception) { }
+        val tv = TextView(this)
+        tv.text = if (ok) info.trim() else ""
+        tv.textSize = 12f
+        tv.typeface = android.graphics.Typeface.MONOSPACE
+        tv.setTextColor(txtColor)
+        tv.setTextIsSelectable(true)
+        tv.setPadding(dp(24), dp(16), dp(24), dp(8))
+        AlertDialog.Builder(this)
+            .setTitle("✅ Whisper cargó")
+            .setView(tv)
+            .setPositiveButton("Cerrar", null)
+            .show()
     }
 
     // ------------------------------------------------- [RED-1] Red
