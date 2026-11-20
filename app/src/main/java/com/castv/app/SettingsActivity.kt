@@ -325,6 +325,9 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Avanzado", "Probar Whisper (IA)",
             "Comprueba que el motor de subtítulos con IA carga en este teléfono (todavía no transcribe)",
             { runWhisperTest() }))   // [IA-2a]
+        l.add(Entry("Avanzado", "Probar transcripción (IA)",
+            "Baja el modelo de voz (una vez, unos 143 MB) y transcribe un video; mide la velocidad. Todavía no crea subtítulos",
+            { startIaTranscribe() }))   // [IA-2b]
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
@@ -728,6 +731,243 @@ class SettingsActivity : AppCompatActivity() {
             .setView(tv)
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    // ------------------------------------------------- [IA-2b] Modelo y transcripción de prueba
+
+    private class IaSeg(val t0: Long, val t1: Long, val text: String)
+
+    private val pickIaTranscribe = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runIaTranscribe(uri)
+    }
+
+    private fun fmtCs(cs: Long): String {
+        val s = cs / 100
+        return String.format(java.util.Locale.US, "%02d:%02d", s / 60, s % 60)
+    }
+
+    private fun startIaTranscribe() {
+        if (WhisperModel.isReady(this)) {
+            pickIaTranscribe.launch(arrayOf("video/*"))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Falta el modelo de voz")
+            .setMessage("Para transcribir hace falta bajar el modelo de voz (base, unos 143 MB, una sola vez). Conviene estar con Wi-Fi. ¿Descargarlo ahora?")
+            .setPositiveButton("Descargar") { _, _ -> downloadWhisperModel() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun downloadWhisperModel() {
+        val cancel = AtomicBoolean(false)
+        val msg = TextView(this)
+        msg.text = "Conectando…"
+        msg.setTextColor(txtColor)
+        msg.setPadding(dp(24), dp(16), dp(24), dp(8))
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Descargando modelo")
+            .setView(msg)
+            .setCancelable(false)
+            .setNegativeButton("Cancelar") { _, _ -> cancel.set(true) }
+            .create()
+        dlg.show()
+        dlg.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val act = this@SettingsActivity
+        Thread {
+            val r = WhisperModel.download(act, { pct, mb ->
+                runOnUiThread {
+                    msg.text = if (pct >= 0) "Avance: $pct % ($mb MB)" else "Descargado: $mb MB"
+                }
+            }, { cancel.get() })
+            try { DebugLog.add("IA-2b: modelo base: ${r.message}") } catch (e: Exception) { }
+            runOnUiThread {
+                if (act.isFinishing || act.isDestroyed) return@runOnUiThread
+                try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
+                if (r.ok) {
+                    pickIaTranscribe.launch(arrayOf("video/*"))
+                } else if (r.cancelled) {
+                    toast("Descarga cancelada")
+                } else {
+                    AlertDialog.Builder(act)
+                        .setTitle("⚠️ No se pudo bajar el modelo")
+                        .setMessage(r.message)
+                        .setPositiveButton("Cerrar", null)
+                        .show()
+                }
+            }
+        }.start()
+    }
+
+    private fun runIaTranscribe(uri: Uri) {
+        var shown: String? = null
+        try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) shown = c.getString(0)
+            }
+        } catch (e: Exception) { }
+        val name = shown ?: (uri.lastPathSegment ?: "video")
+        val pcm = File(cacheDir, "ia_audio.pcm")
+        val cancel = AtomicBoolean(false)
+        val msg = TextView(this)
+        msg.text = "Preparando…"
+        msg.setTextColor(txtColor)
+        msg.setPadding(dp(24), dp(16), dp(24), dp(8))
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Transcribiendo")
+            .setView(msg)
+            .setCancelable(false)
+            .setNegativeButton("Cancelar") { _, _ ->
+                cancel.set(true)
+                try { WhisperLib.setCancel(true) } catch (e: Throwable) { }
+            }
+            .create()
+        dlg.show()
+        dlg.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val act = this@SettingsActivity
+        Thread {
+            var ctx = 0L
+            var errTitle = ""
+            var errText = ""
+            val segs = ArrayList<IaSeg>()
+            var extractMs = 0L
+            var audioSec = 0.0
+            var transMs = 0L
+            var cancelled = false
+            try {
+                WhisperLib.setCancel(false)
+                runOnUiThread { msg.text = "Extrayendo audio…" }
+                val r = AudioExtractor.extract(act, uri, pcm, { pct ->
+                    runOnUiThread { msg.text = "Extrayendo audio: $pct %" }
+                }, { cancel.get() })
+                extractMs = r.tookMs
+                if (!r.ok) {
+                    if (r.cancelled) {
+                        cancelled = true
+                    } else {
+                        errTitle = "⚠️ No se pudo extraer el audio"
+                        errText = r.message
+                    }
+                } else {
+                    audioSec = r.durationSec
+                    runOnUiThread { msg.text = "Cargando el modelo…" }
+                    ctx = WhisperLib.initContext(WhisperModel.file(act).absolutePath)
+                    if (ctx == 0L) {
+                        try { WhisperModel.file(act).delete() } catch (e: Exception) { }
+                        errTitle = "⚠️ No se pudo cargar el modelo"
+                        errText = "El archivo del modelo parece dañado y se borró. Vuelve a tocar la prueba para bajarlo otra vez."
+                    } else {
+                        val chunkSamples = 5 * 60 * 16000
+                        val totalSamples = pcm.length() / 2
+                        val chunks = ((totalSamples + chunkSamples - 1) / chunkSamples).toInt()
+                        val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+                        val tStart = System.currentTimeMillis()
+                        java.io.FileInputStream(pcm).use { fin ->
+                            val bytes = ByteArray(chunkSamples * 2)
+                            var idx = 0
+                            while (idx < chunks) {
+                                if (cancel.get()) {
+                                    cancelled = true
+                                    break
+                                }
+                                val num = idx + 1
+                                runOnUiThread { msg.text = "Transcribiendo bloque $num de $chunks…" }
+                                var got = 0
+                                while (got < bytes.size) {
+                                    val rd = fin.read(bytes, got, bytes.size - got)
+                                    if (rd < 0) break
+                                    got += rd
+                                }
+                                val ns = got / 2
+                                if (ns <= 0) break
+                                // Whisper pide al menos 1 s de audio: se rellena con silencio
+                                val len = if (ns < 17600) 17600 else ns
+                                val audio = FloatArray(len)
+                                for (k in 0 until ns) {
+                                    val lo = bytes[2 * k].toInt() and 0xFF
+                                    val hi = bytes[2 * k + 1].toInt()
+                                    audio[k] = ((hi shl 8) or lo) / 32768f
+                                }
+                                val rc = WhisperLib.transcribe(ctx, threads, "es", audio)
+                                if (cancel.get()) {
+                                    cancelled = true
+                                    break
+                                }
+                                if (rc != 0) {
+                                    errTitle = "⚠️ Falló la transcripción"
+                                    errText = "Whisper devolvió el código $rc en el bloque $num."
+                                    break
+                                }
+                                val offCs = idx.toLong() * chunkSamples / 160
+                                val cnt = WhisperLib.segmentCount(ctx)
+                                for (sIdx in 0 until cnt) {
+                                    val tx = WhisperLib.segmentText(ctx, sIdx).trim()
+                                    if (tx.isNotEmpty()) {
+                                        segs.add(IaSeg(
+                                            offCs + WhisperLib.segmentT0(ctx, sIdx),
+                                            offCs + WhisperLib.segmentT1(ctx, sIdx),
+                                            tx
+                                        ))
+                                    }
+                                }
+                                idx++
+                            }
+                        }
+                        transMs = System.currentTimeMillis() - tStart
+                    }
+                }
+            } catch (e: Throwable) {
+                errTitle = "⚠️ Error en la transcripción"
+                errText = "${e.javaClass.simpleName}: ${e.message}"
+            } finally {
+                if (ctx != 0L) {
+                    try { WhisperLib.freeContext(ctx) } catch (e: Throwable) { }
+                }
+                try { pcm.delete() } catch (e: Exception) { }
+            }
+            val secs = transMs / 1000.0
+            val speed = if (secs > 0) audioSec / secs else 0.0
+            val f1 = { v: Double -> String.format(java.util.Locale.US, "%.1f", v) }
+            val line = when {
+                cancelled -> "IA-2b: $name: cancelado"
+                errTitle.isNotEmpty() -> "IA-2b: $name: $errText"
+                else -> "IA-2b: $name: ${segs.size} frases; ${f1(audioSec)} s de audio en ${f1(secs)} s " +
+                    "(${f1(speed)}x); modelo base; extracción $extractMs ms"
+            }
+            try { DebugLog.add(line) } catch (e: Exception) { }
+            runOnUiThread {
+                if (act.isFinishing || act.isDestroyed) return@runOnUiThread
+                try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
+                val dTitle: String
+                val dBody: String
+                if (cancelled) {
+                    dTitle = "Cancelado"
+                    dBody = "Se detuvo la transcripción y se borró el audio temporal."
+                } else if (errTitle.isNotEmpty()) {
+                    dTitle = errTitle
+                    dBody = errText
+                } else {
+                    dTitle = "✅ Transcripción lista"
+                    val sb = StringBuilder()
+                    sb.append(name).append("\n\n")
+                    sb.append("${f1(audioSec / 60.0)} min de audio en ${f1(secs)} s (${f1(speed)}x el tiempo real).\n")
+                    sb.append("${segs.size} frases.\n\n")
+                    if (segs.isEmpty()) {
+                        sb.append("No se detectó voz.")
+                    } else {
+                        for (sg in segs.take(8)) {
+                            sb.append("[").append(fmtCs(sg.t0)).append("] ").append(sg.text).append("\n")
+                        }
+                    }
+                    dBody = sb.toString()
+                }
+                AlertDialog.Builder(act)
+                    .setTitle(dTitle)
+                    .setMessage(dBody)
+                    .setPositiveButton("Cerrar", null)
+                    .show()
+            }
+        }.start()
     }
 
     // ------------------------------------------------- [RED-1] Red
