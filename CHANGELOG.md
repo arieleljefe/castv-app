@@ -1,4 +1,4 @@
-# Registro de cambios y guía de continuidad – CASTV (v193)
+# Registro de cambios y guía de continuidad – CASTV (v195)
 
 **Memoria del proyecto.** Pasar este archivo completo a cualquier asistente para continuar.
 
@@ -38,18 +38,19 @@
 
 ---
 
-## 📍 Estado Actual (v193)
+## 📍 Estado Actual (v195)
 
+- ✅ **GESTO-2 + NOVEDADES-1 — confirmado por Ariel el 19 nov 2026, 21:32 ("Ya funciona todo"; aplicado, compilado y probado en el teléfono; commits `b71f407` y `16c3e91`).** Cubre los 7 pasos: deslizar de lado, mantener pulsado 2x, doble toque al centro, brillo guardado, pellizco, temporizador 😴 con los 6 chips y el cuadro de Novedades / Consejos de gestos. **Sin anotar:** el resultado de cada paso por separado; pedir solo si Ariel ve algo raro. En el banco de ideas pasan de 🧪 a ✅: 2, 3, 4, 6, 8 (guardar brillo), 9 y 13. **Siguen ⬜:** repetición A-B, saltar a un tiempo, picture-in-picture, estadísticas de video y confirmar antes de reanudar. Detalle original en la entrada de v192 (abajo).
 - 📋 **PARA MAÑANA (20 nov 2026), en este orden (anotado el 19 nov, 21:15):**
-  1. **Aplicar lo entregado en v192 si falta** (aún no se sabe si Ariel lo aplicó): `gestos2.patch` → `novedades1.patch` → `CHANGELOG_v193.md` (una línea cada uno, reglas 5 y 6; si `git apply` falla, probar `--ignore-whitespace`).
-  2. **Mirar GitHub Actions.** Si sale en rojo, pasar el mensaje de error (lo más probable: tipos de Kotlin en `setupGestures` de `VideoPlayerActivity.kt`).
-  3. **Probar GESTO-2 y NOVEDADES-1** con los 7 pasos de la entrada de v192 (deslizar, 2x, doble toque centro, brillo, pellizco, 😴 y 6 chips en vertical, cuadro de novedades). Riesgo conocido: la velocidad 2x depende del `MediaPlayer` del teléfono.
+  1. ~~Aplicar lo entregado en v192~~ **Hecho (v194):** `gestos2.patch`, `novedades1.patch` y los changelogs v192/v193 ya están en GitHub.
+  2. ~~Mirar GitHub Actions~~ **Compiló** (Ariel ya probó la app con GESTO-2).
+  3. ~~Probar GESTO-2 y NOVEDADES-1~~ **Confirmado ✅ (v195).** Riesgo conocido: la velocidad 2x depende del `MediaPlayer` del teléfono.
   4. **Probar lo viejo que sigue 🧪:** versión 3.0, PUERTO-1, BIBLIO-1, AUDIO-1, PARENTAL-1/2, CARPETAS-1, BACKUP-1, AVISO-HLS-2 y SEL-2 (pasos en v139).
   5. **Con el "ya funciona" de Ariel:** pasar esos 🧪 a ✅ y dar la etiqueta `git tag v3.0 && git push origin v3.0` (publica `CASTV-v3.0.apk`).
   6. **Después, a elección:** repetición A-B, saltar a un tiempo, picture-in-picture, estadísticas de video, confirmar antes de reanudar; limpieza de restos en la raíz del repo; CHECK-1 sigue ⏳ en pausa.
-  - **Para retomar:** pasar solo `CHANGELOG_v193.md` (y los `*_actual.kt` que se pidan en una línea, regla 9).
+  - **Para retomar:** pasar solo `CHANGELOG_v195.md` (y los `*_actual.kt` que se pidan en una línea, regla 9).
 
-- 🧪 **GESTO-2 + NOVEDADES-1 Gestos y extras del reproductor de video (v192, 19 nov 2026, ~21:30; DOS parches en cadena; verificados con `git apply --check` sobre tus tres `*_actual.kt` reales (VideoPlayerActivity 947 líneas, SettingsActivity 789, MainActivity 3282); NO compilados (no hay SDK de Android aquí); SIN probar).** Ariel pidió "Hazlo todo" (gestos y extras del banco de ideas). Regla 4: por eso van **dos parches y dos commits**, para poder revertir cada uno solo. **Orden obligatorio: primero `gestos2.patch`, después `novedades1.patch`** (el segundo agrega una fila en Ajustes justo debajo de la que crea el primero).
+- ✅ **(confirmado en v195, ver arriba) GESTO-2 + NOVEDADES-1 Gestos y extras del reproductor de video (v192, 19 nov 2026, ~21:30; DOS parches en cadena; verificados con `git apply --check` sobre tus tres `*_actual.kt` reales (VideoPlayerActivity 947 líneas, SettingsActivity 789, MainActivity 3282); NO compilados (no hay SDK de Android aquí); SIN probar).** Ariel pidió "Hazlo todo" (gestos y extras del banco de ideas). Regla 4: por eso van **dos parches y dos commits**, para poder revertir cada uno solo. **Orden obligatorio: primero `gestos2.patch`, después `novedades1.patch`** (el segundo agrega una fila en Ajustes justo debajo de la que crea el primero).
   - **Parche 1 `gestos2.patch` (2 archivos: `VideoPlayerActivity.kt` +223/−12, `SettingsActivity.kt` +16/−1; cero XML nuevo):**
     1. **Deslizar horizontal = adelantar/retroceder.** Se decide en `onScroll` cuando el dedo se mueve más de lado que de alto (antes se ignoraba). Toda la pantalla equivale a **90 segundos**; mientras arrastras se ve "⏩ +15 s" y el tiempo destino; **el salto se hace al soltar** (así no se traba). No funciona en canales en vivo (duración ≤ 0) ni desde los bordes de 32 dp (gestos del sistema). Si pones un segundo dedo, se cancela.
     2. **Mantener pulsado = velocidad 2x mientras sostienes.** `GestureDetector.onLongPress` pone `PlaybackParams().setSpeed(2f)` en el `MediaPlayer`; como `VideoView` no lo expone, ahora se guarda la referencia `mpRef` en `setOnPreparedListener`. **Solo se activa con el video sonando** (en pausa algunos teléfonos lo arrancan solo; mismo criterio que `applySpeed()` de `MainActivity`) y no en canales en vivo. Al soltar vuelve a 1x (y se restaura también en `onPause`).
@@ -1107,6 +1108,10 @@ Fases propuestas (una por parche, cada una con su 🧪 antes del código):
 - Respaldo exportado por Ariel (`castv_respaldo_2026-11-17.json`) verificado: formato `castv` v1 válido (`castv_lib`: chfav, fav, links, m3u, m3uLast; `castv`: lastMusic, outPhone). El tema y el color no aparecen porque nunca se cambiaron (valores por defecto).
 
 ### Notas de este día
+
+- **v195 (19 nov 2026, ~21:35):** Ariel dijo "Ya funciona todo" tras probar GESTO-2 y NOVEDADES-1: **ambos ✅**. **Sin código nuevo.** Siguen 🧪 sin reporte: versión 3.0, PUERTO-1, BIBLIO-1, AUDIO-1, PARENTAL-1/2, CARPETAS-1, BACKUP-1, AVISO-HLS-2 y SEL-2 (la etiqueta `v3.0` espera a esos). **Para retomar:** pasar solo `CHANGELOG_v195.md`.
+
+- **v194 (19 nov 2026, ~21:35):** Ariel retomó, mostró `git log` (v192, GESTO-2, NOVEDADES-1 y v193 ya subidos, árbol limpio) y confirmó mantener pulsado 2x y doble toque al centro. Se anotó como avance parcial de GESTO-2 (ver Estado Actual). **Sin código nuevo.** **Para retomar:** pasar solo `CHANGELOG_v194.md`.
 
 - **v193 (19 nov 2026, 21:15):** Ariel pidió anotar todo para seguir mañana. **Sin código nuevo**; solo se agregó "PARA MAÑANA" en Estado Actual. **Para retomar:** pasar solo `CHANGELOG_v193.md`.
 
