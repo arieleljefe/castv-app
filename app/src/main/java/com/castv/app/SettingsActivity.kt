@@ -236,6 +236,7 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
             if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
             else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
+        l.add(Entry("Vídeo", "Consejos de gestos", "Cómo usar los gestos del reproductor de video", { sendAction("tips") }))   // [NOVEDADES-1]
 
         // [BIBLIO-1] Biblioteca
         l.add(Entry("Biblioteca", "Re-escanear ahora", "Vuelve a leer tus videos y tu música", { sendAction("rescan") }))

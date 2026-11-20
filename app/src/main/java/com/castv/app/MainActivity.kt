@@ -630,10 +630,40 @@ class MainActivity : AppCompatActivity() {
         monitoring = true
         thread { monitorLoop() }
         window.decorView.postDelayed({ warnIfPortBusy() }, 2000)
+        window.decorView.postDelayed({ showWhatsNewOnce() }, 2600)   // [NOVEDADES-1]
     }
 
     /** [Etapa 14-C] El diálogo vive en PortDialog.kt. */
     private fun warnIfPortBusy() = PortDialog.showIfBusy(this)
+
+    // ------------------------------------------------------------ [NOVEDADES-1] Novedades y consejos de gestos
+
+    /** Súbelo cuando haya algo nuevo que contar: el cuadro vuelve a salir una sola vez. */
+    private val whatsNewId = 1
+
+    private fun showWhatsNewOnce() {
+        if (isFinishing || isDestroyed) return
+        val p = getSharedPreferences("castv", MODE_PRIVATE)
+        if (p.getInt("whatsnew_seen", 0) >= whatsNewId) return
+        p.edit().putInt("whatsnew_seen", whatsNewId).apply()   // se marca al mostrarlo: no vuelve a salir al girar la pantalla
+        showGestureTips()
+    }
+
+    private fun showGestureTips() {
+        AlertDialog.Builder(this)
+            .setTitle("✨ Novedades y consejos")
+            .setMessage(
+                "En el reproductor de video:\n\n" +
+                "• Desliza hacia los lados: adelantas o retrocedes.\n" +
+                "• Desliza hacia arriba o abajo: a la derecha cambia el brillo y a la izquierda el volumen.\n" +
+                "• Doble toque a los lados: salta unos segundos; en el centro: pausa o reanuda.\n" +
+                "• Mantén pulsado: se ve al doble de velocidad hasta que sueltes.\n" +
+                "• Pellizca con dos dedos: acercas la imagen.\n" +
+                "• 😴 (barra de arriba): temporizador de apagado.\n\n" +
+                "Puedes volver a verlo en Ajustes › Vídeo › Consejos de gestos.")
+            .setPositiveButton("Entendido", null)
+            .show()
+    }
 
     private var loadGen = 0
     private var hiddenSig = ""   // [CARPETAS-1] carpetas ocultas con las que se leyó la lista
@@ -2767,6 +2797,7 @@ class MainActivity : AppCompatActivity() {
                     "socials" -> showSocials()
                     "rescan" -> loadMedia(showingMusic)   // [BIBLIO-1]
                     "equalizer" -> showEqualizer()   // [AUDIO-1]
+                    "tips" -> showGestureTips()   // [NOVEDADES-1]
                 }
             }
             reqM3u -> {
