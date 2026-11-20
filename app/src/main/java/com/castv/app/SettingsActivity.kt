@@ -226,6 +226,8 @@ class SettingsActivity : AppCompatActivity() {
             { pickIaLang() }))   // [IA-4]
         l.add(Entry("Subtítulos", "Modelo de voz (IA)", iaModelStatus(),
             { pickIaModel() }))   // [IA-4]
+        l.add(Entry("Subtítulos", "Borrar modelo de voz (IA)", iaUsedStatus(),
+            { pickIaDelete() }))   // [IA-5]
         l.add(Entry("Subtítulos", "Restablecer estilo",
             "Tamaño mediano, texto blanco, fondo semitransparente", { resetSubStyle() }))
 
@@ -588,6 +590,64 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+            .show()
+    }
+
+    // ------------------------------------------------- [IA-5] Borrar modelos de voz
+
+    private fun mbText(bytes: Long): String = "${bytes / 1_000_000L} MB"
+
+    private fun iaUsedStatus(): String {
+        val used = WhisperModel.usedBytes(this)
+        return if (used <= 0L) "No hay modelos bajados" else "Ocupan ${mbText(used)}"
+    }
+
+    private fun pickIaDelete() {
+        if (SubtitleGen.running) {
+            toast("Se están generando subtítulos; espera a que terminen")
+            return
+        }
+        val present = WhisperModel.present(this)
+        if (present.isEmpty()) {
+            val freed = WhisperModel.clearPartials(this)
+            if (freed > 0L) {
+                toast("Se limpiaron ${mbText(freed)} de descargas incompletas")
+                render()
+            } else {
+                toast("No hay modelos bajados")
+            }
+            return
+        }
+        val names = present.map {
+            it.fullLabel + " · " + mbText(WhisperModel.file(this, it).length())
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Borrar modelo de voz (IA)")
+            .setItems(names) { d, which ->
+                d.dismiss()
+                confirmIaDelete(present[which])
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmIaDelete(sp: WhisperModel.Spec) {
+        val size = WhisperModel.file(this, sp).length()
+        AlertDialog.Builder(this)
+            .setTitle("¿Borrar el modelo ${sp.label}?")
+            .setMessage("Se liberan ${mbText(size)}. Si lo necesitas otra vez, habrá que bajarlo de nuevo (${sp.sizeText}).")
+            .setPositiveButton("Borrar") { _, _ ->
+                if (SubtitleGen.running) {
+                    toast("Se están generando subtítulos; espera a que terminen")
+                } else {
+                    val ok = WhisperModel.delete(this, sp)
+                    WhisperModel.clearPartials(this)
+                    try { DebugLog.add("IA-5: modelo ${sp.shortName} borrado (${mbText(size)}): " + (if (ok) "ok" else "no se pudo")) } catch (e: Exception) { }
+                    toast(if (ok) "Modelo ${sp.fullLabel} borrado" else "No se pudo borrar el modelo")
+                    render()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 

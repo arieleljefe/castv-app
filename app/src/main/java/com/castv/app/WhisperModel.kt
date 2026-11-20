@@ -105,6 +105,41 @@ object WhisperModel {
 
     fun isReady(context: Context): Boolean = isReady(context, selected(context))
 
+    // ------------------------------------------------------------ [IA-5] Borrar modelos
+
+    private fun modelsDir(context: Context) = File(context.filesDir, "models")
+
+    /** Modelos cuyo archivo existe en la carpeta (completos o no), para poder borrarlos. */
+    fun present(context: Context): List<Spec> =
+        MODELS.filter { File(modelsDir(context), it.fileName).exists() }
+
+    /** Bytes que ocupa todo lo que hay en la carpeta de modelos (modelos y .part). */
+    fun usedBytes(context: Context): Long =
+        try { modelsDir(context).listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L }
+        catch (e: Exception) { 0L }
+
+    /** Borra el modelo [spec] y su .part. true si ya no queda el archivo. */
+    fun delete(context: Context, spec: Spec): Boolean {
+        val f = File(modelsDir(context), spec.fileName)
+        try { File(f.parentFile, f.name + ".part").delete() } catch (e: Exception) { }
+        try { if (f.exists()) f.delete() } catch (e: Exception) { }
+        return !f.exists()
+    }
+
+    /** Borra los .part de descargas incompletas. Devuelve los bytes liberados. */
+    fun clearPartials(context: Context): Long {
+        var freed = 0L
+        try {
+            modelsDir(context).listFiles()?.forEach {
+                if (it.isFile && it.name.endsWith(".part")) {
+                    val n = it.length()
+                    if (it.delete()) freed += n
+                }
+            }
+        } catch (e: Exception) { }
+        return freed
+    }
+
     fun download(
         context: Context,
         onProgress: (Int, Long) -> Unit,
