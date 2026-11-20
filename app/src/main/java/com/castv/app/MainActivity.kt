@@ -380,7 +380,13 @@ class MainActivity : AppCompatActivity() {
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
 
-        outPhone = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("outPhone", false)
+        // [SALIDA-INI-1] Salida al abrir la app: 0 = Teléfono (por defecto), 1 = TV, 2 = recordar la última
+        val spOut = getSharedPreferences("castv", MODE_PRIVATE)
+        outPhone = when (spOut.getInt("out_start", 0)) {
+            1 -> false
+            2 -> spOut.getBoolean("outPhone", false)
+            else -> true
+        }
         repeatMode = Repeat.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("repeat", 0)) { Repeat.OFF }
         eqPreset = getSharedPreferences("castv", MODE_PRIVATE).getInt("eqPreset", -1)
@@ -1736,8 +1742,9 @@ class MainActivity : AppCompatActivity() {
                         val label = if (TvController.tvName.isNotEmpty()) TvController.tvName
                                     else (TvController.tvIp ?: "")
                         // [PULIDO-2a] "No se encontró el TV" se avisa una sola vez, no cada 5 s.
-                        val say = found || !tvMissingShown
-                        if (!found) tvMissingShown = true
+                        // [SALIDA-INI-1] En modo Teléfono se sigue buscando el TV, pero sin avisos en pantalla.
+                        val say = !outPhone && (found || !tvMissingShown)
+                        if (!found && !outPhone) tvMissingShown = true
                         runOnUiThread {
                             if (found) updateOutputButton()
                             if (say) setStatus(

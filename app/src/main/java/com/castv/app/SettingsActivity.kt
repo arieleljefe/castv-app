@@ -280,6 +280,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
+        l.add(Entry("Emisión al TV", "Salida al abrir la app", outStartNames[outStartIdx()], { pickOutStart() }))   // [SALIDA-INI-1]
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
         l.add(Entry("Emisión al TV", "IP del teléfono", CastvNet.localIpAddress(tvIp) ?: "Sin conexión Wi-Fi", null))
 
@@ -331,7 +332,7 @@ class SettingsActivity : AppCompatActivity() {
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
-        "Emisión al TV" -> "TV detectada e IP del teléfono"
+        "Emisión al TV" -> "Salida al abrir, TV detectada e IP del teléfono"
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Borrado: papelera o permanente"
         "Avanzado" -> "Registro de la app"
@@ -845,6 +846,26 @@ class SettingsActivity : AppCompatActivity() {
             .setSingleChoiceItems(hideLabels, hideIdx()) { d, which ->
                 prefs().edit().putInt("hide_ms", hideOptions[which]).apply()
                 d.dismiss()
+                render()
+            }
+            .show()
+    }
+
+    // [SALIDA-INI-1] Salida al abrir la app: 0 = Teléfono, 1 = TV, 2 = recordar la última
+    private val outStartNames = arrayOf(
+        "Teléfono (la música y los videos suenan en el móvil)",
+        "TV (como antes)",
+        "Recordar la última que usé")
+
+    private fun outStartIdx(): Int = prefs().getInt("out_start", 0).let { if (it in 0..2) it else 0 }
+
+    private fun pickOutStart() {
+        AlertDialog.Builder(this)
+            .setTitle("Salida al abrir la app")
+            .setSingleChoiceItems(outStartNames, outStartIdx()) { d, which ->
+                prefs().edit().putInt("out_start", which).apply()
+                d.dismiss()
+                toast("Se aplica la próxima vez que abras la app")
                 render()
             }
             .show()
