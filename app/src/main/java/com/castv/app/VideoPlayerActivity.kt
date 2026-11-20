@@ -944,15 +944,58 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun loadSavedSub(m: MediaItem) {
         if (m.id == 0L) return   // [Etapa 13-A] enlaces sin subtítulo recordado
+        subOffset = subPrefs().getInt(offKey(m), 0)   // [SUB-DELAY-1] retraso recordado por video
         val u = subPrefs().getString(subKey(m), null) ?: return
         loadSub(Uri.parse(u), false)
+    }
+
+    // [SUB-DELAY-1] retraso de subtítulos recordado por video
+    private fun offKey(m: MediaItem) = "d|" + Store.key(m)
+
+    private fun saveOffset() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) return   // los enlaces no recuerdan nada
+        if (subOffset == 0) subPrefs().edit().remove(offKey(cur)).apply()
+        else subPrefs().edit().putInt(offKey(cur), subOffset).apply()
+    }
+
+    private fun offText(): String {
+        val sign = if (subOffset > 0) "+" else ""
+        return (sign + (subOffset / 1000.0).toString() + " s").replace('.', ',')
+    }
+
+    private fun changeOffset(deltaMs: Int, reset: Boolean = false) {
+        subOffset = if (reset) 0 else subOffset + deltaMs
+        saveOffset()
+        shownCue = null
+        updateSub()
+    }
+
+    private fun showDelayDialog() {
+        val d = AlertDialog.Builder(this)
+            .setTitle("Retraso de subtítulos")
+            .setMessage("Actual: " + offText() + "\n(+ = salen más tarde, − = más temprano)")
+            .setNegativeButton("−0,1 s", null)
+            .setPositiveButton("+0,1 s", null)
+            .setNeutralButton("Reiniciar", null)
+            .create()
+        d.show()
+        // Los botones no cierran el diálogo, para poder tocar varias veces
+        d.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            changeOffset(-100); d.setMessage("Actual: " + offText() + "\n(+ = salen más tarde, − = más temprano)")
+        }
+        d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            changeOffset(100); d.setMessage("Actual: " + offText() + "\n(+ = salen más tarde, − = más temprano)")
+        }
+        d.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            changeOffset(0, reset = true); d.setMessage("Actual: " + offText() + "\n(+ = salen más tarde, − = más temprano)")
+        }
     }
 
     private fun showSubtitleMenu() {
         val labels = arrayOf(
             "📂 Elegir archivo (.srt / .vtt)…",
-            "⏩ Subtítulos más tarde (+0,5 s)",
-            "⏪ Subtítulos más temprano (−0,5 s)",
+            "⏱ Retraso de subtítulos…",
             "🚫 Quitar subtítulos",
             "🎨 Estilo del subtítulo…")
         AlertDialog.Builder(this)
@@ -965,16 +1008,17 @@ class VideoPlayerActivity : AppCompatActivity() {
                             .setType("*/*")
                         try { startActivityForResult(i, reqSub) } catch (e: Exception) { toast("No hay selector de archivos") }
                     }
-                    1 -> { subOffset += 500; toast("Desfase: ${subOffset / 1000.0} s") }
-                    2 -> { subOffset -= 500; toast("Desfase: ${subOffset / 1000.0} s") }
-                    3 -> {
+                    1 -> showDelayDialog()
+                    2 -> {
                         subs = emptyList()
                         shownCue = null
                         subText.visibility = View.GONE
                         subPrefs().edit().remove(subKey(items[index])).apply()
+                        subOffset = 0
+                        saveOffset()
                         toast("Subtítulos quitados")
                     }
-                    4 -> { previewSub(); showStyleMenu() }
+                    3 -> { previewSub(); showStyleMenu() }
                 }
             }
             .show()
