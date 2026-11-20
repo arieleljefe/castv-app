@@ -57,11 +57,19 @@ object Store {
         return now
     }
 
+    // ------------------------------------------------- [INCOG-1] Modo incógnito
+
+    /** Con el modo incógnito activado no se guardan puntos de reanudación, reproducciones, historial de enlaces ni "visto". */
+    var incognito: Boolean
+        get() = prefs.getBoolean("incog", false)
+        set(v) { prefs.edit().putBoolean("incog", v).apply() }
+
     // ----------------------------------------------------- Continuar donde lo dejé
 
     fun resumeAt(item: MediaItem): Int = resumePrefs.getInt(key(item), 0)
 
     fun saveResume(item: MediaItem, sec: Int) {
+        if (incognito) return   // [INCOG-1]
         resumePrefs.edit().putInt(key(item), sec).apply()
     }
 
@@ -102,6 +110,7 @@ object Store {
     fun lastPlayed(item: MediaItem): Long = statsPrefs.getLong("t|" + key(item), 0L)
 
     fun registerPlay(item: MediaItem) {
+        if (incognito) return   // [INCOG-1]
         val k = key(item)
         statsPrefs.edit()
             .putInt("c|$k", statsPrefs.getInt("c|$k", 0) + 1)
@@ -140,6 +149,7 @@ object Store {
 
     /** Guarda (o sube al principio) un enlace. Los favoritos no se borran; de los demás quedan los 20 más recientes. */
     fun addLink(url: String, title: String) {
+        if (incognito) return   // [INCOG-1]
         val all = readLinks()
         val old = all.firstOrNull { it.url == url }
         all.removeAll { it.url == url }

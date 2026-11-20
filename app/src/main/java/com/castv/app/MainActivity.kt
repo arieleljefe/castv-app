@@ -1029,6 +1029,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
         menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
         menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
+        menu.add(0, 19, 11, "🕶 Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -1063,6 +1064,11 @@ class MainActivity : AppCompatActivity() {
             }
             17 -> showBackupMenu()
             18 -> pickFolder()   // [UI-5]
+            19 -> {   // [INCOG-1]
+                Store.incognito = !Store.incognito
+                toast(if (Store.incognito) "🕶 Incógnito activado: no se guardan reproducciones, puntos de reanudación, historial de enlaces ni «visto»"
+                      else "🕶 Incógnito desactivado")
+            }
         }
     }
 
