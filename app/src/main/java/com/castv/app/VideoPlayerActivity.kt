@@ -296,6 +296,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             updatePlayIcon()
         }
         video.setOnCompletionListener {
+            items[index].let { if (it.id != 0L && !Store.incognito) Store.markSeen(it, true) }   // [VISTO-1]
             Store.clearResume(items[index])
             if (sleepEnd) {   // [GESTO-2] "al terminar este video"
                 sleepEnd = false
@@ -918,6 +919,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         val pos = try { video.currentPosition / 1000 } catch (e: Exception) { 0 }
         val dur = if (cur.durationSec > 0) cur.durationSec
                   else try { video.duration / 1000 } catch (e: Exception) { 0 }
+        if (dur > 0 && pos >= dur * 9 / 10 && !Store.incognito) Store.markSeen(cur, true)   // [VISTO-1] casi terminado = visto
         if (dur > 0 && pos >= dur - 10) Store.clearResume(cur)
         else if (pos >= 10) Store.saveResume(cur, pos)
     }

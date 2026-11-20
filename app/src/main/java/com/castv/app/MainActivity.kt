@@ -2532,6 +2532,7 @@ class MainActivity : AppCompatActivity() {
                 menu.add(0, 4, 3, "★ Añadir a favoritos").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 menu.add(0, 5, 4, "📃 Añadir a lista…").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 menu.add(0, 7, 5, "📤 Compartir").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
+                menu.add(0, 8, 6, "👁 Marcar como visto").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [VISTO-1]
                 mode.title = "1 seleccionado"
                 return true
             }
@@ -2541,6 +2542,8 @@ class MainActivity : AppCompatActivity() {
                 val sel = selectedItems()
                 val allFav = sel.isNotEmpty() && sel.all { Store.isFav(it) }
                 menu.findItem(4)?.title = if (allFav) "☆ Quitar de favoritos" else "★ Añadir a favoritos"
+                val vids = sel.filter { !it.isMusic }   // [VISTO-1]
+                menu.findItem(8)?.title = if (vids.isNotEmpty() && vids.all { Store.isSeen(it) }) "👁 Marcar como no visto" else "👁 Marcar como visto"
                 return true
             }
 
@@ -2558,6 +2561,7 @@ class MainActivity : AppCompatActivity() {
                     5 -> bulkToList()    // [SEL-1]
                     6 -> bulkPlay()      // [SEL-2]
                     7 -> bulkShare()     // [SEL-2]
+                    8 -> bulkSeen()      // [VISTO-1]
                 }
                 return true
             }
@@ -2613,6 +2617,18 @@ class MainActivity : AppCompatActivity() {
         if (viewMode == ViewMode.FAVS) applyFilters() else adapter.notifyDataSetChanged()
         toast(if (remove) "☆ " + countText(n, "quitada", "quitadas") + " de favoritos"
               else "★ " + countText(n, "añadida", "añadidas") + " a favoritos")
+    }
+
+    /** [VISTO-1] Marca (o desmarca) como vistos los videos seleccionados. */
+    private fun bulkSeen() {
+        val vids = selectedItems().filter { !it.isMusic }
+        if (vids.isEmpty()) { toast("Selecciona al menos un video"); return }
+        val unmark = vids.all { Store.isSeen(it) }
+        for (m in vids) Store.markSeen(m, !unmark)
+        actionMode?.finish()
+        adapter.notifyDataSetChanged()
+        toast("👁 " + (if (unmark) countText(vids.size, "marcado como no visto", "marcados como no vistos")
+                       else countText(vids.size, "marcado como visto", "marcados como vistos")))
     }
 
     private fun bulkToList() {
@@ -2910,6 +2926,11 @@ class MainActivity : AppCompatActivity() {
         if (Store.resumeAt(item) >= 10) {
             labels.add("↺ Olvidar el punto guardado")
             actions.add { Store.clearResume(item); applyFilters() }
+        }
+        if (!item.isMusic) {   // [VISTO-1]
+            val seen = Store.isSeen(item)
+            labels.add(if (seen) "👁 Marcar como no visto" else "👁 Marcar como visto")
+            actions.add { Store.markSeen(item, !seen); adapter.notifyDataSetChanged() }
         }
         AlertDialog.Builder(this)
             .setTitle(prettyTitle(item))
@@ -3302,6 +3323,7 @@ class MainActivity : AppCompatActivity() {
                 parts.add(if (item.artist.isNotBlank()) item.artist else item.folder.substringAfterLast('/'))
                 if (saved >= 10 && item.durationSec > 0) parts.add("⏩ ${fmt(saved)} / ${fmt(item.durationSec)}")
                 else if (item.durationSec > 0) parts.add(fmt(item.durationSec))
+                if (!item.isMusic && Store.isSeen(item)) parts.add("✓ visto")   // [VISTO-1]
                 if (item.id in dupIds) parts.add("duplicado")
                 if (sortMode == Sort.MOST_PLAYED) {
                     val c = Store.playCount(item)

@@ -94,7 +94,17 @@ object Store {
         for (l in lists.values) if (l.remove(k)) changed = true
         if (changed) saveLists()
         resumePrefs.edit().remove(k).apply()
-        statsPrefs.edit().remove("c|$k").remove("t|$k").apply()
+        statsPrefs.edit().remove("c|$k").remove("t|$k").remove("v|$k").apply()
+    }
+
+    // ------------------------------------------------- [VISTO-1] Marca "visto"
+
+    fun isSeen(item: MediaItem): Boolean = statsPrefs.getBoolean("v|" + key(item), false)
+
+    fun markSeen(item: MediaItem, seen: Boolean) {
+        val k = "v|" + key(item)
+        if (seen) statsPrefs.edit().putBoolean(k, true).apply()
+        else if (statsPrefs.contains(k)) statsPrefs.edit().remove(k).apply()
     }
 
     // ------------------------------------------------------------ Duplicados
