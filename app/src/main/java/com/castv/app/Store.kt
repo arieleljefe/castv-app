@@ -15,6 +15,9 @@ import org.json.JSONObject
 /** Enlace guardado en el historial de "Reproducir enlace". */
 data class SavedLink(val url: String, val title: String, val fav: Boolean, val t: Long)
 
+/** [MARCAS-1] Marcador guardado en un video: segundo y nombre (puede ir vacío). */
+data class VideoMark(val sec: Int, val name: String)
+
 /** Lista M3U guardada (canales de TV por internet). */
 data class M3uList(val name: String, val url: String)
 
@@ -95,6 +98,7 @@ object Store {
         if (changed) saveLists()
         resumePrefs.edit().remove(k).apply()
         statsPrefs.edit().remove("c|$k").remove("t|$k").remove("v|$k").apply()
+        if (prefs.contains("bm|$k")) prefs.edit().remove("bm|$k").apply()   // [MARCAS-1]
     }
 
     // ------------------------------------------------- [VISTO-1] Marca "visto"
@@ -105,6 +109,43 @@ object Store {
         val k = "v|" + key(item)
         if (seen) statsPrefs.edit().putBoolean(k, true).apply()
         else if (statsPrefs.contains(k)) statsPrefs.edit().remove(k).apply()
+    }
+
+    // ------------------------------------------------- [MARCAS-1] Marcadores de un video
+    // Se guardan en castv_lib (clave bm|<clave del video>), así que viajan en el respaldo.
+
+    private const val MAX_MARKS = 50
+
+    fun marks(item: MediaItem): List<VideoMark> {
+        val raw = prefs.getString("bm|" + key(item), null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                VideoMark(o.getInt("t"), o.optString("n", ""))
+            }.sortedBy { it.sec }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private fun saveMarks(item: MediaItem, list: List<VideoMark>) {
+        val k = "bm|" + key(item)
+        if (list.isEmpty()) { prefs.edit().remove(k).apply(); return }
+        val arr = JSONArray()
+        for (m in list) arr.put(JSONObject().put("t", m.sec).put("n", m.name))
+        prefs.edit().putString(k, arr.toString()).apply()
+    }
+
+    /** Devuelve false si no se guardó (modo incógnito o demasiados marcadores). */
+    fun addMark(item: MediaItem, sec: Int, name: String): Boolean {
+        if (incognito) return false
+        val list = marks(item).filter { it.sec != sec }
+        if (list.size >= MAX_MARKS) return false
+        saveMarks(item, list + VideoMark(sec, name))
+        return true
+    }
+
+    fun removeMark(item: MediaItem, sec: Int) {
+        saveMarks(item, marks(item).filter { it.sec != sec })
     }
 
     // ------------------------------------------------------------ Duplicados

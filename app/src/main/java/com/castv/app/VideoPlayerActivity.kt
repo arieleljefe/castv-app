@@ -1209,6 +1209,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private fun curPos(): Int = try { video.currentPosition } catch (e: Exception) { 0 }
 
     private fun showToolsMenu() {
+        val nMarks = items.getOrNull(index)?.let { if (it.id != 0L) Store.marks(it).size else 0 } ?: 0   // [MARCAS-1]
         val labels = arrayOf(
             "⏱ Saltar a un tiempo…",
             "🔁 Marcar A (inicio) aquí",
@@ -1216,7 +1217,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "❌ Quitar repetición A-B",
             "🔊 Volumen extra: " + boostPct() + " %",
             "ℹ️ Información del video",
-            "🪟 Ventana flotante (PiP)")
+            "🪟 Ventana flotante (PiP)",
+            "🔖 Marcadores (" + nMarks + ")…")   // [MARCAS-1]
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
@@ -1228,6 +1230,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                     4 -> showBoostDialog()
                     5 -> showInfo()
                     6 -> if (!enterPip()) toast("Este teléfono no permite la ventana flotante")
+                    7 -> showMarks()   // [MARCAS-1]
                 }
             }
             .show()
@@ -1385,6 +1388,63 @@ class VideoPlayerActivity : AppCompatActivity() {
                     val target = if (d2 > 0) ms.coerceIn(0, maxOf(d2 - 500, 0)) else ms
                     video.seekTo(target)
                     showHud("⏩ " + fmt(target))
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    // ------------------------------------------------------------ [MARCAS-1] Marcadores
+
+    private fun showMarks() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) { toast("Los marcadores solo sirven en videos del teléfono"); return }
+        val list = Store.marks(cur)
+        val labels = ArrayList<String>()
+        labels.add("➕ Añadir marcador aquí (" + fmt(curPos()) + ")")
+        for (m in list) labels.add("🔖 " + fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else ""))
+        AlertDialog.Builder(this)
+            .setTitle("🔖 Marcadores")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == 0) askMarkName(cur) else markActions(cur, list[which - 1])
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun askMarkName(cur: MediaItem) {
+        val sec = curPos() / 1000
+        val input = EditText(this).apply {
+            hint = "Nombre (opcional)"
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        val box = FrameLayout(this).apply {
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Marcador en " + fmt(sec * 1000))
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ ->
+                if (Store.addMark(cur, sec, input.text.toString().trim())) showHud("🔖 Marcador en " + fmt(sec * 1000))
+                else toast(if (Store.incognito) "🕵️‍♂️ Incógnito: no se guardan marcadores"
+                           else "Ya hay demasiados marcadores en este video (máximo 50)")
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun markActions(cur: MediaItem, m: VideoMark) {
+        AlertDialog.Builder(this)
+            .setTitle("🔖 " + fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else ""))
+            .setItems(arrayOf("▶ Saltar aquí", "🗑 Borrar marcador")) { _, which ->
+                if (which == 0) {
+                    video.seekTo(m.sec * 1000)
+                    showHud("⏩ " + fmt(m.sec * 1000))
+                } else {
+                    Store.removeMark(cur, m.sec)
+                    toast("🗑 Marcador borrado")
                 }
             }
             .setNegativeButton("Cancelar", null)
