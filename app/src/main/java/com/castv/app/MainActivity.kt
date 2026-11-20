@@ -155,6 +155,14 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var tvPlaying = false
     private var lastNotifKey = ""
     private var notifReceiverRegistered = false
+    // [FOCO-2] la música del teléfono se pausa al desconectar audífonos / Bluetooth
+    private var noisyRegistered = false
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+            if (localActive && localIsPlaying()) togglePlayPause()   // solo música del teléfono; el TV no se toca
+        }
+    }
     private var mediaSession: MediaSessionCompat? = null
 
     private val notifReceiver = object : BroadcastReceiver() {
@@ -326,6 +334,12 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(notifReceiver, nf)
         notifReceiverRegistered = true
+        try {   // [FOCO-2]
+            val nz = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(noisyReceiver, nz, Context.RECEIVER_EXPORTED)
+            else registerReceiver(noisyReceiver, nz)
+            noisyRegistered = true
+        } catch (e: Exception) { }
         mediaSession = MediaSessionCompat(this, "CASTV").apply {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() { if (!currentlyPlaying()) togglePlayPause() }
@@ -564,6 +578,10 @@ class MainActivity : AppCompatActivity() {
         fullDialog?.dismiss()   // [UI-3b]
         monitoring = false
         stopLocal()
+        if (noisyRegistered) {   // [FOCO-2]
+            try { unregisterReceiver(noisyReceiver) } catch (e: Exception) { }
+            noisyRegistered = false
+        }
         if (notifReceiverRegistered) {
             try { unregisterReceiver(notifReceiver) } catch (e: Exception) { }
             notifReceiverRegistered = false

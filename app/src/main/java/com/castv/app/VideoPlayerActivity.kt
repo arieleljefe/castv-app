@@ -1,7 +1,10 @@
 package com.castv.app
 
 import android.app.PictureInPictureParams
+import android.content.BroadcastReceiver
 import android.content.ContentUris
+import android.content.Context
+import android.content.IntentFilter
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
@@ -89,6 +92,18 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var resumeOnReturn = false
     // [FOCO-1] foco de audio: pausa con llamadas/alarmas y cuando otra app toma el sonido
     private var pausedByFocus = false
+    // [FOCO-2] pausa al desconectar audífonos / Bluetooth (ACTION_AUDIO_BECOMING_NOISY)
+    private var noisyRegistered = false
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+            if (!::video.isInitialized) return
+            resumeOnReturn = false
+            pausedByFocus = false
+            try { if (video.isPlaying) video.pause() } catch (e: Exception) { }
+            updatePlayIcon()
+        }
+    }
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change -> onFocusChange(change) }
     private val handler = Handler(Looper.getMainLooper())
     private val reqSub = 5101
@@ -1712,9 +1727,23 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {   // [FOCO-2]
+        super.onStart()
+        if (!noisyRegistered) {
+            try {
+                registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+                noisyRegistered = true
+            } catch (e: Exception) { }
+        }
+    }
+
     override fun onStop() {
         // Si se cierra la ventana flotante (o se apaga la pantalla), se detiene el sonido
         if (inPip && ::video.isInitialized) { try { video.pause() } catch (e: Exception) { } }
+        if (noisyRegistered) {   // [FOCO-2]
+            try { unregisterReceiver(noisyReceiver) } catch (e: Exception) { }
+            noisyRegistered = false
+        }
         super.onStop()
     }
 
