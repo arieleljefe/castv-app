@@ -4,7 +4,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -17,13 +19,16 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.io.File
 import java.text.Normalizer
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * [UI-1b] Pantalla de Ajustes (botón ⋮), organizada por categorías como en VLC.
@@ -314,6 +319,9 @@ class SettingsActivity : AppCompatActivity() {
         // [AJUSTES-2c] Avanzado: registro de la app
         l.add(Entry("Avanzado", "Ver registro", "Eventos de la app y del servidor, para diagnosticar fallos", { showLog() }))
         l.add(Entry("Avanzado", "Limpiar registro", "Borra el registro actual", { confirmClearLog() }))
+        l.add(Entry("Avanzado", "Probar extracción de audio (IA)",
+            "Prueba para los subtítulos con IA: saca el audio de un video y mide cuánto tarda",
+            { pickIaVideo.launch(arrayOf("video/*")) }))   // [IA-1]
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
@@ -341,7 +349,7 @@ class SettingsActivity : AppCompatActivity() {
         "Emisión al TV" -> "Salida al abrir, TV detectada e IP del teléfono"
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Borrado: papelera o permanente"
-        "Avanzado" -> "Registro de la app"
+        "Avanzado" -> "Registro de la app y pruebas"
         "Respaldo" -> "Exportar o importar"
         "Acerca de" -> "Versión, autor, redes y licencia"
         else -> null
@@ -614,6 +622,76 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------- [IA-1] Prueba de extracción de audio
+
+    private val pickIaVideo = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runIaAudioTest(uri)
+    }
+
+    private fun runIaAudioTest(uri: Uri) {
+        var shown: String? = null
+        try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) shown = c.getString(0)
+            }
+        } catch (e: Exception) { }
+        val name = shown ?: (uri.lastPathSegment ?: "video")
+        val outFile = File(cacheDir, "ia_audio.pcm")
+        val cancel = AtomicBoolean(false)
+        val msg = TextView(this)
+        msg.text = "Preparando…"
+        msg.setTextColor(txtColor)
+        msg.setPadding(dp(24), dp(16), dp(24), dp(8))
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Extrayendo audio")
+            .setView(msg)
+            .setCancelable(false)
+            .setNegativeButton("Cancelar") { _, _ -> cancel.set(true) }
+            .create()
+        dlg.show()
+        val act = this@SettingsActivity
+        Thread {
+            val r = AudioExtractor.extract(act, uri, outFile, { pct ->
+                runOnUiThread { msg.text = "Avance: $pct %" }
+            }, { cancel.get() })
+            try { outFile.delete() } catch (e: Exception) { }
+            val secs = r.tookMs / 1000.0
+            val line = if (r.ok) {
+                "IA-1: $name: ${r.mime} ${r.srcHz} Hz ${r.srcChannels}ch -> ${AudioExtractor.TARGET_HZ} Hz mono; " +
+                    "${r.samples} muestras; ${String.format(java.util.Locale.US, "%.1f", r.durationSec)} s de audio; " +
+                    "${r.tookMs} ms"
+            } else {
+                "IA-1: $name: ${r.message}"
+            }
+            try { DebugLog.add(line) } catch (e: Exception) { }
+            runOnUiThread {
+                if (act.isFinishing || act.isDestroyed) return@runOnUiThread
+                try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
+                val title: String
+                val text: String
+                if (r.ok) {
+                    val mins = String.format(java.util.Locale.US, "%.1f", r.durationSec / 60.0)
+                    val took = String.format(java.util.Locale.US, "%.1f", secs)
+                    val speed = if (secs > 0) String.format(java.util.Locale.US, "%.0f", r.durationSec / secs) else "-"
+                    title = "✅ Audio extraído"
+                    text = "$name\n\n$mins min de audio en $took s (unas ${speed}x más rápido que el video).\n" +
+                        "Pista: ${r.mime}, ${r.srcHz} Hz, ${r.srcChannels} canales → ${AudioExtractor.TARGET_HZ} Hz mono."
+                } else if (r.cancelled) {
+                    title = "Cancelado"
+                    text = "Se detuvo la extracción y se borró el archivo temporal."
+                } else {
+                    title = "⚠️ No se pudo extraer el audio"
+                    text = r.message
+                }
+                AlertDialog.Builder(act)
+                    .setTitle(title)
+                    .setMessage(text)
+                    .setPositiveButton("Cerrar", null)
+                    .show()
+            }
+        }.start()
     }
 
     // ------------------------------------------------- [RED-1] Red
