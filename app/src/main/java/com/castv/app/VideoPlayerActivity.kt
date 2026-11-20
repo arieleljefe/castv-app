@@ -3,6 +3,8 @@ package com.castv.app
 import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.ColorStateList
+import android.util.TypedValue
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -11,6 +13,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.TextUtils
@@ -23,17 +26,20 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.MediaController
+import android.widget.ImageView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.concurrent.thread
+import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -48,7 +54,17 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var subText: TextView
     private lateinit var topBar: LinearLayout
     private lateinit var titleView: TextView
-    private lateinit var controller: MediaController
+    // [UI-2b] barra de control propia (reemplaza al MediaController del sistema)
+    private lateinit var bottomBar: LinearLayout
+    private lateinit var seek: SeekBar
+    private lateinit var tvPos: TextView
+    private lateinit var tvDur: TextView
+    private lateinit var playBtn: ImageView
+    private lateinit var backSkip: TextView
+    private lateinit var fwdSkip: TextView
+    private var dragging = false
+    private var hideAt = 0L
+    private val hideControlsMs = 3500L
 
     private var items: List<MediaItem> = emptyList()
     private var index = 0
@@ -88,6 +104,11 @@ class VideoPlayerActivity : AppCompatActivity() {
     private val tick = object : Runnable {
         override fun run() {
             updateSub()
+            if (controlsShowing()) {   // [UI-2b]
+                updateProgress()
+                updatePlayIcon()
+                if (!dragging && !locked && video.isPlaying && SystemClock.uptimeMillis() > hideAt) hideControls()
+            }
             handler.postDelayed(this, 250)
         }
     }
@@ -98,6 +119,12 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        theme.applyStyle(when (getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)) {   // [UI-2d] color de acento
+            1 -> R.style.AccentOverlayGreen
+            2 -> R.style.AccentOverlayOrange
+            3 -> R.style.AccentOverlayPurple
+            else -> R.style.AccentOverlayCyan
+        }, true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
         Store.init(this)
@@ -204,36 +231,19 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
         onBackPressedDispatcher.addCallback(this, backLock)
         setContentView(root)
+        // [UI-2d] la barra de control nunca queda debajo de los botones de navegación ni del notch
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            if (::bottomBar.isInitialized) bottomBar.setPadding(dp(16) + b.left, dp(24), dp(16) + b.right, dp(10) + b.bottom)
+            insets
+        }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val bars = WindowInsetsControllerCompat(window, window.decorView)
         bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         bars.hide(WindowInsetsCompat.Type.systemBars())
 
-        controller = object : MediaController(this@VideoPlayerActivity) {
-            override fun show(timeout: Int) {
-                if (locked) return   // [UI-2a]
-                super.show(timeout)
-                topBar.visibility = View.VISIBLE
-            }
-
-            override fun hide() {
-                super.hide()
-                topBar.visibility = View.GONE
-            }
-
-            // [UI-2e] El MediaController se come el botón Atrás (solo oculta los controles);
-            // lo pasamos a la actividad para que salga a la primera (y respete el 🔒).
-            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                if (event.keyCode == KeyEvent.KEYCODE_BACK) {
-                    if (event.action == KeyEvent.ACTION_UP) this@VideoPlayerActivity.onBackPressedDispatcher.onBackPressed()
-                    return true
-                }
-                return super.dispatchKeyEvent(event)
-            }
-        }
-        controller.setPrevNextListeners({ playAt(index + 1) }, { playAt(index - 1) })
-        video.setMediaController(controller)
+        buildControls(root)   // [UI-2b]
         setupGestures(root)
 
         video.setOnPreparedListener { mp ->
@@ -241,6 +251,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             if (pendingStart > 0) video.seekTo(pendingStart * 1000)
             pendingStart = 0
             video.start()
+            updatePlayIcon()
         }
         video.setOnCompletionListener {
             Store.clearResume(items[index])
@@ -322,7 +333,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                     handler.postDelayed(hideLockBtn, 2500)
                     return true
                 }
-                if (controller.isShowing) controller.hide() else controller.show()
+                if (controlsShowing()) hideControls() else showControls()   // [UI-2b]
                 return true
             }
 
@@ -374,11 +385,183 @@ class VideoPlayerActivity : AppCompatActivity() {
         video.setOnTouchListener { _, ev -> gesture.onTouchEvent(ev); true }
     }
 
+    // ------------------------------------------------------------ [UI-2b] Barra de control propia
+
+    private fun accent(): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(R.attr.castvAccent, tv, true)
+        return tv.data
+    }
+
+    private fun fmt(ms: Int): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        val h = s / 3600
+        val m = (s % 3600) / 60
+        val ss = s % 60
+        return if (h > 0) String.format(Locale.US, "%d:%02d:%02d", h, m, ss)
+        else String.format(Locale.US, "%d:%02d", m, ss)
+    }
+
+    private fun controlsShowing(): Boolean = ::bottomBar.isInitialized && bottomBar.visibility == View.VISIBLE
+
+    private fun keepControls() {
+        hideAt = SystemClock.uptimeMillis() + hideControlsMs
+    }
+
+    private fun showControls() {
+        if (locked) return
+        backSkip.text = "−${dtapSec()}"
+        fwdSkip.text = "+${dtapSec()}"
+        bottomBar.visibility = View.VISIBLE
+        topBar.visibility = View.VISIBLE
+        keepControls()
+        updateProgress()
+        updatePlayIcon()
+        moveSubtitles(up = true)
+    }
+
+    private fun hideControls() {
+        bottomBar.visibility = View.GONE
+        topBar.visibility = View.GONE
+        moveSubtitles(up = false)
+    }
+
+    /** Sube los subtítulos mientras se ve la barra, para que no queden tapados. */
+    private fun moveSubtitles(up: Boolean) {
+        val lp = subText.layoutParams as FrameLayout.LayoutParams
+        lp.bottomMargin = if (up) dp(140) else dp(72)
+        subText.layoutParams = lp
+    }
+
+    private fun togglePlay() {
+        if (video.isPlaying) video.pause() else video.start()
+        updatePlayIcon()
+        keepControls()
+    }
+
+    private fun updatePlayIcon() {
+        if (!::playBtn.isInitialized) return
+        playBtn.setImageResource(if (video.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_w)
+    }
+
+    private fun updateProgress() {
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        val pos = try { video.currentPosition } catch (e: Exception) { 0 }
+        if (dur > 0) {
+            seek.isEnabled = true
+            if (!dragging) {
+                seek.progress = (pos.toLong() * 1000 / dur).toInt()
+                tvPos.text = fmt(pos)
+            }
+            tvDur.text = fmt(dur)
+        } else {   // canal en vivo: sin barra de avance
+            seek.isEnabled = false
+            seek.progress = 0
+            tvPos.text = fmt(pos)
+            tvDur.text = "EN VIVO"
+        }
+    }
+
+    private fun skipBtn(onClick: () -> Unit): TextView = TextView(this).apply {
+        setTextColor(Color.WHITE)
+        textSize = 15f
+        typeface = Typeface.DEFAULT_BOLD
+        gravity = Gravity.CENTER
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        setOnClickListener { onClick(); keepControls() }
+    }
+
+    private fun iconBtn(res: Int, onClick: () -> Unit): ImageView = ImageView(this).apply {
+        setImageResource(res)
+        setColorFilter(Color.WHITE)
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        setOnClickListener { onClick(); keepControls() }
+    }
+
+    private fun buildControls(root: FrameLayout) {
+        val acc = accent()
+        bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(24), dp(16), dp(10))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, 0xCC000000.toInt()))
+            isClickable = true   // los toques sobre la barra no pasan al video
+            visibility = View.GONE
+        }
+        // Fila 1: tiempo actual · barra · duración
+        val timeRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        tvPos = TextView(this).apply { setTextColor(Color.WHITE); textSize = 13f; text = "0:00" }
+        tvDur = TextView(this).apply { setTextColor(Color.WHITE); textSize = 13f; text = "0:00" }
+        seek = SeekBar(this).apply {
+            max = 1000
+            progressTintList = ColorStateList.valueOf(acc)
+            thumbTintList = ColorStateList.valueOf(acc)
+            progressBackgroundTintList = ColorStateList.valueOf(0x55FFFFFF)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    val dur = try { video.duration } catch (e: Exception) { -1 }
+                    if (dur > 0) tvPos.text = fmt((dur.toLong() * p / 1000).toInt())
+                    keepControls()
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) { dragging = true }
+                override fun onStopTrackingTouch(sb: SeekBar) {
+                    dragging = false
+                    val dur = try { video.duration } catch (e: Exception) { -1 }
+                    if (dur > 0) video.seekTo((dur.toLong() * sb.progress / 1000).toInt())
+                    keepControls()
+                }
+            })
+        }
+        timeRow.addView(tvPos)
+        timeRow.addView(seek, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            leftMargin = dp(8); rightMargin = dp(8)
+        })
+        timeRow.addView(tvDur)
+        bottomBar.addView(timeRow)
+
+        // Fila 2: anterior · −N · play/pausa · +N · siguiente
+        val btnRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        btnRow.addView(iconBtn(R.drawable.ic_prev) { playAt(index - 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        backSkip = skipBtn { seekBy(-dtapSec()) }
+        btnRow.addView(backSkip)
+        playBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_play_w)
+            setColorFilter(Color.WHITE)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(acc) }
+            setOnClickListener { togglePlay() }
+        }
+        btnRow.addView(playBtn, LinearLayout.LayoutParams(dp(56), dp(56)).apply {
+            leftMargin = dp(8); rightMargin = dp(8)
+        })
+        fwdSkip = skipBtn { seekBy(dtapSec()) }
+        btnRow.addView(fwdSkip)
+        btnRow.addView(iconBtn(R.drawable.ic_next) { playAt(index + 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        bottomBar.addView(btnRow)
+
+        root.addView(bottomBar, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+    }
+
+    // Teclas multimedia (audífonos, teclado): el VideoView solo las atendía con MediaController
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK, KeyEvent.KEYCODE_SPACE -> {
+                if (!locked) togglePlay()
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> { if (!locked && !video.isPlaying) togglePlay(); return true }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> { if (!locked && video.isPlaying) togglePlay(); return true }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     // ------------------------------------------------------------ [UI-2a] Bloqueo y giro
 
     private fun lock() {
         locked = true
-        controller.hide()
+        hideControls()
         hud.visibility = View.GONE
         backLock.isEnabled = true
         toast("🔒 Controles bloqueados · toca la pantalla para ver 🔓")
@@ -390,7 +573,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         lockBtn.visibility = View.GONE
         backLock.isEnabled = false
         toast("🔓 Controles desbloqueados")
-        controller.show()
+        showControls()
     }
 
     private fun rotate() {
