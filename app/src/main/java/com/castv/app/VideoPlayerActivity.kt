@@ -1095,7 +1095,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (WhisperModel.isReady(this)) { aiRun(cur); return }
         AlertDialog.Builder(this)
             .setTitle("Falta el modelo de voz")
-            .setMessage("Hay que bajar el modelo de Whisper (~143 MB, una sola vez). Conviene estar con Wi-Fi.")
+            .setMessage("Hay que bajar el modelo de Whisper (${WhisperModel.selected(this).sizeText}, una sola vez). Conviene estar con Wi-Fi.")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Bajar y generar") { _, _ -> aiRun(cur) }
             .show()

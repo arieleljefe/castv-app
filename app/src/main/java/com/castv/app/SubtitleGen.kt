@@ -14,7 +14,7 @@ import java.util.Locale
 
 /**
  * [IA-3] Genera subtítulos con IA para un video del teléfono: audio (AudioExtractor) -> Whisper
- * en bloques de 5 min -> archivo .srt. Solo usa AudioExtractor, WhisperModel y WhisperLib tal cual.
+ * (idioma y modelo según Ajustes, IA-4) en bloques de 5 min -> archivo .srt. Solo usa AudioExtractor, WhisperModel y WhisperLib tal cual.
  * Usa su propio temporal (ia3_audio.pcm) y una marca para no lanzar dos a la vez, porque
  * WhisperLib.setCancel es global.
  */
@@ -70,6 +70,8 @@ object SubtitleGen {
         val appCtx = context.applicationContext
         val pcm = File(appCtx.cacheDir, "ia3_audio.pcm")
         val part = File(outSrt.parentFile, outSrt.name + ".part")
+        val spec = WhisperModel.selected(appCtx)   // [IA-4]
+        val lang = WhisperModel.lang(appCtx)       // [IA-4]
         var ctx = 0L
         try {
             onProgress(0, "Extrayendo el audio…")
@@ -83,7 +85,7 @@ object SubtitleGen {
             if (totalSamples < 8000L) return Out(false, "El video casi no tiene audio")
 
             onProgress(30, "Cargando el modelo de voz…")
-            ctx = WhisperLib.initContext(WhisperModel.file(appCtx).absolutePath)
+            ctx = WhisperLib.initContext(WhisperModel.file(appCtx, spec).absolutePath)
             if (ctx == 0L) return Out(false, "No se pudo cargar el modelo de voz")
             WhisperLib.setCancel(false)
 
@@ -106,7 +108,7 @@ object SubtitleGen {
                     onProgress(30 + c * 70 / nChunks, "Transcribiendo… parte ${c + 1} de $nChunks")
                     inTranscribe = true
                     if (cancelFlag) WhisperLib.setCancel(true)
-                    val rc = WhisperLib.transcribe(ctx, threads, "es", audio)
+                    val rc = WhisperLib.transcribe(ctx, threads, lang, audio)
                     inTranscribe = false
                     if (cancelFlag) return Out(false, "Cancelado", cancelled = true)
                     if (rc != 0) return Out(false, "Whisper falló (código $rc)")
@@ -136,6 +138,11 @@ object SubtitleGen {
             if (outSrt.exists()) outSrt.delete()
             if (!part.renameTo(outSrt)) return Out(false, "No se pudo guardar el .srt")
             val took = System.currentTimeMillis() - t0
+            try {
+                DebugLog.add("IA-4: idioma $lang, modelo ${spec.shortName}, ${segs.size} frases, audio " +
+                    String.format(Locale.US, "%.1f", ex.durationSec) + " s en " +
+                    String.format(Locale.US, "%.1f", took / 1000.0) + " s")
+            } catch (e: Throwable) { }
             return Out(true, "${segs.size} frases", segments = segs.size,
                 audioSec = ex.durationSec, tookMs = took)
         } catch (e: Throwable) {

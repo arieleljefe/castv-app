@@ -222,6 +222,10 @@ class SettingsActivity : AppCompatActivity() {
             { pickSub("Color del texto", subColorNames, stColor(), "style_color") }))
         l.add(Entry("Subtítulos", "Fondo", subBgNames[stBg()],
             { pickSub("Fondo", subBgNames, stBg(), "style_bg") }))
+        l.add(Entry("Subtítulos", "Idioma de los subtítulos con IA", WhisperModel.langName(this),
+            { pickIaLang() }))   // [IA-4]
+        l.add(Entry("Subtítulos", "Modelo de voz (IA)", iaModelStatus(),
+            { pickIaModel() }))   // [IA-4]
         l.add(Entry("Subtítulos", "Restablecer estilo",
             "Tamaño mediano, texto blanco, fondo semitransparente", { resetSubStyle() }))
 
@@ -326,7 +330,7 @@ class SettingsActivity : AppCompatActivity() {
             "Comprueba que el motor de subtítulos con IA carga en este teléfono (todavía no transcribe)",
             { runWhisperTest() }))   // [IA-2a]
         l.add(Entry("Avanzado", "Probar transcripción (IA)",
-            "Baja el modelo de voz (una vez, unos 143 MB) y transcribe un video; mide la velocidad. Todavía no crea subtítulos",
+            "Baja el modelo de voz elegido (una vez) y transcribe un video; mide la velocidad. Todavía no crea subtítulos",
             { startIaTranscribe() }))   // [IA-2b]
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
@@ -346,7 +350,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun sectionSummary(name: String): String? = when (name) {
         "Interfaz" -> "Tema y color de acento"
-        "Subtítulos" -> "Tamaño, color y fondo"
+        "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Vídeo" -> "Gestos, velocidad, controles y brillo"
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
@@ -537,6 +541,54 @@ class SettingsActivity : AppCompatActivity() {
     private fun toggleSubBold() {
         subPrefs().edit().putBoolean("style_bold", !stBold()).apply()
         render()
+    }
+
+    // ------------------------------------------------- [IA-4] Idioma y modelo de la transcripción con IA
+
+    private fun iaModelStatus(): String {
+        val sp = WhisperModel.selected(this)
+        return if (WhisperModel.isReady(this, sp)) "${sp.fullLabel}: listo"
+        else "${sp.fullLabel}: falta bajarlo, ${sp.sizeText}"
+    }
+
+    private fun pickIaLang() {
+        val names = WhisperModel.LANGS.map { it.second }.toTypedArray()
+        val cur = WhisperModel.LANGS.indexOfFirst { it.first == WhisperModel.lang(this) }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Idioma de los subtítulos con IA")
+            .setSingleChoiceItems(names, cur) { d, which ->
+                WhisperModel.setLang(this, WhisperModel.LANGS[which].first)
+                d.dismiss()
+                render()
+            }
+            .show()
+    }
+
+    private fun pickIaModel() {
+        val specs = WhisperModel.MODELS
+        val names = specs.map {
+            it.fullLabel + if (WhisperModel.isReady(this, it)) "" else " · falta bajarlo, ${it.sizeText}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Modelo de voz (IA)")
+            .setSingleChoiceItems(names, WhisperModel.selected(this).id) { d, which ->
+                d.dismiss()
+                val sp = specs[which]
+                if (sp.id != WhisperModel.selected(this).id) {
+                    if (WhisperModel.isReady(this, sp)) {
+                        WhisperModel.setModel(this, sp.id)
+                        render()
+                    } else {
+                        AlertDialog.Builder(this)
+                            .setTitle("Falta el modelo ${sp.label}")
+                            .setMessage("Hay que bajar el modelo de voz (${sp.shortName}, ${sp.sizeText}, una sola vez). Conviene estar con Wi-Fi. ¿Descargarlo ahora?")
+                            .setPositiveButton("Descargar") { _, _ -> downloadWhisperModel(sp, false) }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun resetSubStyle() {
@@ -753,13 +805,17 @@ class SettingsActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("Falta el modelo de voz")
-            .setMessage("Para transcribir hace falta bajar el modelo de voz (base, unos 143 MB, una sola vez). Conviene estar con Wi-Fi. ¿Descargarlo ahora?")
+            .setMessage("Para transcribir hace falta bajar el modelo de voz (${WhisperModel.selected(this).shortName}, ${WhisperModel.selected(this).sizeText}, una sola vez). Conviene estar con Wi-Fi. ¿Descargarlo ahora?")
             .setPositiveButton("Descargar") { _, _ -> downloadWhisperModel() }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun downloadWhisperModel() {
+    /** [IA-4] [spec] = modelo a bajar; [pickAfter] = abrir el selector de video al terminar (la prueba de Avanzado). */
+    private fun downloadWhisperModel(
+        spec: WhisperModel.Spec = WhisperModel.selected(this),
+        pickAfter: Boolean = true
+    ) {
         val cancel = AtomicBoolean(false)
         val msg = TextView(this)
         msg.text = "Conectando…"
@@ -775,17 +831,23 @@ class SettingsActivity : AppCompatActivity() {
         dlg.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val act = this@SettingsActivity
         Thread {
-            val r = WhisperModel.download(act, { pct, mb ->
+            val r = WhisperModel.download(act, spec, { pct, mb ->
                 runOnUiThread {
                     msg.text = if (pct >= 0) "Avance: $pct % ($mb MB)" else "Descargado: $mb MB"
                 }
             }, { cancel.get() })
-            try { DebugLog.add("IA-2b: modelo base: ${r.message}") } catch (e: Exception) { }
+            try { DebugLog.add("IA-2b: modelo ${spec.shortName}: ${r.message}") } catch (e: Exception) { }
             runOnUiThread {
                 if (act.isFinishing || act.isDestroyed) return@runOnUiThread
                 try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
                 if (r.ok) {
-                    pickIaTranscribe.launch(arrayOf("video/*"))
+                    if (pickAfter) {
+                        pickIaTranscribe.launch(arrayOf("video/*"))
+                    } else {
+                        WhisperModel.setModel(act, spec.id)   // [IA-4] solo se cambia si la descarga terminó bien
+                        toast("Modelo ${spec.fullLabel} listo")
+                        render()
+                    }
                 } else if (r.cancelled) {
                     toast("Descarga cancelada")
                 } else {
@@ -888,7 +950,7 @@ class SettingsActivity : AppCompatActivity() {
                                     val hi = bytes[2 * k + 1].toInt()
                                     audio[k] = ((hi shl 8) or lo) / 32768f
                                 }
-                                val rc = WhisperLib.transcribe(ctx, threads, "es", audio)
+                                val rc = WhisperLib.transcribe(ctx, threads, WhisperModel.lang(act), audio)
                                 if (cancel.get()) {
                                     cancelled = true
                                     break
@@ -932,7 +994,7 @@ class SettingsActivity : AppCompatActivity() {
                 cancelled -> "IA-2b: $name: cancelado"
                 errTitle.isNotEmpty() -> "IA-2b: $name: $errText"
                 else -> "IA-2b: $name: ${segs.size} frases; ${f1(audioSec)} s de audio en ${f1(secs)} s " +
-                    "(${f1(speed)}x); modelo base; extracción $extractMs ms"
+                    "(${f1(speed)}x); modelo ${WhisperModel.selected(act).shortName}; idioma ${WhisperModel.lang(act)}; extracción $extractMs ms"
             }
             try { DebugLog.add(line) } catch (e: Exception) { }
             runOnUiThread {
