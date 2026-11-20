@@ -1208,7 +1208,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "🔁 Marcar A (inicio) aquí",
             "🔁 Marcar B (fin) aquí",
             "❌ Quitar repetición A-B",
-            "🔊 Volumen extra: " + boostPct() + " %")
+            "🔊 Volumen extra: " + boostPct() + " %",
+            "ℹ️ Información del video")
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
@@ -1218,8 +1219,29 @@ class VideoPlayerActivity : AppCompatActivity() {
                     2 -> markB()
                     3 -> clearAb()
                     4 -> showBoostDialog()
+                    5 -> showInfo()
                 }
             }
+            .show()
+    }
+
+    // [INFO-1] información del video (versión sencilla de "estadísticas")
+    private fun showInfo() {
+        val mp = mpRef
+        val w = try { mp?.videoWidth ?: 0 } catch (e: Exception) { 0 }
+        val h = try { mp?.videoHeight ?: 0 } catch (e: Exception) { 0 }
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        val txt = "Archivo: " + (items.getOrNull(index)?.name ?: "?") +
+            "\nResolución: " + (if (w > 0 && h > 0) "$w × $h" else "?") +
+            "\nDuración: " + (if (dur > 0) fmt(dur) else "?") +
+            "\nPosición: " + fmt(curPos()) +
+            "\nVolumen extra: " + boostPct() + " %" +
+            "\nRetraso de subtítulos: " + offText() +
+            "\nRepetición: " + abText()
+        AlertDialog.Builder(this)
+            .setTitle("ℹ️ Información del video")
+            .setMessage(txt)
+            .setPositiveButton("Cerrar", null)
             .show()
     }
 
