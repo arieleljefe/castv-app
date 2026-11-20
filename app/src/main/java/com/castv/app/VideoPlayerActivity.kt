@@ -106,6 +106,8 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var gSeekStart = 0
     private var gSeekTo = 0
     private var mpRef: MediaPlayer? = null
+    private var abA = -1               // [AB-1] inicio de la repetición A-B (ms; -1 = sin marcar)
+    private var abB = -1               // [AB-1] fin (ms; -1 = sin marcar)
     private var fastOn = false
     // [GESTO-2] temporizador de apagado
     private lateinit var sleepChip: TextView
@@ -123,6 +125,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private val tick = object : Runnable {
         override fun run() {
             if (sleepAt > 0L && SystemClock.uptimeMillis() >= sleepAt) { sleepNow(); return }   // [GESTO-2]
+            abLoop()   // [AB-1]
             updateSub()
             if (controlsShowing()) {   // [UI-2b]
                 updateSleepChip()   // [GESTO-2]
@@ -899,6 +902,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         titleView.text = it.name.substringBeforeLast('.')
         mpRef = null   // [GESTO-2]
         fastOn = false
+        abA = -1   // [AB-1]
+        abB = -1
         video.setVideoURI(Uri.parse(it.uriString))
         loadSavedSub(it)
     }
@@ -1195,15 +1200,55 @@ class VideoPlayerActivity : AppCompatActivity() {
     private fun curPos(): Int = try { video.currentPosition } catch (e: Exception) { 0 }
 
     private fun showToolsMenu() {
-        val labels = arrayOf("⏱ Saltar a un tiempo…")
+        val labels = arrayOf(
+            "⏱ Saltar a un tiempo…",
+            "🔁 Marcar A (inicio) aquí",
+            "🔁 Marcar B (fin) aquí",
+            "❌ Quitar repetición A-B")
         AlertDialog.Builder(this)
-            .setTitle("Herramientas")
+            .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
                 when (which) {
                     0 -> showJumpDialog()
+                    1 -> markA()
+                    2 -> markB()
+                    3 -> clearAb()
                 }
             }
             .show()
+    }
+
+    // [AB-1] repetición A-B: al llegar a B vuelve a A
+    private fun abLoop() {
+        if (abA < 0 || abB <= abA || !::video.isInitialized) return
+        val pos = try { video.currentPosition } catch (e: Exception) { return }
+        if (pos >= abB) video.seekTo(abA)
+    }
+
+    private fun abText(): String = when {
+        abA < 0 -> "A-B sin marcar"
+        abB < 0 -> "A: " + fmt(abA) + " (falta B)"
+        else -> "A: " + fmt(abA) + "  B: " + fmt(abB)
+    }
+
+    private fun markA() {
+        abA = curPos()
+        if (abB <= abA) abB = -1
+        showHud("🔁 A: " + fmt(abA))
+    }
+
+    private fun markB() {
+        if (abA < 0) { toast("Marca primero A"); return }
+        val p = curPos()
+        if (p <= abA + 500) { toast("B debe ir después de A"); return }
+        abB = p
+        showHud("🔁 " + fmt(abA) + " → " + fmt(abB))
+    }
+
+    private fun clearAb() {
+        abA = -1
+        abB = -1
+        showHud("🔁 Repetición A-B quitada")
     }
 
     /** Acepta "90", "12:30" o "1:05:30". Devuelve milisegundos o null si no se entiende. */
