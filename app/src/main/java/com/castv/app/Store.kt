@@ -451,6 +451,21 @@ object Store {
         forgetChFav(c.url)
     }
 
+    /** [CHECK-1] Oculta varios canales de una vez (una sola escritura). A los que eran favoritos también se les quita la ★. */
+    fun hideChannels(cs: List<M3uChannel>) {
+        if (cs.isEmpty()) return
+        val l = readHidden()
+        val have = HashSet<String>()
+        for (x in l) have.add(x.url)
+        for (c in cs) if (have.add(c.url)) l.add(c)
+        writeHidden(l)
+        val favSet = chFavs()
+        for (c in cs) if (favSet.contains(c.url)) {
+            toggleChFav(c.url)
+            forgetChFav(c.url)
+        }
+    }
+
     /** Devuelve a la vista los canales con esos enlaces. */
     fun unhideChannels(urls: Collection<String>) {
         val set = HashSet<String>(urls)

@@ -48,6 +48,44 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 "No se pudo leer la lista del canal (${e.javaClass.simpleName}: ${e.message})."
             }
         }
+
+        /** [CHECK-1] Comprobación ligera de un canal: ¿responde su servidor? Devuelve null si responde bien, o el motivo
+         *  corto en español. En listas .m3u8 lee solo el comienzo y exige "#EXTM3U"; en otros enlaces basta un 200.
+         *  No reproduce nada ni deja conexiones abiertas (5 s para conectar y 5 s para leer). */
+        fun checkChannel(url: String): String? {
+            return try {
+                val c = LiveHttp.open(url, 5000, 5000).first
+                try {
+                    if (url.substringBefore('?').lowercase().endsWith(".m3u8")) {
+                        val src: InputStream = if (c.contentEncoding.equals("gzip", ignoreCase = true))
+                            java.util.zip.GZIPInputStream(c.inputStream) else c.inputStream
+                        val buf = ByteArray(512)
+                        var n = 0
+                        while (n < buf.size) {
+                            val r = src.read(buf, n, buf.size - n)
+                            if (r < 0) break
+                            n += r
+                        }
+                        val head = String(buf, 0, n, Charsets.UTF_8).trimStart('\uFEFF', ' ', '\r', '\n', '\t')
+                        if (head.startsWith("#EXTM3U")) null else "La respuesta no es una lista de canal válida"
+                    } else null
+                } finally {
+                    try { c.disconnect() } catch (_: Exception) {}
+                }
+            } catch (e: HttpFail) {
+                when (e.code) {
+                    401, 403 -> "Bloqueado o pide permiso (${e.code})"
+                    404, 410 -> "Ya no existe (${e.code})"
+                    else -> "Error del servidor (${e.code})"
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                "No respondió a tiempo"
+            } catch (e: java.net.UnknownHostException) {
+                "Servidor no encontrado"
+            } catch (e: Exception) {
+                "No se pudo conectar (${e.javaClass.simpleName})"
+            }
+        }
     }
 
     /** Lee solo [length] bytes de un archivo y cierra el descriptor al terminar. */
@@ -286,13 +324,13 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     private object LiveHttp {
         /** Abre [url] siguiendo redirecciones (igual que serveRelay). Devuelve la conexión y la URL final. */
-        fun open(url: String, readTimeout: Int): Pair<HttpURLConnection, String> {
+        fun open(url: String, readTimeout: Int, connectTimeout: Int = 10000): Pair<HttpURLConnection, String> {
             var current = url
             var hops = 0
             while (true) {
                 val c = URL(current).openConnection() as HttpURLConnection
                 c.instanceFollowRedirects = false
-                c.connectTimeout = 10000
+                c.connectTimeout = connectTimeout
                 c.readTimeout = readTimeout
                 c.requestMethod = "GET"
                 c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CASTV")

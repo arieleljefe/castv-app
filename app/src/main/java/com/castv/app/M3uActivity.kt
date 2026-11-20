@@ -58,6 +58,11 @@ class M3uActivity : AppCompatActivity() {
     @Volatile private var hidden: Set<String> = emptySet()   // [OCULTAR-1] enlaces de los canales ocultos
     private val reqPlayer = 4715
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
+    // [CHECK-1] revisar qué canales responden
+    private lateinit var checkBtn: TextView
+    @Volatile private var checkGen = 0   // sube al detener o salir: los hilos viejos dejan de contar
+    private var checking = false
+    private var checkPool: java.util.concurrent.ExecutorService? = null
 
     private val freeTvUrl = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
     private val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
@@ -177,7 +182,15 @@ class M3uActivity : AppCompatActivity() {
         statusView.setTextColor(mutedColor)
         statusView.textSize = 13f
         statusView.setPadding(dp(4), dp(8), dp(4), dp(4))
-        root.addView(statusView)
+        // [CHECK-1] el estado y, a la derecha, el botón 🔎 Revisar
+        val statusRow = LinearLayout(this)
+        statusRow.gravity = Gravity.CENTER_VERTICAL
+        statusRow.addView(statusView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        checkBtn = chip("🔎 Revisar") { onCheckClick() }
+        checkBtn.textSize = 13f
+        checkBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        statusRow.addView(checkBtn)
+        root.addView(statusRow)
 
         chAdapter = ChannelAdapter()
         channelList = ListView(this)
@@ -211,6 +224,7 @@ class M3uActivity : AppCompatActivity() {
     // ------------------------------------------------------------ Listas
 
     private fun loadList(l: M3uList) {
+        if (checking) stopCheck(null)   // [CHECK-1]
         current = l
         Store.lastM3u = l.url
         listBtn.text = "📡 ${l.name} ▾"
@@ -302,6 +316,7 @@ class M3uActivity : AppCompatActivity() {
     /** [REGIONES-1b] Descarga y une todas las listas de una región o categoría, sin repetidos por enlace de stream. */
     private fun loadRegion(lists: List<M3uList>, name: String) {
         if (lists.isEmpty()) return
+        if (checking) stopCheck(null)   // [CHECK-1]
         current = null
         groupFilter = null
         groupBtn.text = "Grupo: Todos ▾"
@@ -586,6 +601,142 @@ class M3uActivity : AppCompatActivity() {
         applyFilter()
         updateHiddenBtn()
         toast("👁 Canales restaurados: ${urls.size}")
+    }
+
+    // ------------------------------------------------------------ Revisar canales [CHECK-1]
+
+    private class CheckFail(val ch: M3uChannel, val why: String)
+
+    /** Toca 🔎: pide confirmación y revisa los canales que se ven en pantalla; si ya está revisando, lo detiene. */
+    private fun onCheckClick() {
+        if (checking) {
+            stopCheck("⏹ Revisión detenida")
+            return
+        }
+        val list = ArrayList(shown)
+        if (list.isEmpty()) {
+            toast("No hay canales para revisar")
+            return
+        }
+        val mins = (list.size * 1.5 / 8 / 60).toInt() + 1   // cálculo grueso: 8 a la vez, ~1,5 s por canal
+        AlertDialog.Builder(this)
+            .setTitle("🔎 Revisar ${list.size} canales")
+            .setMessage("El teléfono pide la lista de cada canal para ver si su servidor responde. No se reproduce nada y se gastan pocos datos.\n\n" +
+                "Puede tardar " + (if (mins <= 1) "un minuto" else "unos $mins minutos") + ". Nada se oculta sin que tú aceptes.\n\n" +
+                "Ojo: un canal que no responde no siempre está caído; puede estar bloqueado para tu país o tener un enlace que caduca.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Revisar") { _, _ -> startCheck(list) }
+            .show()
+    }
+
+    private fun startCheck(list: List<M3uChannel>) {
+        val gen = ++checkGen
+        checking = true
+        val total = list.size
+        val done = java.util.concurrent.atomic.AtomicInteger(0)
+        val fails = java.util.concurrent.ConcurrentLinkedQueue<CheckFail>()
+        val pool = Executors.newFixedThreadPool(8)
+        checkPool = pool
+        checkBtn.text = "⏹ 0/$total"
+        statusView.text = "🔎 Revisando $total canales…"
+        val listName = listBtn.text.toString()
+        for (c in list) {
+            pool.execute {
+                if (gen != checkGen) return@execute
+                val why = MediaServer.checkChannel(c.url)
+                if (gen != checkGen) return@execute
+                if (why != null) fails.add(CheckFail(c, why))
+                val n = done.incrementAndGet()
+                if (n == total) {
+                    runOnUiThread { if (!isFinishing && gen == checkGen) finishCheck(total, fails.toList(), listName) }
+                } else if (n % 5 == 0) {
+                    runOnUiThread {
+                        if (!isFinishing && gen == checkGen) {
+                            checkBtn.text = "⏹ $n/$total"
+                            statusView.text = "🔎 Revisando… $n de $total · ${fails.size} sin respuesta"
+                        }
+                    }
+                }
+            }
+        }
+        pool.shutdown()   // deja terminar lo ya pedido y no acepta más
+    }
+
+    /** Detiene la revisión (los hilos que sigan en curso terminan solos y su resultado se ignora). */
+    private fun stopCheck(msg: String?) {
+        checkGen++
+        checkPool?.shutdownNow()
+        checkPool = null
+        checking = false
+        checkBtn.text = "🔎 Revisar"
+        if (msg != null) {
+            toast(msg)
+            applyFilter()
+        }
+    }
+
+    private fun finishCheck(total: Int, fails: List<CheckFail>, listName: String) {
+        checkPool = null
+        checking = false
+        checkBtn.text = "🔎 Revisar"
+        DebugLog.add("CHECK-1: $listName: $total revisados, ${fails.size} sin respuesta")
+        applyFilter()
+        if (fails.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("✅ Todo responde")
+                .setMessage("Los $total canales revisados respondieron bien.")
+                .setPositiveButton("Cerrar", null)
+                .show()
+            return
+        }
+        val byWhy = LinkedHashMap<String, Int>()
+        for (f in fails) {
+            val k = f.why.substringBefore(" (")
+            byWhy[k] = (byWhy[k] ?: 0) + 1
+        }
+        val resumen = byWhy.entries.sortedByDescending { it.value }.joinToString("\n") { "• ${it.key}: ${it.value}" }
+        val favN = fails.count { favs.contains(it.ch.url) }
+        AlertDialog.Builder(this)
+            .setTitle("🔎 ${fails.size} de $total no responden")
+            .setMessage(resumen +
+                (if (favN > 0) "\n\n$favN de ellos son favoritos ★ y también se quitarían de tus favoritos." else "") +
+                "\n\nPuedes ocultarlos todos (se devuelven con el botón 👁) o elegir cuáles.")
+            .setPositiveButton("Ocultar") { _, _ -> hideFailed(fails.map { it.ch }) }
+            .setNeutralButton("Ver cuáles") { _, _ -> pickFailed(fails) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** Lista con todos marcados; se desmarcan los que se quieran conservar y se ocultan los demás. */
+    private fun pickFailed(fails: List<CheckFail>) {
+        val labels = Array(fails.size) { i -> "${fails[i].ch.name} · ${fails[i].why}" }
+        val checked = BooleanArray(fails.size) { true }
+        AlertDialog.Builder(this)
+            .setTitle("Sin respuesta (${fails.size})")
+            .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
+            .setPositiveButton("Ocultar marcados") { _, _ ->
+                val sel = ArrayList<M3uChannel>()
+                for (i in fails.indices) if (checked[i]) sel.add(fails[i].ch)
+                if (sel.isEmpty()) toast("No marcaste ningún canal") else hideFailed(sel)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun hideFailed(cs: List<M3uChannel>) {
+        Store.hideChannels(cs)
+        hidden = Store.hiddenUrls()
+        favs = Store.chFavs()
+        if (favOnly) reloadFavChannels()
+        applyFilter()
+        updateHiddenBtn()
+        toast("🗑 ${cs.size} canales ocultos (👁 para restaurar)")
+    }
+
+    override fun onDestroy() {
+        checkGen++   // [CHECK-1] si se sale de la pantalla, la revisión se detiene
+        checkPool?.shutdownNow()
+        super.onDestroy()
     }
 
     // ------------------------------------------------------------ Canales
