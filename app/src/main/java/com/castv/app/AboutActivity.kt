@@ -139,10 +139,28 @@ class AboutActivity : AppCompatActivity() {
         }
         addRow(rows, R.drawable.ic_about_book, "Librerías", "Las que usa CASTV y su licencia") { showLibs() }
         addRow(rows, R.drawable.ic_about_person, "Autores", "Ariel De Jesus Bueno", null)
-        addRow(rows, R.drawable.ic_about_share, "Mis redes y contacto", "Facebook, Instagram, TikTok y WhatsApp") {
-            showSocials()
-        }
         content.addView(rows, cardLp())
+
+        // [REDES-1] Tarjeta "Sígueme": una fila por red, con icono propio sobre círculo de color
+        val soc = card()
+        soc.setPadding(0, dp(12), 0, dp(4))
+        val socTitle = text("Sígueme", 13f, accent(), bold = true)
+        socTitle.setPadding(dp(16), 0, dp(16), dp(4))
+        soc.addView(socTitle)
+        addSocial(soc, R.drawable.ic_social_facebook, 0xFF1877F2.toInt(), "Facebook", "Perfil de Ariel") {
+            openUrl(MainActivity.FB_URL)
+        }
+        addSocial(soc, R.drawable.ic_social_instagram, 0xFFC13584.toInt(), "Instagram", "Perfil de Ariel") {
+            openUrl(MainActivity.IG_URL)
+        }
+        addSocial(soc, R.drawable.ic_social_tiktok, 0xFF111111.toInt(), "TikTok", "Videos de Ariel") {
+            openUrl(MainActivity.TT_URL)
+        }
+        addSocial(soc, R.drawable.ic_social_whatsapp, 0xFF25D366.toInt(), "WhatsApp", "+1 (809) 448-0441") {
+            openUrl("https://wa.me/18094480441?text=" +
+                Uri.encode("Hola Ariel, vi tu app CASTV y está excelente!"))
+        }
+        content.addView(soc, cardLp())
 
         // 4) Tarjeta final
         val end = card()
@@ -203,6 +221,32 @@ class AboutActivity : AppCompatActivity() {
         box.addView(text(title, 16f, txtColor))
         box.addView(text(subtitle, 13f, mutedColor, top = 2))
         row.addView(box, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        parent.addView(row)
+    }
+
+    /** [REDES-1] Fila de red social: icono blanco sobre círculo de color, nombre, texto gris y "›". */
+    private fun addSocial(parent: LinearLayout, iconRes: Int, color: Int, title: String, subtitle: String, onClick: () -> Unit) {
+        val row = LinearLayout(this)
+        row.gravity = Gravity.CENTER_VERTICAL
+        row.setPadding(dp(16), dp(10), dp(16), dp(10))
+        val sel = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, sel, true)
+        row.setBackgroundResource(sel.resourceId)
+        row.setOnClickListener { onClick() }
+        val ic = ImageView(this)
+        ic.setImageResource(iconRes)
+        ic.setPadding(dp(9), dp(9), dp(9), dp(9))
+        val bg = GradientDrawable()
+        bg.shape = GradientDrawable.OVAL
+        bg.setColor(color)
+        ic.background = bg
+        row.addView(ic, LinearLayout.LayoutParams(dp(40), dp(40)).apply { rightMargin = dp(16) })
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.addView(text(title, 16f, txtColor))
+        box.addView(text(subtitle, 13f, mutedColor, top = 2))
+        row.addView(box, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(text("›", 24f, accent()))
         parent.addView(row)
     }
 
