@@ -185,6 +185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var viewMode = ViewMode.ALL
+    private var onlyUnseen = false   // [NOVISTOS-1] filtro "solo no vistos" (solo videos; no se guarda)
     private var dupIds: Set<Long> = emptySet()               // copias repetidas (se conserva la más antigua)
     private val queue = ArrayList<MediaItem>()               // cola: suena antes de seguir con la lista
     private var playingFromQueue = false
@@ -756,6 +757,7 @@ class MainActivity : AppCompatActivity() {
         selectedAlbum?.let { al -> list = list.filter { it.album == al } }
         selectedPlaylist?.let { pl -> list = list.filter { Store.inList(pl, it) } }
         if (Store.hideDups) list = list.filter { it.id !in dupIds }
+        if (onlyUnseen && !showingMusic) list = list.filter { !Store.isSeen(it) }   // [NOVISTOS-1]
         when (viewMode) {
             ViewMode.FAVS -> list = list.filter { Store.isFav(it) }
             ViewMode.RESUME -> list = list.filter { Store.resumeAt(it) >= 10 }
@@ -806,6 +808,7 @@ class MainActivity : AppCompatActivity() {
             allItems.isEmpty() -> if (showingMusic) "No se encontró música en el teléfono." else "No se encontraron videos en el teléfono."
             viewMode == ViewMode.FAVS -> "Aún no hay favoritos.\nToca ⋮ en un archivo y elige ☆."
             viewMode == ViewMode.RESUME -> "Nada por continuar todavía."
+            onlyUnseen && !showingMusic -> "Ya viste todos los videos.\nToca el filtro de arriba para quitarlo."   // [NOVISTOS-1]
             query.isNotEmpty() -> "Sin resultados para «$query»."
             selectedPlaylist != null -> "Esta lista no tiene " + (if (showingMusic) "audios" else "videos") +
                     ".\nToca ⋮ en un archivo y elige 📃 Añadir a lista."
@@ -827,6 +830,7 @@ class MainActivity : AppCompatActivity() {
         selectedArtist = null
         selectedAlbum = null
         selectedPlaylist = null
+        onlyUnseen = false   // [NOVISTOS-1]
         applyFilters()
     }
 
@@ -837,6 +841,7 @@ class MainActivity : AppCompatActivity() {
         selectedArtist?.let { parts.add("🎤 $it") }
         selectedAlbum?.let { parts.add("💿 $it") }
         selectedPlaylist?.let { parts.add("📃 $it") }
+        if (onlyUnseen && !showingMusic) parts.add("👁 No vistos")   // [NOVISTOS-1]
         if (parts.isEmpty()) {
             tvFilter.visibility = View.GONE
         } else {
@@ -1036,6 +1041,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
         menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
         menu.add(0, 19, 11, "🕶 Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
+        if (!showingMusic) menu.add(0, 20, 11, "👁 No vistos: " + (if (onlyUnseen) "Solo no vistos" else "Todos"))   // [NOVISTOS-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -1075,6 +1081,10 @@ class MainActivity : AppCompatActivity() {
                 toast(if (Store.incognito) "🕶 Incógnito activado: no se guardan reproducciones, puntos de reanudación, historial de enlaces ni «visto»"
                       else "🕶 Incógnito desactivado")
             }
+            20 -> {   // [NOVISTOS-1]
+                if (showingMusic) toast("«No vistos» solo sirve en videos")
+                else { onlyUnseen = !onlyUnseen; applyFilters() }
+            }
         }
     }
 
@@ -1094,7 +1104,7 @@ class MainActivity : AppCompatActivity() {
 
         val groups = ArrayList<Pair<String, List<Int>>>()
         groups.add("Reproducir y canales" to listOf(15, 18, 10, 3))
-        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6))
+        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
         val inSettings = setOf(11, 12, 13, 14, 16, 17)   // [UI-1b] viven en la pantalla Ajustes
@@ -1634,7 +1644,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
-        if (::adapter.isInitialized) adapter.notifyDataSetChanged()   // refresca "Continuar" al volver del reproductor
+        if (::adapter.isInitialized) {   // refresca "Continuar" (y "No vistos") al volver del reproductor
+            if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
+        }
         // [CARPETAS-1] si en Ajustes se mostraron carpetas de nuevo, relee la lista conservando los filtros
         if (lastScanMs != 0L && actionMode == null && hiddenFolderSet().sorted().joinToString("|") != hiddenSig) {
             loadMedia(showingMusic, keepFilters = true)
@@ -2626,6 +2638,11 @@ class MainActivity : AppCompatActivity() {
               else "★ " + countText(n, "añadida", "añadidas") + " a favoritos")
     }
 
+    /** [NOVISTOS-1] Tras cambiar una marca "visto": con el filtro activo hay que volver a filtrar la lista. */
+    private fun refreshSeen() {
+        if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
+    }
+
     /** [VISTO-1] Marca (o desmarca) como vistos los videos seleccionados. */
     private fun bulkSeen() {
         val vids = selectedItems().filter { !it.isMusic }
@@ -2633,7 +2650,7 @@ class MainActivity : AppCompatActivity() {
         val unmark = vids.all { Store.isSeen(it) }
         for (m in vids) Store.markSeen(m, !unmark)
         actionMode?.finish()
-        adapter.notifyDataSetChanged()
+        refreshSeen()   // [NOVISTOS-1]
         toast("👁 " + (if (unmark) countText(vids.size, "marcado como no visto", "marcados como no vistos")
                        else countText(vids.size, "marcado como visto", "marcados como vistos")))
     }
@@ -2937,7 +2954,7 @@ class MainActivity : AppCompatActivity() {
         if (!item.isMusic) {   // [VISTO-1]
             val seen = Store.isSeen(item)
             labels.add(if (seen) "👁 Marcar como no visto" else "👁 Marcar como visto")
-            actions.add { Store.markSeen(item, !seen); adapter.notifyDataSetChanged() }
+            actions.add { Store.markSeen(item, !seen); refreshSeen() }   // [NOVISTOS-1]
         }
         AlertDialog.Builder(this)
             .setTitle(prettyTitle(item))
