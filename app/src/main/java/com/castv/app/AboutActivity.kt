@@ -110,6 +110,7 @@ class AboutActivity : AppCompatActivity() {
         name.textSize = 26f
         name.setTypeface(null, android.graphics.Typeface.BOLD)
         name.setTextColor(txtColor)
+        name.gravity = Gravity.CENTER   // [ACERCA-2] centrado bajo el icono
         name.setPadding(0, dp(10), 0, dp(4))
         top.addView(name)
         val desc = TextView(this)
