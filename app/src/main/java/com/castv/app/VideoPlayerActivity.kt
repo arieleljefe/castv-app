@@ -49,6 +49,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.concurrent.thread
+import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 
@@ -88,6 +89,9 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var resumeOnReturn = false
     private val handler = Handler(Looper.getMainLooper())
     private val reqSub = 5101
+    // [IA-3] generación de subtítulos con IA
+    @Volatile private var aiCancel = false
+    private var aiDialog: AlertDialog? = null
     private var previewing = false     // [UI-S1] muestra un subtítulo de ejemplo al cambiar el estilo
     private val hidePreview = Runnable {
         previewing = false
@@ -927,6 +931,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (i !in items.indices) return
         if (saveCurrent) saveProgress()
         flushWatch(); watchAccMs = 0L; watchLastMs = 0L   // [TIEMPO-1] lo visto va al video que termina
+        if (SubtitleGen.running) { aiCancel = true; SubtitleGen.requestCancel() }   // [IA-3] cambia de video
         index = i
         val it = items[i]
         pendingStart = startAt
@@ -1041,7 +1046,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "📂 Elegir archivo (.srt / .vtt)…",
             "⏱ Retraso de subtítulos…",
             "🚫 Quitar subtítulos",
-            "🎨 Estilo del subtítulo…")
+            "🎨 Estilo del subtítulo…",
+            "✨ Generar subtítulos con IA…")
         AlertDialog.Builder(this)
             .setTitle("Subtítulos")
             .setItems(labels) { _, which ->
@@ -1063,9 +1069,111 @@ class VideoPlayerActivity : AppCompatActivity() {
                         toast("Subtítulos quitados")
                     }
                     3 -> { previewSub(); showStyleMenu() }
+                    4 -> startAiSubs()   // [IA-3]
                 }
             }
             .show()
+    }
+
+    // ------------------------------------------------------------ [IA-3] Subtítulos con IA
+
+    private fun startAiSubs() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
+        if (SubtitleGen.running) { toast("Ya hay una generación en curso"); return }
+        if (subs.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Este video ya tiene subtítulos")
+                .setMessage("¿Reemplazarlos por los generados con IA?")
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Reemplazar") { _, _ -> aiAskModel(cur) }
+                .show()
+        } else aiAskModel(cur)
+    }
+
+    private fun aiAskModel(cur: MediaItem) {
+        if (WhisperModel.isReady(this)) { aiRun(cur); return }
+        AlertDialog.Builder(this)
+            .setTitle("Falta el modelo de voz")
+            .setMessage("Hay que bajar el modelo de Whisper (~143 MB, una sola vez). Conviene estar con Wi-Fi.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Bajar y generar") { _, _ -> aiRun(cur) }
+            .show()
+    }
+
+    private fun aiRun(cur: MediaItem) {
+        if (!SubtitleGen.tryStart()) { toast("Ya hay una generación en curso"); return }
+        val idx = index
+        val app = applicationContext
+        aiCancel = false
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("✨ Subtítulos con IA")
+            .setMessage("Preparando…")
+            .setCancelable(false)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            aiCancel = true
+            SubtitleGen.requestCancel()
+            dlg.setMessage("Cancelando…")
+        }
+        aiDialog = dlg
+        val srt = File(File(filesDir, "subs"), "ia_" + Integer.toHexString(Store.key(cur).hashCode()) + ".srt")
+        thread {
+            var res: SubtitleGen.Out? = null
+            try {
+                if (!WhisperModel.isReady(app)) {
+                    val d = WhisperModel.download(app, { pct, mb ->
+                        val t = if (pct >= 0) "Bajando el modelo… $pct %" else "Bajando el modelo… $mb MB"
+                        SubtitleGen.notifyProgress(app, if (pct >= 0) pct else 0, t)
+                        runOnUiThread { if (!isFinishing && aiDialog === dlg) dlg.setMessage(t) }
+                    }, { aiCancel })
+                    if (!d.ok) res = SubtitleGen.Out(false, d.message, cancelled = d.cancelled)
+                }
+                if (res == null) {
+                    res = SubtitleGen.run(app, Uri.parse(cur.uriString), srt) { pct, text ->
+                        val t = "$text ($pct %)"
+                        SubtitleGen.notifyProgress(app, pct, text)
+                        runOnUiThread { if (!isFinishing && aiDialog === dlg) dlg.setMessage(t) }
+                    }
+                }
+            } catch (e: Throwable) {
+                res = SubtitleGen.Out(false, "Error: ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                SubtitleGen.finish()
+            }
+            val out = res ?: SubtitleGen.Out(false, "Sin resultado")
+            val msg = when {
+                out.cancelled -> null
+                out.ok -> "Subtítulos listos (${out.segments} frases)"
+                else -> "No se pudieron generar: ${out.message}"
+            }
+            SubtitleGen.notifyDone(app, msg)
+            runOnUiThread {
+                try { if (aiDialog === dlg) dlg.dismiss() } catch (e: Exception) { }
+                if (aiDialog === dlg) aiDialog = null
+                if (isFinishing || isDestroyed) {
+                    try { srt.delete() } catch (e: Exception) { }
+                    return@runOnUiThread
+                }
+                if (out.cancelled) {
+                    toast("Generación cancelada")
+                } else if (!out.ok) {
+                    AlertDialog.Builder(this)
+                        .setTitle("✨ Subtítulos con IA")
+                        .setMessage(out.message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                } else if (idx != index) {
+                    try { srt.delete() } catch (e: Exception) { }   // cambió de video: no se aplica
+                } else {
+                    val min = out.audioSec / 60.0
+                    toast("✨ ${out.segments} frases (" + String.format(Locale.US, "%.1f", min) + " min de audio)")
+                    loadSub(Uri.fromFile(srt), true)
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------ [UI-S1] Estilo de subtítulos
@@ -1580,6 +1688,9 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         flushWatch()   // [TIEMPO-1]
+        if (SubtitleGen.running) { aiCancel = true; SubtitleGen.requestCancel() }   // [IA-3]
+        try { aiDialog?.dismiss() } catch (e: Exception) { }
+        aiDialog = null
         handler.removeCallbacks(tick)
         handler.removeCallbacks(hideHud)
         handler.removeCallbacks(hidePreview)
