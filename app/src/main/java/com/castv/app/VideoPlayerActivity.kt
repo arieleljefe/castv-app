@@ -1393,7 +1393,9 @@ class VideoPlayerActivity : AppCompatActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         val playing = try { video.isPlaying } catch (e: Exception) { false }
-        if (playing && !locked) enterPip()   // al salir con Inicio, el video sigue en una ventana flotante
+        // [PIP-2] se puede apagar en Ajustes › Vídeo (pip_auto; por defecto Sí, como antes)
+        val auto = getSharedPreferences("castv", MODE_PRIVATE).getBoolean("pip_auto", true)
+        if (playing && !locked && auto) enterPip()   // al salir con Inicio, el video sigue en una ventana flotante
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {

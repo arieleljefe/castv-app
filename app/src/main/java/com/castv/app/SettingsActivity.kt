@@ -246,6 +246,9 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
             if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
             else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
+        l.add(Entry("Vídeo", "Ventana flotante al pulsar Inicio",   // [PIP-2]
+            if (pipAuto()) "Sí: el video sigue en una ventana flotante al salir con Inicio"
+            else "No: el video se pausa al salir (la ventana manual sigue en 🛠 › 🪟)", { togglePipAuto() }))
         l.add(Entry("Vídeo", "Consejos de gestos", "Cómo usar los gestos del reproductor de video", { sendAction("tips") }))   // [NOVEDADES-1]
 
         // [BIBLIO-1] Biblioteca
@@ -798,6 +801,16 @@ class SettingsActivity : AppCompatActivity() {
 
     // [GESTO-2] Recordar el brillo que se ajusta deslizando en el video
     private fun rememberBright(): Boolean = prefs().getBoolean("video_bright_on", true)
+
+    // [PIP-2] ventana flotante automática al pulsar Inicio
+    private fun pipAuto(): Boolean = prefs().getBoolean("pip_auto", true)
+
+    private fun togglePipAuto() {
+        val now = !pipAuto()
+        prefs().edit().putBoolean("pip_auto", now).apply()
+        toast(if (now) "🪟 Con Inicio, el video pasa a ventana flotante" else "🪟 Con Inicio, el video se pausa")
+        render()
+    }
 
     private fun toggleRememberBright() {
         val now = !rememberBright()
