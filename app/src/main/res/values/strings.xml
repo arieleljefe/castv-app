@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CASTV</string>
+    <string name="sc_resume_short">Continuar video</string>
+    <string name="sc_resume_long">Continuar último video</string>
+    <string name="sc_music_short">Música</string>
+    <string name="sc_music_long">Abrir música</string>
+    <string name="sc_live_short">Canales en vivo</string>
+    <string name="sc_live_long">Abrir canales en vivo</string>
 </resources>

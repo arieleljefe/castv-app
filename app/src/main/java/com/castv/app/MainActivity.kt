@@ -147,6 +147,9 @@ class MainActivity : AppCompatActivity() {
         const val ACT_NEXT = "com.castv.app.ACT_NEXT"
         const val ACT_STOP_LOCAL = "com.castv.app.ACT_STOP_LOCAL"   // [LOCAL-1]
         const val ACT_CHANNEL_ON_TV = "com.castv.app.ACT_CHANNEL_ON_TV"   // [NOW-1]
+        const val SC_RESUME = "com.castv.app.SC_RESUME"       // [ATAJOS-1] atajos del icono
+        const val SC_MUSIC = "com.castv.app.SC_MUSIC"
+        const val SC_CHANNELS = "com.castv.app.SC_CHANNELS"
         const val CHANNEL_ID = "castv_channel"
         const val FB_URL = "https://www.facebook.com/share/19x6GMsWUM/"
         const val IG_URL = "https://www.instagram.com/arieldejesusbuen"
@@ -236,6 +239,7 @@ class MainActivity : AppCompatActivity() {
     private var userSeeking = false
     private var volTouching = false
     private var muted = false
+    private var pendingShortcut: String? = null   // [ATAJOS-1] atajo pulsado que aún no se aplicó
     private var volBeforeMute = -1   // [REMOTO-1b] volumen del TV antes de silenciarlo (-1 = no lo silenció la app)
     @Volatile private var lastPos = 0
     @Volatile private var lastDur = 0
@@ -585,7 +589,59 @@ class MainActivity : AppCompatActivity() {
         updateRepeatButton()
         updateTabs()
         updateQueueBadge()
+        if (savedInstanceState == null) {   // [ATAJOS-1] abierta desde un atajo del icono (no al recrearse)
+            pendingShortcut = intent?.action?.takeIf { it.startsWith("com.castv.app.SC_") }
+        }
+        registerShortcuts()   // [ATAJOS-1]
         checkPermissionsAndStart()
+    }
+
+    // ------------------------------------------- [ATAJOS-1] Atajos al mantener pulsado el icono
+
+    /** Registra los 3 atajos (Android 7.1+). Se hace al abrir la app; no cambia nada si falla. */
+    @android.annotation.TargetApi(Build.VERSION_CODES.N_MR1)
+    private fun registerShortcuts() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return
+        try {
+            val sm = getSystemService(android.content.pm.ShortcutManager::class.java) ?: return
+            fun mk(id: String, short: Int, long: Int, icon: Int, act: String, rank: Int) =
+                android.content.pm.ShortcutInfo.Builder(this, id)
+                    .setShortLabel(getString(short))
+                    .setLongLabel(getString(long))
+                    .setIcon(android.graphics.drawable.Icon.createWithResource(this, icon))
+                    .setIntent(Intent(this, MainActivity::class.java).setAction(act))
+                    .setRank(rank)
+                    .build()
+            sm.dynamicShortcuts = listOf(
+                mk("sc_resume", R.string.sc_resume_short, R.string.sc_resume_long, R.drawable.ic_sc_video, SC_RESUME, 0),
+                mk("sc_music", R.string.sc_music_short, R.string.sc_music_long, R.drawable.ic_sc_music, SC_MUSIC, 1),
+                mk("sc_channels", R.string.sc_live_short, R.string.sc_live_long, R.drawable.ic_sc_tv, SC_CHANNELS, 2)
+            )
+        } catch (e: Exception) {
+            DebugLog.add("ATAJOS no se pudieron registrar: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    /** Aplica el atajo pendiente: Continuar (lista "Continuar" de videos), Música o Canales (con PIN si lo hay). */
+    private fun applyPendingShortcut() {
+        val a = pendingShortcut ?: return
+        pendingShortcut = null
+        when (a) {
+            SC_RESUME -> { viewMode = ViewMode.RESUME; showMovies() }
+            SC_MUSIC -> { viewMode = ViewMode.ALL; showMusic() }
+            SC_CHANNELS -> runMenuAction(16)
+        }
+    }
+
+    /** Con la app ya abierta, un atajo llega aquí (launchMode singleTop). */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val a = intent.action
+        if (a != null && a.startsWith("com.castv.app.SC_")) {
+            pendingShortcut = a
+            if (monitoring) applyPendingShortcut()
+        }
     }
 
     override fun onDestroy() {
@@ -672,6 +728,7 @@ class MainActivity : AppCompatActivity() {
         if (getSharedPreferences("castv", MODE_PRIVATE).getBoolean("lastMusic", false)) showMusic()
         else showMovies()
         monitoring = true
+        applyPendingShortcut()   // [ATAJOS-1]
         thread { monitorLoop() }
         window.decorView.postDelayed({ warnIfPortBusy() }, 2000)
         window.decorView.postDelayed({ showWhatsNewOnce() }, 2600)   // [NOVEDADES-1]
