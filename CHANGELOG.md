@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v262
+# CASTV: CHANGELOG (cerebro) · v263
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -85,12 +85,9 @@ rm -f ~/storage/downloads/*_actual.*
 - **Qué:** pantalla propia de control remoto en la app (cruceta/OK, atrás, inicio, menú, volumen, canal, encendido, teclado numérico, etc.), con iconos y código propios.
 - **Diagnóstico cerrado (REMOTO-0):** el puerto 36669 (MQTT/TLS 1.2) exige certificado de cliente emitido por la CA de Hisense; con certificado propio responde `unknown ca`. **Descartado** para CASTV (R9). Borrar pruebas: `rm -f ~/castv_key.pem ~/castv_cert.pem`.
 - **Decisión de Ariel (21 nov 2026):** seguir por DLNA (38400), sin nada externo. `TvController.kt` (509 líneas) hoy solo tiene AVTransport + RenderingControl (play, pausa, stop, seek, volumen, silencio); no hay teclas de navegación.
-- **Siguiente paso (REMOTO-1-DIAG):** Ariel ejecuta, con la TV encendida, una línea que guarda el XML de descripción UPnP:
-```
-curl -s http://192.168.100.14:38400/description.xml -o ~/storage/downloads/tv_description.xml && ls -l ~/storage/downloads/tv_description.xml || echo "no respondió en esa ruta"
-```
-  y sube `tv_description.xml`. La IA revisa si hay algún servicio extra. Si solo hay AVTransport/RenderingControl, REMOTO-1a será una pantalla con ▶⏸ ⏮ ⏭, seek, volumen y silencio mejor presentados (y se dice con honestidad que no habrá flechas/OK). Antes de código: plan 🧪 y "Dale".
-- **Pendiente:** modelo y versión del sistema de la TV.
+- **REMOTO-1-DIAG (cerrado, 22 nov 2026):** la ruta real del XML es `http://192.168.100.14:38400/MediaServer/rendererdevicedesc.xml` (`/description.xml` devuelve 0 bytes). La TV es solo MediaRenderer (nombre "TV del dormitorio") con 3 servicios: ConnectionManager (`/upnp/control/minguscmr`), AVTransport (`/upnp/control/mingusavtr`), RenderingControl (`/upnp/control/mingusrcr`). No hay servicio de teclas ni de control remoto. Conclusión: por DLNA no hay flechas/OK.
+- **Siguiente paso (REMOTO-1a):** plan 🧪 entregado en el chat: pantalla de control con ▶⏸, seek, volumen y silencio mejor presentados (sin flechas/OK). Espera el "Dale" de Ariel; luego la IA pide `TvController.kt` y el layout/Activity que corresponda con la plantilla A.
+- **Pendiente:** modelo real de la TV (el XML solo dice fabricante "SmartTV", modelo "Renderer"; la descripción trae `vidaa_support=1`). Se puede ver en Ajustes › Soporte › Info de la TV.
 
 ### ATAJOS-1 · 🧪 (solo plan, sin parche) · Atajos al mantener pulsado el icono
 - **Qué:** atajos estáticos: Continuar último video, Música, Canales en vivo (Android 7.1+; `minSdk 24`).
