@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v269
+# CASTV: CHANGELOG (cerebro) · v270
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -81,11 +81,19 @@ rm -f ~/storage/downloads/*_actual.*
 - **R9 Seguridad:** nunca guardar claves/certificados dentro del repo; no extraer ni copiar archivos de apps de terceros.
 - **R10 Tono:** corto, directo, sin repetir lo ya dicho. Primero el resultado y el siguiente paso.
 
+- **R11 Termux en el móvil:** comandos cortos; si una línea es muy larga el pegado se corta (queda un `>` esperando): partirla en 2 pasos (definir función, luego usarla) y recordar `CTRL`+`c` para salir. Las pruebas imprimen en pantalla (captura) o guardan en Download; Ariel NO borra Download hasta que la IA lo diga. Parche + changelog + historial = UNA sola línea (B+C), con `CHANGELOG_v<N>.md` y `HISTORIAL_v<N>.md` del mismo número.
+
 **Plantilla de entrada activa (sección 4):** `ID · estado · Qué · Archivos · Cómo probar · Siguiente paso`.
 
 ---
 
 ## 4. ESTADO VIVO
+
+### ▶ RETOMAR AQUÍ (22 nov 2026, 9:20)
+- **Hecho y ✅:** REMOTO-1 (ver `HISTORIAL`). La TV solo es MediaRenderer (sin flechas/OK); ignora `SetMute`; el silencio es `SetVolume 0` con restauración.
+- **En curso 🧪:** ATAJOS-1. Se entregó `ATAJOS-1.patch` (+ changelog/historial v269). **Falta:** que Ariel pegue la línea B+C, espere el build en verde y lo pruebe (abrir CASTV una vez; mantener pulsado el icono; 3 atajos; probar con algo sonando). Si el build falla: pedir el mensaje de GitHub Actions. Con su "ya funciona" → ✅ y a `HISTORIAL`.
+- **Siguiente (cuando ATAJOS-1 esté ✅):** WIDGET-1 (widget con ⏮ ⏯ ⏭). Plan 🧪 primero, archivos de una vez (R5), esperar el "Dale". Para el widget probablemente hagan falta `AndroidManifest.xml`, `res/xml/…`, un layout nuevo, `CastvService.kt` y `MainActivity.kt` (acciones `ACT_PREV/TOGGLE/NEXT`).
+- **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### ATAJOS-1 · 🧪 (parche `ATAJOS-1.patch`, 22 nov 2026) · Atajos al mantener pulsado el icono
 - **Qué:** 3 atajos: ⏩ Continuar video (abre Videos con la lista "Continuar", sin reproducir sola), 🎵 Música, 📡 Canales en vivo (respeta el PIN parental: usa `runMenuAction(16)`). Android 7.1+.
