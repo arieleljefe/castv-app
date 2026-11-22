@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v268
+# CASTV: CHANGELOG (cerebro) · v269
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -87,14 +87,15 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ATAJOS-1 · 🧪 (solo plan, sin parche) · Atajos al mantener pulsado el icono
-- **Qué:** atajos estáticos: Continuar último video, Música, Canales en vivo (Android 7.1+; `minSdk 24`).
-- **Archivos:** `AndroidManifest.xml`, `res/xml/shortcuts.xml` (nuevo), `res/values/strings.xml`, `MainActivity.kt`.
-- **Cómo probar:** mantener pulsado el icono; cada atajo abre lo correcto; abrir normal sigue igual.
-- **Siguiente paso:** cuando le toque, la IA pide los archivos con la plantilla A y espera el "Dale".
+### ATAJOS-1 · 🧪 (parche `ATAJOS-1.patch`, 22 nov 2026) · Atajos al mantener pulsado el icono
+- **Qué:** 3 atajos: ⏩ Continuar video (abre Videos con la lista "Continuar", sin reproducir sola), 🎵 Música, 📡 Canales en vivo (respeta el PIN parental: usa `runMenuAction(16)`). Android 7.1+.
+- **Cómo se hizo:** atajos **dinámicos** (`ShortcutManager`, se registran en `registerShortcuts()` al abrir la app; no hay `shortcuts.xml` porque un atajo estático exige escribir el `applicationId` a mano y no se pudo verificar). Aparecen tras abrir la app una vez. Acciones `SC_RESUME`/`SC_MUSIC`/`SC_CHANNELS` se leen en `onCreate` (arranque en frío, aplicadas al final de `startEverything`) y en `onNewIntent` (app abierta; `launchMode="singleTop"` en el manifest).
+- **Archivos:** `MainActivity.kt`, `AndroidManifest.xml` (solo `singleTop`), `res/values/strings.xml` (6 textos), 3 iconos nuevos `res/drawable/ic_sc_video|music|tv.xml` (propios, gris `#455A64`).
+- **Cómo probar:** abrir CASTV una vez › cerrar › mantener pulsado el icono: salen 3 atajos › cada uno abre lo correcto con la app cerrada, y también con la app abierta o con algo sonando. Probar con un video/canal sonando en la TV y con música en el teléfono (algunos lanzadores reinician la pantalla principal al usar un atajo; ver si se corta). Abrir normal y desde la notificación sigue igual.
+- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
 
 ### Cola de pendientes (uno a la vez, en este orden)
-1. ATAJOS-1 (arriba; plan presentado, espera el "Dale") → 2. WIDGET-1 (widget con ⏮ ⏯ ⏭) → 3. CAPÍTULOS (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 4. Vocabulario en español (solo referencia) → 5. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+1. ATAJOS-1 (arriba, 🧪 por probar) → 2. WIDGET-1 (widget con ⏮ ⏯ ⏭) → 3. CAPÍTULOS (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 4. Vocabulario en español (solo referencia) → 5. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
