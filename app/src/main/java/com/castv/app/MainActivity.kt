@@ -2431,6 +2431,42 @@ class MainActivity : AppCompatActivity() {
         row2.addView(auto)
         root.addView(row2, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
 
+        // [REMOTO-1a] Fila 3: silencio + volumen (reflejan y mandan lo mismo que el mini reproductor)
+        val row3 = android.widget.LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        val muteBtn = ImageButton(this).apply {
+            setImageResource(if (muted) R.drawable.ic_vol_off else R.drawable.ic_vol_on)
+            contentDescription = "Silenciar"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundResource(ripple.resourceId)
+            setPadding(dp(11), dp(11), dp(11), dp(11))
+            layoutParams = android.widget.LinearLayout.LayoutParams(dp(48), dp(48))
+            setOnClickListener { btnMute.performClick() }
+        }
+        row3.addView(muteBtn)
+        val volFull = SeekBar(this).apply {
+            max = 100
+            progress = volSeek.progress
+            progressTintList = ColorStateList.valueOf(accentColor())
+            thumbTintList = ColorStateList.valueOf(accentColor())
+            progressBackgroundTintList = ColorStateList.valueOf(0xFF555555.toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, wrap, 1f)
+        }
+        volFull.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {}
+            override fun onStartTrackingTouch(sb: SeekBar) { volTouching = true }
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                val v = sb.progress
+                volSeek.progress = v
+                volTouching = false
+                if (localActive) {
+                    val mx = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (v * mx + 50) / 100, 0)
+                } else thread { TvController.setVolume(v) }
+            }
+        })
+        row3.addView(volFull)
+        root.addView(row3, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
+
         // Refleja el panel cada medio segundo mientras la ventana está abierta
         var shownKey: Any? = null
         val sync = object : Runnable {
@@ -2463,6 +2499,8 @@ class MainActivity : AppCompatActivity() {
                 fav.text = btnNowFav.text
                 fav.setTextColor(btnNowFav.currentTextColor)
                 btnAuto.background?.constantState?.newDrawable()?.let { auto.background = it }
+                muteBtn.setImageResource(if (muted) R.drawable.ic_vol_off else R.drawable.ic_vol_on)   // [REMOTO-1a]
+                if (!volTouching) volFull.progress = volSeek.progress
                 fullHandler.postDelayed(this, 500)
             }
         }
