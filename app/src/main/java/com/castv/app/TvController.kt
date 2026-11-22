@@ -501,8 +501,11 @@ $innerXml
         return tag(body, "CurrentVolume")?.trim()?.toIntOrNull()
     }
 
-    fun setVolume(v: Int): Boolean =
-        rcCall("SetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>") != null
+    fun setVolume(v: Int): Boolean {
+        val ok = rcCall("SetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>") != null
+        DebugLog.add("TV VOLUMEN set=${v.coerceIn(0, 100)} -> ${if (ok) "OK" else "FALLO"}")   // [REMOTO-1b]
+        return ok
+    }
 
     fun setMute(mute: Boolean): Boolean =
         rcCall("SetMute", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${if (mute) 1 else 0}</DesiredMute>") != null

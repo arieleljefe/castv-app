@@ -236,6 +236,7 @@ class MainActivity : AppCompatActivity() {
     private var userSeeking = false
     private var volTouching = false
     private var muted = false
+    private var volBeforeMute = -1   // [REMOTO-1b] volumen del TV antes de silenciarlo (-1 = no lo silenció la app)
     @Volatile private var lastPos = 0
     @Volatile private var lastDur = 0
 
@@ -511,7 +512,17 @@ class MainActivity : AppCompatActivity() {
             muted = !muted
             btnMute.setImageResource(if (muted) R.drawable.ic_vol_off else R.drawable.ic_vol_on)
             val m = muted
-            if (localActive) applyLocalVolume() else thread { TvController.setMute(m) }
+            if (localActive) applyLocalVolume()
+            else if (m) {   // [REMOTO-1b] la TV ignora SetMute: el silencio es volumen 0 y se guarda el anterior
+                volBeforeMute = volSeek.progress
+                volSeek.progress = 0
+                thread { TvController.setVolume(0) }
+            } else if (volBeforeMute >= 0) {
+                val back = if (volBeforeMute > 0) volBeforeMute else 10
+                volBeforeMute = -1
+                volSeek.progress = back
+                thread { TvController.setVolume(back) }
+            }
         }
         volSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {}
@@ -522,7 +533,10 @@ class MainActivity : AppCompatActivity() {
                 if (localActive) {
                     val mx = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (v * mx + 50) / 100, 0)
-                } else thread { TvController.setVolume(v) }
+                } else {
+                    leaveMuteIfRaised(v)   // [REMOTO-1b]
+                    thread { TvController.setVolume(v) }
+                }
             }
         })
 
@@ -613,6 +627,7 @@ class MainActivity : AppCompatActivity() {
             val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 5 else -5
             val v = (volSeek.progress + delta).coerceIn(0, 100)
             volSeek.progress = v
+            leaveMuteIfRaised(v)   // [REMOTO-1b]
             setStatus("🔊 Volumen del TV: $v")
             thread { TvController.setVolume(v) }
             return true
@@ -2115,6 +2130,15 @@ class MainActivity : AppCompatActivity() {
         try { block(mp) } catch (e: Exception) { }
     }
 
+    /** [REMOTO-1b] Si se sube el volumen con el TV en silencio, se quita el silencio (el icono vuelve a 🔊). */
+    private fun leaveMuteIfRaised(v: Int) {
+        if (!localActive && muted && v > 0) {
+            muted = false
+            volBeforeMute = -1
+            btnMute.setImageResource(R.drawable.ic_vol_on)
+        }
+    }
+
     private fun applyLocalVolume() {
         val v = if (muted) 0f else 1f
         try { localPlayer?.setVolume(v, v) } catch (e: Exception) { }
@@ -2461,7 +2485,10 @@ class MainActivity : AppCompatActivity() {
                 if (localActive) {
                     val mx = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (v * mx + 50) / 100, 0)
-                } else thread { TvController.setVolume(v) }
+                } else {
+                    leaveMuteIfRaised(v)   // [REMOTO-1b]
+                    thread { TvController.setVolume(v) }
+                }
             }
         })
         row3.addView(volFull)
