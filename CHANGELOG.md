@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v270
+# CASTV: CHANGELOG (cerebro) · v271
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,21 +89,18 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (22 nov 2026, 9:20)
-- **Hecho y ✅:** REMOTO-1 (ver `HISTORIAL`). La TV solo es MediaRenderer (sin flechas/OK); ignora `SetMute`; el silencio es `SetVolume 0` con restauración.
-- **En curso 🧪:** ATAJOS-1. Se entregó `ATAJOS-1.patch` (+ changelog/historial v269). **Falta:** que Ariel pegue la línea B+C, espere el build en verde y lo pruebe (abrir CASTV una vez; mantener pulsado el icono; 3 atajos; probar con algo sonando). Si el build falla: pedir el mensaje de GitHub Actions. Con su "ya funciona" → ✅ y a `HISTORIAL`.
-- **Siguiente (cuando ATAJOS-1 esté ✅):** WIDGET-1 (widget con ⏮ ⏯ ⏭). Plan 🧪 primero, archivos de una vez (R5), esperar el "Dale". Para el widget probablemente hagan falta `AndroidManifest.xml`, `res/xml/…`, un layout nuevo, `CastvService.kt` y `MainActivity.kt` (acciones `ACT_PREV/TOGGLE/NEXT`).
+### ▶ RETOMAR AQUÍ (22 nov 2026, 9:25)
+- **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). Nada 🧪 pendiente de prueba.
+- **Siguiente:** WIDGET-1 (abajo). Ariel pega la línea A para subir `CastvService.kt`; luego plan 🧪 y "Dale".
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### ATAJOS-1 · 🧪 (parche `ATAJOS-1.patch`, 22 nov 2026) · Atajos al mantener pulsado el icono
-- **Qué:** 3 atajos: ⏩ Continuar video (abre Videos con la lista "Continuar", sin reproducir sola), 🎵 Música, 📡 Canales en vivo (respeta el PIN parental: usa `runMenuAction(16)`). Android 7.1+.
-- **Cómo se hizo:** atajos **dinámicos** (`ShortcutManager`, se registran en `registerShortcuts()` al abrir la app; no hay `shortcuts.xml` porque un atajo estático exige escribir el `applicationId` a mano y no se pudo verificar). Aparecen tras abrir la app una vez. Acciones `SC_RESUME`/`SC_MUSIC`/`SC_CHANNELS` se leen en `onCreate` (arranque en frío, aplicadas al final de `startEverything`) y en `onNewIntent` (app abierta; `launchMode="singleTop"` en el manifest).
-- **Archivos:** `MainActivity.kt`, `AndroidManifest.xml` (solo `singleTop`), `res/values/strings.xml` (6 textos), 3 iconos nuevos `res/drawable/ic_sc_video|music|tv.xml` (propios, gris `#455A64`).
-- **Cómo probar:** abrir CASTV una vez › cerrar › mantener pulsado el icono: salen 3 atajos › cada uno abre lo correcto con la app cerrada, y también con la app abierta o con algo sonando. Probar con un video/canal sonando en la TV y con música en el teléfono (algunos lanzadores reinician la pantalla principal al usar un atajo; ver si se corta). Abrir normal y desde la notificación sigue igual.
-- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
+### WIDGET-1 · ⬜ · Widget con ⏮ ⏯ ⏭
+- **Qué:** widget de pantalla de inicio con anterior / ▶⏸ / siguiente y el título de lo que suena.
+- **Punto delicado:** hoy `notifReceiver` (que atiende `ACT_PREV/TOGGLE/NEXT`) vive en `MainActivity` (se registra en `onCreate` y se quita en `onDestroy`); con la pantalla cerrada nadie escucharía al widget. Hay que ver `CastvService.kt` para decidir dónde atender los botones.
+- **Siguiente paso:** Ariel pega la línea A (pide `CastvService.kt`); la IA presenta el plan 🧪 y espera el "Dale".
 
 ### Cola de pendientes (uno a la vez, en este orden)
-1. ATAJOS-1 (arriba, 🧪 por probar) → 2. WIDGET-1 (widget con ⏮ ⏯ ⏭) → 3. CAPÍTULOS (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 4. Vocabulario en español (solo referencia) → 5. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+1. WIDGET-1 (arriba) (widget con ⏮ ⏯ ⏭) → 2. CAPÍTULOS (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 3. Vocabulario en español (solo referencia) → 4. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).

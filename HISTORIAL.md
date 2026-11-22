@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v270
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v271
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -19,6 +19,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CHECK-1 + COMPAT-TV-1 (diagnóstico) · 20 nov · revisar qué canales responden; log de la TV · `M3uActivity.kt`, `MediaServer.kt`, `Store.kt`, `TvController.kt`.
 - SALIDA-INI-1 · 19 nov · abrir en modo Teléfono · `MainActivity.kt`, `SettingsActivity.kt`.
 - FOCO-1 y FOCO-2 · 21 nov · pausa con llamadas/alarmas/otra app y al desconectar audífonos · `VideoPlayerActivity.kt`, `MainActivity.kt`.
+- ATAJOS-1 · 22 nov · atajos dinámicos al mantener pulsado el icono: Continuar video, Música, Canales en vivo (con PIN); `launchMode=singleTop` · `MainActivity.kt`, `AndroidManifest.xml`, `strings.xml`, `ic_sc_*.xml`.
 - REMOTO-1 (REMOTO-0, DIAG, 1a, 1b) · 22 nov · diagnóstico: la TV solo es MediaRenderer, sin teclas; volumen y 🔇 en la pantalla Reproduciendo; silencio = `SetVolume 0` con restauración porque la TV ignora `SetMute` · `MainActivity.kt`, `TvController.kt`.
 
 ## Canales y catálogo
