@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v263
+# CASTV: CHANGELOG (cerebro) · v266
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -44,9 +44,15 @@ cd ~/castv-nuevo/castv-fresh && cp app/src/main/java/com/castv/app/<A>.kt ~/stor
 cd ~/castv-nuevo/castv-fresh && git apply --check ~/storage/downloads/<parche>.patch && git apply ~/storage/downloads/<parche>.patch && git status --short && git add -A && git commit -m "<ID> <resumen>" && git push origin main
 ```
 
-**C. Subir changelog (siempre con el nombre fijo `CHANGELOG.md` en Download):**
+**B+C. Parche y changelog de golpe (LA QUE SE ENTREGA por defecto cuando hay parche; una sola línea, dos commits, un solo push):**
 ```
-cd ~/castv-nuevo/castv-fresh && git ls-files | grep -x CHANGELOG.md && cp ~/storage/downloads/CHANGELOG.md CHANGELOG.md && cp ~/storage/downloads/HISTORIAL.md HISTORIAL.md && git add CHANGELOG.md HISTORIAL.md && git commit -m "Changelog <ID> (<resumen>)" && git push origin main
+cd ~/castv-nuevo/castv-fresh && git apply --check ~/storage/downloads/<parche>.patch && git apply ~/storage/downloads/<parche>.patch && git add -A && git commit -m "<ID> <resumen>" && cp ~/storage/downloads/CHANGELOG_v<N>.md CHANGELOG.md && cp ~/storage/downloads/HISTORIAL.md HISTORIAL.md && git add CHANGELOG.md HISTORIAL.md && git commit -m "Changelog <ID> (<resumen>)" && git push origin main && git status --short
+```
+(B y C sueltas se usan solo cuando hay parche sin changelog o changelog sin parche.)
+
+**C. Subir changelog (en Download viene con versión: `CHANGELOG_v<N>.md`, igual al número del título; en el repo se guarda siempre como `CHANGELOG.md`):**
+```
+cd ~/castv-nuevo/castv-fresh && git ls-files | grep -x CHANGELOG.md && cp ~/storage/downloads/CHANGELOG_v<N>.md CHANGELOG.md && cp ~/storage/downloads/HISTORIAL.md HISTORIAL.md && git add CHANGELOG.md HISTORIAL.md && git commit -m "Changelog <ID> (<resumen>)" && git push origin main
 ```
 (La primera vez, si `git ls-files` no lo encuentra, quitar solo el tramo `git ls-files | grep -x CHANGELOG.md &&` y avisar.)
 
@@ -71,7 +77,7 @@ rm -f ~/storage/downloads/*_actual.*
 - **R5 Pedir archivos de una sola vez:** al empezar un objetivo, la IA decide TODOS los archivos que necesitará hasta el parche final (código, manifest, layouts, gradle, ruta de recursos) y los pide en UNA línea con la plantilla A. Si más tarde necesita otro, lo dice una vez con una línea nueva. Nunca pedir capturas ni "pásame la conversación"; Ariel solo sube archivos.
 - **R6 Todo en Download:** cualquier archivo que Ariel deba subir o bajar (código, `.patch`, changelog, recursos) vive en `~/storage/downloads/`. La app NO guarda nada ahí (el modelo de Whisper se queda en carpeta interna).
 - **R7 VLC solo como inspiración (GPL):** no copiar código, iconos, textos largos, nombre ni logo. Todo propio.
-- **R8 Mantenimiento del changelog:** en cada respuesta que cambie algo, entregar `CHANGELOG.md` (y `HISTORIAL.md` si algo pasó a ✅) ya actualizados como archivos, más las líneas A/B/C que correspondan. Al pasar a ✅: mover a `HISTORIAL.md` como UNA línea y borrar de la sección 4. No crear notas por versión.
+- **R8 Mantenimiento del changelog:** en cada respuesta que cambie algo, entregar `CHANGELOG_v<N>.md` (el título sube de versión en cada entrega; y `HISTORIAL.md` si algo pasó a ✅) ya actualizados como archivos, más las líneas A/B/C que correspondan (si hay parche y changelog, UNA sola línea B+C). Al pasar a ✅: mover a `HISTORIAL.md` como UNA línea y borrar de la sección 4. El archivo lleva la versión en el nombre, pero no se crean notas por versión dentro del texto.
 - **R9 Seguridad:** nunca guardar claves/certificados dentro del repo; no extraer ni copiar archivos de apps de terceros.
 - **R10 Tono:** corto, directo, sin repetir lo ya dicho. Primero el resultado y el siguiente paso.
 
@@ -81,12 +87,17 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### REMOTO-1 · ⬜ · Control remoto dentro de CASTV (va primero)
+### REMOTO-1 · 🧪 · Control remoto dentro de CASTV (va primero)
 - **Qué:** pantalla propia de control remoto en la app (cruceta/OK, atrás, inicio, menú, volumen, canal, encendido, teclado numérico, etc.), con iconos y código propios.
 - **Diagnóstico cerrado (REMOTO-0):** el puerto 36669 (MQTT/TLS 1.2) exige certificado de cliente emitido por la CA de Hisense; con certificado propio responde `unknown ca`. **Descartado** para CASTV (R9). Borrar pruebas: `rm -f ~/castv_key.pem ~/castv_cert.pem`.
 - **Decisión de Ariel (21 nov 2026):** seguir por DLNA (38400), sin nada externo. `TvController.kt` (509 líneas) hoy solo tiene AVTransport + RenderingControl (play, pausa, stop, seek, volumen, silencio); no hay teclas de navegación.
 - **REMOTO-1-DIAG (cerrado, 22 nov 2026):** la ruta real del XML es `http://192.168.100.14:38400/MediaServer/rendererdevicedesc.xml` (`/description.xml` devuelve 0 bytes). La TV es solo MediaRenderer (nombre "TV del dormitorio") con 3 servicios: ConnectionManager (`/upnp/control/minguscmr`), AVTransport (`/upnp/control/mingusavtr`), RenderingControl (`/upnp/control/mingusrcr`). No hay servicio de teclas ni de control remoto. Conclusión: por DLNA no hay flechas/OK.
-- **Siguiente paso (REMOTO-1a):** plan 🧪 entregado en el chat: pantalla de control con ▶⏸, seek, volumen y silencio mejor presentados (sin flechas/OK). Espera el "Dale" de Ariel; luego la IA pide `TvController.kt` y el layout/Activity que corresponda con la plantilla A.
+- **REMOTO-1a · 🧪 (aplicado):** fila 3 (🔇 + barra de volumen) añadida a la pantalla completa "Reproduciendo" (`showFullPlayer`, UI-3b), que ya traía ▶⏸, seek, ±10, anterior/siguiente, detener, mezclar, ★ y repetir. Los botones ⏮ ⏭ de la app saltan en la cola de CASTV (la TV recibe una sola URI); `Next`/`Previous` de AVTransport existen pero no se usan.
+- **Diagnóstico de volumen (22 nov 2026):** `rc.xml` solo trae ListPresets, SelectPreset, GetMute, SetMute, GetVolume, SetVolume (canal `Master`). **La TV ignora `SetMute`**: responde 200 OK con `1`/`true`, pero `GetMute` sigue en 0 y sigue sonando. **`SetVolume` sí funciona** (5 y 15 verificados a oído) y `GetVolume` devuelve el valor fijado; antes del primer `SetVolume` devuelve 0 aunque suene (no es el volumen real).
+- **REMOTO-1b · 🧪 (parche `REMOTO-1b.patch`, 22 nov 2026):** el 🔇 en la TV ahora es `SetVolume 0` guardando el volumen anterior (`volBeforeMute`) y lo restaura al quitar el silencio (si no había volumen anterior, 10). Subir el volumen (barras o botones del teléfono) con el TV en silencio quita el silencio (`leaveMuteIfRaised`). `TvController.setVolume` anota en el `/log` cada llamada: `TV VOLUMEN set=N -> OK/FALLO`. `setMute` queda sin uso en la TV (sigue en el código). Local (teléfono): sin cambios.
+- **Cómo probar REMOTO-1b:** video en la TV › volumen a 20 › 🔇 (la TV calla, barra en 0) › 🔇 otra vez (vuelve a 20) › con 🔇 activo mover la barra (se quita el silencio) › revisar `/log`.
+- **Límite conocido:** si Ariel cambia el volumen con el control físico de la TV, la app no se entera; el 🔇 restaura el último valor que la app fijó.
+- **Siguiente paso:** build en verde + prueba; con el "ya funciona" REMOTO-1 pasa a ✅ y va a `HISTORIAL.md`. Luego ATAJOS-1 (plan ya presentado, espera "Dale").
 - **Pendiente:** modelo real de la TV (el XML solo dice fabricante "SmartTV", modelo "Renderer"; la descripción trae `vidaa_support=1`). Se puede ver en Ajustes › Soporte › Info de la TV.
 
 ### ATAJOS-1 · 🧪 (solo plan, sin parche) · Atajos al mantener pulsado el icono
