@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v309
+# CASTV: CHANGELOG (cerebro) · v311
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -114,10 +114,17 @@ rm -f ~/storage/downloads/*_actual.*
   - **Prueba con servidor propio (Termux, dos líneas):** `mkdir -p ~/t && printf '#EXTM3U\n#EXTINF:-1,Prueba Uno\nhttp://example.com/a.m3u8\n#EXTINF:-1,Prueba Dos\nhttp://example.com/b.m3u8\n' > ~/t/lista.m3u` y luego `cd ~/t && python3 -m http.server 9000 &`. En la app: añadir lista `http://192.168.100.43:9000/lista.m3u` (2 canales). Vaciarla con `: > ~/t/lista.m3u`, volver a abrir la lista: deben seguir los 2 canales con «lista nueva dañada (copia guardada)» y la línea en el `/log`. Al terminar: `kill %1`, «Quitar lista» y `rm -r ~/t`.
   - **Siguiente paso:** Ariel dice «ya funciona» → pasa al historial. Sin etiqueta (R12). (La prueba dejó la lista `prueba` y `~/t` en Termux: limpiar con 🗑 y `pkill -f http.server; rm -r ~/t`.)
 - **ZAP-1 ✅ (23 nov):** Ariel: «Funciona bien con el TV». ⏮ ⏭ cambian de canal cuando hay un canal de lista en el TV (pantalla Reproduciendo y notificación). Solo vale para el TV: en modo teléfono ⏮⏭ no cambian de canal (por diseño; opción ZAP-2 si Ariel la pide: `Zap.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`). Línea en `HISTORIAL`. Sin etiqueta (R12).
+- **Ahora en 🧪: SPEED-1 (selector de velocidad del video; ENTREGADO el 23 nov, pendiente de probar).** Código visto: `VideoPlayerActivity.kt` (hoy la velocidad solo existe al mantener pulsado: `setFast`, `fastVals`, `PlaybackParams`).
+  - **Qué cambia (solo `VideoPlayerActivity.kt`, aditivo):** Herramientas gana «⏩ Velocidad: 1×» (opciones 0.5×, 0.75×, 1×, 1.25×, 1.5×, 2×), con diálogo de una elección como «Volumen extra». Variable `curSpeed` (por video: vuelve a 1× al cambiar de video; no se guarda). `applySpeed()` usa `mp.playbackParams`, y si el video estaba en pausa lo deja en pausa (algunos teléfonos arrancan solos). Al soltar «mantener pulsado» vuelve a la velocidad elegida, no a 1×. Canales en vivo (sin duración): aviso «No disponible en canales en vivo». Capítulos pasa del índice 8 al 9 en el menú.
+  - **Archivos:** solo `VideoPlayerActivity.kt` (`Store.kt` no se toca).
+  - **Riesgos:** (a) el audio a 0.5× / 2× suena distinto según el teléfono; (b) toca `setFast` (gesto de mantener pulsado): se prueba que siga igual; (c) sin compilador de Kotlin aquí (R4).
+  - **Cómo probar:** 1) Herramientas › Velocidad: elegir 1.5× y ver que acelera; 2) mantener pulsado y soltar: vuelve a 1.5×; 3) en pausa, cambiar velocidad: no arranca solo; 4) cambiar de video: vuelve a 1×; 5) Capítulos sigue abriendo (MKV con capítulos).
+  - **Entregado:** `SPEED-1.patch` (solo `VideoPlayerActivity.kt`; `git apply --check` verificado contra el archivo actual; sin compilador de Kotlin, R4). Velocidad por video, sin guardar (decisión: la más simple). Variables `speedVals`, `curSpeed`; funciones `applySpeed()`, `showSpeedDialog()`, `speedText()`; `setFast(false)` vuelve a `curSpeed`. Menú: Velocidad = índice 8, Capítulos pasa a 9.
+  - **Siguiente paso:** Ariel prueba y dice «ya funciona» (R3) o pasa el error de Actions. Sin etiqueta (R12).
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. **SPEED-1** Selector de velocidad del video (0.5×–2×) en Herramientas; hoy solo existe la velocidad al mantener pulsado (sin plan aún).
+1. **SPEED-1** Selector de velocidad del video (0.5×–2×) en Herramientas (entregado, pendiente de probar).
 2. Idioma "Automático" de los subtítulos con IA: **PAUSADO por Ariel (23 nov): no tocar ni proponer hasta que él lo mencione** (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
