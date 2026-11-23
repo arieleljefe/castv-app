@@ -433,7 +433,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun showSpeedDialog() {
-        val cur = speedVals.indexOf(curSpeed).let { if (it < 0) 2 else it }
+        val cur = speedVals.indexOfFirst { it == curSpeed }.let { if (it < 0) 2 else it }   // [SPEED-1b] FloatArray no tiene indexOf
         AlertDialog.Builder(this)
             .setTitle("⏩ Velocidad del video")
             .setSingleChoiceItems(speedLabels, cur) { d, which ->
