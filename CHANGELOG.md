@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v274
+# CASTV: CHANGELOG (cerebro) · v275
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -91,20 +91,20 @@ rm -f ~/storage/downloads/*_actual.*
 
 ### ▶ RETOMAR AQUÍ (22 nov 2026, 23:55)
 - **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Ahora:** CAPÍTULOS: plan 🧪 entregado (abajo); espera el "Dale" de Ariel.
+- **Ahora:** CAPÍTULOS-1 🧪: parche entregado (abajo); falta que Ariel lo suba, espere el build en verde y lo pruebe.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### CAPÍTULOS · 🧪 (solo plan, sin parche) · Capítulos de video
-- **Veredicto (verificado en `VideoPlayerActivity.kt`):** el reproductor es `SizedVideoView : VideoView` (→ `MediaPlayer`), sin API de capítulos. **Sí se puede sin cambiar de motor**, leyendo los capítulos con código propio del archivo (`it.uriString`, un `content://` del teléfono) y usando `video.seekTo(...)` como ya hacen los marcadores (MARCAS-1).
-- **Qué:** nueva entrada en Herramientas: "📑 Capítulos (N)…" (solo aparece con N>0), que abre una lista con título y tiempo; tocar uno salta ahí. Opcional: el capítulo actual se resalta en la lista.
-- **Formatos:** MKV/WebM (elemento `Chapters`, localizado por `SeekHead` y, si falta, recorriendo los elementos de nivel superior) y MP4/M4V/MOV con átomo `chpl` (el que escriben ffmpeg y mp4box). Otros (capítulos como pista de texto QuickTime, AVI, etc.): no se leen. Solo videos del teléfono; en la TV por DLNA no aplica.
-- **Archivos:** `Chapters.kt` (nuevo, ~150 líneas, solo lee: nunca escribe ni cambia el video) y `VideoPlayerActivity.kt` (entrada en `showToolsMenu`, `showChapters()`, lectura en un hilo al abrir el video; si falla o no hay capítulos, no cambia nada).
-- **Verificación aquí:** antes de entregar, el algoritmo se prueba en Python con MKV/MP4 con capítulos hechos con ffmpeg, y el Kotlin se porta igual; no hay compilador de Kotlin (si falla el build, pedir el mensaje de GitHub Actions).
-- **Cómo probar:** abrir un video con capítulos › Herramientas › "📑 Capítulos" › tocar uno: salta a ese tiempo › un video sin capítulos: la entrada no aparece › todo lo demás igual. Hace falta al menos un video de Ariel con capítulos (si no tiene, se prueba con uno de prueba hecho aquí).
-- **Siguiente paso:** espera el "Dale" de Ariel. No hace falta subir más archivos.
+### CAPÍTULOS-1 · 🧪 (parche `CAPITULOS-1.patch`, 22 nov 2026) · Capítulos de video
+- **Qué:** Herramientas › "📑 Capítulos (N)…" (solo aparece si el video tiene capítulos): lista con tiempo y título, marca el actual con ▶ y salta con `video.seekTo` al tocar uno. Solo videos del teléfono (`id != 0`); en la TV por DLNA no aplica.
+- **Cómo:** `Chapters.kt` (nuevo, solo lectura): MKV/WebM (elemento `Chapters`, localizado por `SeekHead` o recorriendo el archivo) y MP4/M4V/MOV (átomo `chpl`). Se lee en un hilo al abrir cada video (`loadChapters` en `playAt`); si no hay capítulos o algo falla, no cambia nada. `VideoPlayerActivity.kt`: `loadChapters`, `showChapters`, y la entrada en `showToolsMenu`.
+- **Verificado aquí (Python, mismo algoritmo):** MKV y MP4 de ffmpeg con 3 capítulos (con y sin índice SeekHead; `moov` al inicio y al final); MKV sin capítulos devuelve vacío. El Kotlin no se pudo compilar aquí.
+- **Archivos de prueba:** `prueba_capitulos.mkv` / `.mp4` (20 s, capítulos: Inicio 0:00, "Segunda parte ñandú 🎬" 0:04, Final 0:09; en MP4 salen ~23 ms corridos, es normal).
+- **Cómo probar:** guardar el video de prueba en Descargas › abrirlo en CASTV › Herramientas › "📑 Capítulos (3)…" › tocar uno: salta › un video sin capítulos: no sale la opción › lo demás igual. Idealmente también uno de sus videos reales con capítulos.
+- **Límites:** capítulos como pista de texto QuickTime, AVI y otros no se leen; subcapítulos se aplanan; se usa la primera edición con capítulos.
+- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
 
 ### Cola de pendientes (uno a la vez, en este orden)
-1. CAPÍTULOS (arriba) (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 2. Vocabulario en español (solo referencia) → 3. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+1. CAPÍTULOS-1 (arriba, 🧪 por probar) (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 2. Vocabulario en español (solo referencia) → 3. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
