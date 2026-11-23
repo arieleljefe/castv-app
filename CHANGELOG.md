@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v280
+# CASTV: CHANGELOG (cerebro) · v281
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,13 +89,13 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (23 nov 2026, 01:05)
+### ▶ RETOMAR AQUÍ (23 nov 2026, 01:15)
 - **Hecho y ✅:** REMOTO-1, ATAJOS-1 y CAPÍTULOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
 - **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1 y VOCABULARIO-1.
-- **Ahora:** VOCABULARIO-2 🧪: plan abajo; falta el "Dale" de Ariel al plan para generar el parche.
+- **Ahora:** VOCABULARIO-2 🧪: parche entregado (abajo); falta que Ariel lo suba, espere el build en verde y lo pruebe.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### VOCABULARIO-2 · 🧪 (solo plan, 23 nov 2026) · Unificar textos de la app
+### VOCABULARIO-2 · 🧪 (parche `VOCABULARIO-2.patch`, 23 nov 2026) · Unificar textos de la app
 - **Qué:** solo cambia texto visible, sin tocar lógica. Según `VOCABULARIO.md` (sección 2). Código de `castv-src.zip` (HEAD del 23 nov), ya leído: no hace falta pedir archivos.
 - **Cambios (~35 líneas, 5 archivos):**
   - `MainActivity.kt`: "En el móvil" → "En el teléfono" (botones y avisos, 5 sitios: 1534, 1561, 1589, 1590, 1619); "Playlist vacía" → "Lista vacía" (1489, 1498); "aparato(s)" → "dispositivo(s)" (3591, 3601); "Borrado: a la papelera/permanente" → "Eliminado: …" (1131); "🗑 Eliminar lista" → "🗑 Quitar lista" (3550); "Vídeo" → "Video" (764).
@@ -107,7 +107,9 @@ rm -f ~/storage/downloads/*_actual.*
 - **Al preparar el parche:** revisar los avisos vecinos de "Quitar lista" (el aviso al quitar debe decir "quitada", no "eliminada").
 - **Riesgo:** bajo. Lo único delicado es "Vídeo" → "Video" en Ajustes, porque es el nombre que agrupa las entradas: se cambia en todas a la vez.
 - **Cómo probar:** build en verde › Ajustes: aparece la sección "Video" con todas sus entradas › ⋮ › menú de Almacenamiento dice "Eliminado: …" › Listas: la opción dice "Quitar lista" y funciona › enlace con datos móviles: el aviso dice "teléfono" › subtítulos con IA: "Descargando el modelo…" › lo demás igual.
-- **Siguiente paso:** "Dale" de Ariel → `VOCABULARIO-2.patch` (verificado con `git apply --check`; el Kotlin no se compila aquí) y línea B+C.
+- **Entregado:** 5 archivos, 39 líneas cambiadas (+39/−39). Verificado con `git apply --check` + `git apply` sobre el código real (`castv-src.zip`); las llaves no cambian (el desfase 471/472 en `VideoPlayerActivity.kt` ya existía antes por llaves dentro de textos). El Kotlin no se compiló aquí.
+- **Cambios extra respecto al plan:** el aviso "Lista eliminada" pasa a "Lista quitada" (coherente con "Quitar lista"). Se deja igual el título "Borrado" de la entrada de Ajustes › Almacenamiento (solo cambió su subtítulo y el menú).
+- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
 
 ### Cola de pendientes (uno a la vez, en este orden)
 1. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
