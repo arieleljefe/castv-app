@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v314
+# CASTV: CHANGELOG (cerebro) · v315
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -112,7 +112,7 @@ rm -f ~/storage/downloads/*_actual.*
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. Idioma "Automático" de los subtítulos con IA: **PAUSADO por Ariel (23 nov): no tocar ni proponer hasta que él lo mencione** (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+(Cola vacía. Ariel elige el siguiente objetivo; ideas en «Pendientes sueltos».)
 
 ### Pendientes sueltos
 - ⬜ Ideas de referencia NO elegidas (23 nov; con su contra): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · ATOMIC-1 guardado seguro de ajustes/favoritos (toca `Store.kt`) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · TESTS-1 pruebas automáticas en GitHub Actions · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
@@ -125,6 +125,7 @@ rm -f ~/storage/downloads/*_actual.*
 - Verificado 23 nov: temporizador de apagado y velocidad ya existen en música (`MainActivity.kt`); el temporizador también en video (GESTO-2). Velocidad en video, verificado 23 nov: solo existe al mantener pulsado (1.5×/2×/3×), no hay selector (ver SPEED-1).
 
 ### Descartado (⛔)
+Subtítulos con IA (Whisper), idioma «Automático» y mejoras: **CERRADO por Ariel (23 nov)**; no tocar ni proponer. Si algún día quiere mejorarlo, él avisa (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 `Platzi-Download` y `Youtube_Downloader` (23 nov): no aportan a castv y descargan contenido de terceros; no se toman ideas de ellos.
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
 LOG-1 (ocultar claves en el `/log`): Ariel lo salta el 23 nov porque no comparte el log. Idea: `redact()` en `DebugLog.kt` que cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …` (no cubre claves en la ruta del enlace). Se retoma solo si Ariel empieza a compartir el log.
