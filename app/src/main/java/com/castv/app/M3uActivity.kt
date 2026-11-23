@@ -49,6 +49,13 @@ class M3uActivity : AppCompatActivity() {
     private var normNames: List<String> = emptyList()
     private var shown: List<M3uChannel> = emptyList()
     private var groupFilter: String? = null
+    private var moodFilter = -1   // [ESTILO-3] índice en MOODS (-1 = ningún ánimo)
+    private lateinit var moodScroll: HorizontalScrollView
+    private lateinit var moodRow: LinearLayout
+    private var moodCounts = IntArray(MOODS.size)
+    private var moodSig = ""     // de qué lista/ocultos son moodCounts
+    private var moodDrawn = ""   // qué se dibujó la última vez (lista + ánimo activo)
+    private val moodMaskCache = HashMap<String, Int>()
     private var loadGen = 0
     private var fromCache = false
     private var favs: Set<String> = emptySet()
@@ -180,6 +187,16 @@ class M3uActivity : AppCompatActivity() {
         row2.addView(groupBtn)
         root.addView(row2)
 
+        // [ESTILO-3] Fila de ánimos (chips desplazables); se llena en refreshMoods()
+        moodRow = LinearLayout(this)
+        moodRow.gravity = Gravity.CENTER_VERTICAL
+        moodScroll = HorizontalScrollView(this)
+        moodScroll.isHorizontalScrollBarEnabled = false
+        moodScroll.setPadding(0, dp(8), 0, 0)
+        moodScroll.visibility = View.GONE
+        moodScroll.addView(moodRow)
+        root.addView(moodScroll)
+
         statusView = TextView(this)
         statusView.setTextColor(mutedColor)
         statusView.textSize = 13f
@@ -240,8 +257,10 @@ class M3uActivity : AppCompatActivity() {
         normNames = emptyList()
         shown = emptyList()
         groupFilter = null
+        moodFilter = -1   // [ESTILO-3]
         groupBtn.text = "Grupo: Todos ▾"
         chAdapter.notifyDataSetChanged()
+        refreshMoods()   // [ESTILO-3] lista vacía: la fila se esconde
         val gen = ++loadGen
         val cache = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
         thread {
@@ -326,12 +345,14 @@ class M3uActivity : AppCompatActivity() {
         if (checking) stopCheck(null)   // [CHECK-1]
         current = null
         groupFilter = null
+        moodFilter = -1   // [ESTILO-3]
         groupBtn.text = "Grupo: Todos ▾"
         listBtn.text = "🌐 ${name.trimStart { !it.isLetterOrDigit() }} · toda ▾"   // [PULIDO-3a] un solo icono
         channels = emptyList()
         normNames = emptyList()
         shown = emptyList()
         fromCache = false
+        refreshMoods()   // [ESTILO-3]
         statusView.text = "Descargando 0 de ${lists.size} listas…"
         chAdapter.notifyDataSetChanged()
         val gen = ++loadGen
@@ -472,6 +493,7 @@ class M3uActivity : AppCompatActivity() {
     private fun applyFilter() {
         val toks = norm(searchBox.text.toString()).split(' ').filter { it.isNotEmpty() }
         val g = groupFilter
+        val mood = moodFilter   // [ESTILO-3]
         val out = ArrayList<M3uChannel>()
         // [FAV-1] con ★ Favs activo la base son los favoritos de TODAS las listas
         val base = if (favOnly) favChannels else channels
@@ -480,6 +502,7 @@ class M3uActivity : AppCompatActivity() {
             val c = base[i]
             if (hidden.isNotEmpty() && hidden.contains(c.url)) continue   // [OCULTAR-1]
             if (!favOnly && g != null && !groupKeys(c).contains(g)) continue   // [GRUPOS-1]
+            if (!favOnly && mood >= 0 && (moodMask(c.group) and (1 shl mood)) == 0) continue   // [ESTILO-3]
             val n = baseNames[i]
             if (toks.all { n.contains(it) }) out.add(c)
         }
@@ -494,6 +517,74 @@ class M3uActivity : AppCompatActivity() {
                 (if (fromCache) " · sin conexión (copia guardada)" else "")
         }
         refreshSections()   // [ESTILO-2]
+        refreshMoods()   // [ESTILO-3]
+    }
+
+    // ------------------------------------------------------------ [ESTILO-3] Ánimos
+
+    /** Máscara de ánimos (un bit por ánimo) de un texto de grupos "Movies;Music"; se guarda por texto, no por canal. */
+    private fun moodMask(group: String): Int = moodMaskCache.getOrPut(group) {
+        var m = 0
+        for (k in group.split(';')) {
+            val n = norm(k.trim())
+            for (i in MOODS.indices) if (MOODS[i].keys.contains(n)) m = m or (1 shl i)
+        }
+        m
+    }
+
+    private fun toggleMood(i: Int) {
+        moodFilter = if (moodFilter == i) -1 else i
+        if (moodFilter >= 0) {   // ánimo y grupo no se mezclan
+            groupFilter = null
+            groupBtn.text = "Grupo: Todos ▾"
+        }
+        applyFilter()
+    }
+
+    /** Dibuja la fila de ánimos: solo los que tienen canales en la lista abierta (y el activo). Se esconde con ★ Favs. */
+    private fun refreshMoods() {
+        if (!::moodRow.isInitialized) return
+        if (favOnly) {
+            moodScroll.visibility = View.GONE
+            moodDrawn = ""
+            return
+        }
+        val sig = System.identityHashCode(channels).toString() + "|" + channels.size + "|" + hidden.size
+        val drawn = sig + "|" + moodFilter
+        if (drawn == moodDrawn) return   // nada cambió (p. ej. solo se escribió en el buscador)
+        if (sig != moodSig) {
+            val cnt = IntArray(MOODS.size)
+            val h = hidden
+            for (c in channels) {
+                if (h.isNotEmpty() && h.contains(c.url)) continue   // [OCULTAR-1]
+                val m = moodMask(c.group)
+                if (m == 0) continue
+                for (i in MOODS.indices) if ((m and (1 shl i)) != 0) cnt[i]++
+            }
+            moodCounts = cnt
+            moodSig = sig
+        }
+        moodDrawn = drawn
+        moodRow.removeAllViews()
+        var any = false
+        for (i in MOODS.indices) {
+            if (moodCounts[i] == 0 && i != moodFilter) continue
+            any = true
+            val t = chip(MOODS[i].label) { toggleMood(i) }
+            t.textSize = 14f
+            t.setPadding(dp(12), dp(6), dp(12), dp(6))
+            if (i == moodFilter) {
+                t.setTextColor(accent())
+                t.setTypeface(null, android.graphics.Typeface.BOLD)
+                t.background = GradientDrawable().apply {
+                    setColor(0x33888888)
+                    cornerRadius = dp(18).toFloat()
+                    setStroke(dp(2), accent())
+                }
+            }
+            moodRow.addView(t)
+        }
+        moodScroll.visibility = if (any) View.VISIBLE else View.GONE
     }
 
     // ------------------------------------------------------------ [ESTILO-2] Continuar y Favoritos
@@ -507,7 +598,7 @@ class M3uActivity : AppCompatActivity() {
     private fun refreshSections() {
         if (!::sections.isInitialized) return
         sections.removeAllViews()
-        val plain = !favOnly && groupFilter == null && searchBox.text.isNullOrEmpty()
+        val plain = !favOnly && groupFilter == null && moodFilter < 0 && searchBox.text.isNullOrEmpty()   // [ESTILO-3]
         if (!plain) return
         val h = hidden
         val recent = Store.recentChannels().filter { !h.contains(it.url) }
@@ -581,6 +672,7 @@ class M3uActivity : AppCompatActivity() {
             .setTitle("Filtrar por grupo")
             .setItems(labels.toTypedArray()) { _, which ->
                 groupFilter = if (which == 0) null else keys[which - 1]
+                if (groupFilter != null) moodFilter = -1   // [ESTILO-3] ánimo y grupo no se mezclan
                 groupBtn.text = "Grupo: " + (groupFilter?.let { groupLabel(it) } ?: "Todos") + " ▾"
                 applyFilter()
             }
@@ -998,6 +1090,20 @@ class M3uActivity : AppCompatActivity() {
         }
     }
 }
+
+// [ESTILO-3] Ánimos: cada uno agrupa categorías (en minúsculas y sin acentos, en inglés de iptv-org y en español).
+private class Mood(val label: String, val keys: Set<String>)
+
+private val MOODS = listOf(
+    Mood("😴 Relajarme", setOf("relax", "lifestyle", "travel", "outdoor", "relajacion", "estilo de vida", "viajes", "aire libre")),
+    Mood("🎭 Entretenimiento", setOf("comedy", "entertainment", "comedia", "entretenimiento")),
+    Mood("🧠 Aprender", setOf("documentary", "education", "science", "culture", "documentales", "documental", "educacion", "ciencia", "cultura")),
+    Mood("👨‍👩‍👧 Familia", setOf("kids", "family", "animation", "infantil", "familia", "animacion")),
+    Mood("🎬 Cine y series", setOf("movies", "series", "classic", "peliculas", "pelicula", "cine", "clasicos")),
+    Mood("⚽ Deportes", setOf("sports", "sport", "deportes", "deporte")),
+    Mood("📰 Informarme", setOf("news", "weather", "business", "legislative", "noticias", "clima", "negocios", "legislativo")),
+    Mood("🎵 Música", setOf("music", "musica"))
+)
 
 // [PULIDO-3b] Categorías de iptv-org en español (clave en minúsculas); las que no estén salen tal cual.
 private val GROUP_ES = mapOf(
