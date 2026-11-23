@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v275
+# CASTV: CHANGELOG (cerebro) · v279
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,30 +89,23 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (22 nov 2026, 23:55)
-- **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Ahora:** CAPÍTULOS-1 🧪: parche entregado (abajo); falta que Ariel lo suba, espere el build en verde y lo pruebe.
+### ▶ RETOMAR AQUÍ (23 nov 2026, 00:55)
+- **Hecho y ✅:** REMOTO-1, ATAJOS-1 y CAPÍTULOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
+- **Ahora:** VOCABULARIO-1 🧪: `VOCABULARIO.md` entregado como referencia (sin código); falta que Ariel lo revise y diga si está bien. Con su "ya está" pasa a ✅ y a `HISTORIAL`.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### CAPÍTULOS-1 · 🧪 (parche `CAPITULOS-1.patch`, 22 nov 2026) · Capítulos de video
-- **Qué:** Herramientas › "📑 Capítulos (N)…" (solo aparece si el video tiene capítulos): lista con tiempo y título, marca el actual con ▶ y salta con `video.seekTo` al tocar uno. Solo videos del teléfono (`id != 0`); en la TV por DLNA no aplica.
-- **Cómo:** `Chapters.kt` (nuevo, solo lectura): MKV/WebM (elemento `Chapters`, localizado por `SeekHead` o recorriendo el archivo) y MP4/M4V/MOV (átomo `chpl`). Se lee en un hilo al abrir cada video (`loadChapters` en `playAt`); si no hay capítulos o algo falla, no cambia nada. `VideoPlayerActivity.kt`: `loadChapters`, `showChapters`, y la entrada en `showToolsMenu`.
-- **Verificado aquí (Python, mismo algoritmo):** MKV y MP4 de ffmpeg con 3 capítulos (con y sin índice SeekHead; `moov` al inicio y al final); MKV sin capítulos devuelve vacío. El Kotlin no se pudo compilar aquí.
-- **Archivos de prueba:** `prueba_capitulos.mkv` / `.mp4` (20 s, capítulos: Inicio 0:00, "Segunda parte ñandú 🎬" 0:04, Final 0:09; en MP4 salen ~23 ms corridos, es normal).
-- **Cómo probar:** guardar el video de prueba en Descargas › abrirlo en CASTV › Herramientas › "📑 Capítulos (3)…" › tocar uno: salta › un video sin capítulos: no sale la opción › lo demás igual. Idealmente también uno de sus videos reales con capítulos.
-- **Límites:** capítulos como pista de texto QuickTime, AVI y otros no se leen; subcapítulos se aplanan; se usa la primera edición con capítulos.
-- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
-
 ### Cola de pendientes (uno a la vez, en este orden)
-1. CAPÍTULOS-1 (arriba, 🧪 por probar) (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 2. Vocabulario en español (solo referencia) → 3. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+1. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
+- ⬜ VOCABULARIO-2 (opcional): parche de textos (Quitar/Eliminar/Borrar, teléfono/móvil, dispositivo, Video, Descargando, Continuar). Solo si Ariel dice "Dale".
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
-- ⬜ Etiqueta `git tag v3.0 && git push origin v3.0` (publica `CASTV-v3.0.apk`), si Ariel aún no la puso.
 - ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
 - ⬜ Idea grande (sin planear): que la reproducción sobreviva a cerrar la app (mover el reproductor a un servicio); arreglaría notificación y widget.
 - ⬜ Ideas: Android Auto / Android TV.
+- ⏳ Pistas de audio/subtítulos embebidos: solo con libvlc/ffmpeg. El tamaño del APK ya no es impedimento (decisión de Ariel, 17 nov); se evalúa caso por caso, y solo si Ariel lo pide.
+- Verificado 23 nov: temporizador de apagado y velocidad ya existen en música (`MainActivity.kt`); el temporizador también en video (GESTO-2). Velocidad en video: sin verificar.
 
 ### Descartado (⛔)
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).

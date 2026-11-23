@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v275
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v279
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -43,14 +43,16 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - UI-3a/3b · 19 nov · carátula grande y pantalla completa "Reproduciendo".
 - PUERTO-1, BIBLIO-1, AUDIO-1, PARENTAL-1/2, CARPETAS-1, BACKUP-1/2 · 19 nov · `ParentalPin.kt`, `Backup.kt`, `SettingsActivity.kt`.
 - VERSION-1 · 19 nov · versión 3.0.
+- TAG-3.1 · 23 nov · etiqueta `v3.1` sobre `main` (la `v3.0` ya existía en un commit viejo, `8f41c34`); publica `CASTV-v3.1.apk` · `build.yml`.
 - SEL-1/SEL-2 · 18-19 nov · acciones en selección múltiple.
 - RONDA-2/3/4 · 19-20 nov · incógnito, visto, PiP, presets EQ, No vistos, marcadores, confirmar antes de continuar, tiempo visto · `VideoPlayerActivity.kt`, `Store.kt`, `MainActivity.kt`.
 
 ## Reproductor de video
-- Gestos (17 nov), GESTO-1/GESTO-2/NOVEDADES-1, GESTOS-AJ-1 · 19 nov · `VideoPlayerActivity.kt`.
+- Gestos (17 nov), GESTO-1/GESTO-2/NOVEDADES-1, GESTOS-AJ-1 · 19 nov · deslizar para adelantar, mantener pulsado (velocidad rápida), doble toque al centro, zoom con pellizco, guardar brillo, temporizador de apagado, "Qué hay de nuevo" · `VideoPlayerActivity.kt`.
 - UI-2a/2b/2c/2d/2e · 19 nov · bloqueo, barra propia, tamaño de pantalla, botón Atrás.
 - UI-S1 + SUB-DELAY-1 · 18-19 nov · estilo y retraso de subtítulos.
 - HERRAMIENTAS-VIDEO · 19 nov · saltar a tiempo, A-B, volumen extra, información.
+- CAPITULOS-1 · 23 nov · Herramientas › "📑 Capítulos (N)…" lista y salta a capítulos de MKV/WebM y MP4/M4V/MOV (`chpl`) · `Chapters.kt`, `VideoPlayerActivity.kt`.
 - Respaldo JSON · 17 nov · `Backup.kt`.
 
 ## Subtítulos con IA (Whisper)
