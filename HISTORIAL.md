@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v292
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v295
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -64,3 +64,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CACHE-1 · 19 nov · caché de Gradle en el workflow.
 - UPDATE-1 · 23 nov · actualizar desde la app (Ajustes › Actualizaciones: lee el último Release público, descarga, comprueba SHA-256/firma/versionCode y abre el instalador; `versionCode` = n.º de ejecución, `versionName` = etiqueta) · `Updater.kt`, `file_paths.xml`, `SettingsActivity.kt`, `AndroidManifest.xml`, `build.gradle`, `build.yml`.
 - VERSION-2 · 23 nov · la cabecera de la pantalla principal lee `versionName` de la app (ya no "3.0" fijo) · `activity_main.xml`, `MainActivity.kt`.
+- ESTILO-1 · 23 nov · tamaños de texto, radios y espaciados reunidos en `values/dimens.xml` y estilos `TextAppearance.Castv.*` (sin cambiar cómo se ve nada) · `dimens.xml`, `styles.xml`, `activity_main.xml`, `item_file.xml`, `item_queue.xml`, `player_bar.xml`, `footer_credits.xml`, `bg_chip/bg_thumb/bg_search/bg_dialog.xml`.
