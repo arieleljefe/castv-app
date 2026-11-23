@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v288
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v289
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -21,6 +21,8 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FOCO-1 y FOCO-2 · 21 nov · pausa con llamadas/alarmas/otra app y al desconectar audífonos · `VideoPlayerActivity.kt`, `MainActivity.kt`.
 - ATAJOS-1 · 22 nov · atajos dinámicos al mantener pulsado el icono: Continuar video, Música, Canales en vivo (con PIN); `launchMode=singleTop` · `MainActivity.kt`, `AndroidManifest.xml`, `strings.xml`, `ic_sc_*.xml`.
 - REMOTO-1 (REMOTO-0, DIAG, 1a, 1b) · 22 nov · diagnóstico: la TV solo es MediaRenderer, sin teclas; volumen y 🔇 en la pantalla Reproduciendo; silencio = `SetVolume 0` con restauración porque la TV ignora `SetMute` · `MainActivity.kt`, `TvController.kt`.
+
+- FIRMA-1 · 23 nov · firma estable del APK: clave propia `castv` (RSA 4096) guardada en GitHub Secrets, `assembleRelease` firmado, huella SHA-256 impresa en el build (`4dd1f018…dc558e`); instalado una sola vez desinstalando; las siguientes versiones se instalan encima · `app/build.gradle`, `.github/workflows/build.yml`.
 
 ## Canales y catálogo
 - 13-B.1 / 13-B.2 · 17 nov · Listas M3U, favoritos de canales · `M3uParser.kt`, `M3uActivity.kt`, `Store.kt`.
