@@ -411,6 +411,39 @@ class VideoPlayerActivity : AppCompatActivity() {
     private val fastLabels = arrayOf("1.5x", "2x", "3x")
     private fun fastIdx(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("fast_i", 1).coerceIn(0, 2)
 
+    // [SPEED-1] Velocidad elegida en Herramientas (por video: vuelve a 1x al cambiar de video; no se guarda).
+    private val speedVals = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+    private val speedLabels = arrayOf("0.5×", "0.75×", "1× (normal)", "1.25×", "1.5×", "2×")
+    private var curSpeed = 1f
+
+    private fun speedText(): String = (if (curSpeed == 1f) "1" else curSpeed.toString().trimEnd('0').trimEnd('.')) + "×"
+
+    /** [SPEED-1] Aplica la velocidad; si el video estaba en pausa lo deja en pausa (algunos teléfonos lo arrancan solos). */
+    private fun applySpeed(sp: Float) {
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        if (dur <= 0) { toast("No disponible en canales en vivo"); return }
+        val mp = mpRef ?: return
+        val playing = try { video.isPlaying } catch (e: Exception) { false }
+        try {
+            curSpeed = sp
+            if (!fastOn) mp.playbackParams = PlaybackParams().setSpeed(sp)
+            if (!playing) video.pause()
+            showHud("⏩ Velocidad: " + speedText())
+        } catch (e: Exception) { toast("Este teléfono no permite cambiar la velocidad") }
+    }
+
+    private fun showSpeedDialog() {
+        val cur = speedVals.indexOf(curSpeed).let { if (it < 0) 2 else it }
+        AlertDialog.Builder(this)
+            .setTitle("⏩ Velocidad del video")
+            .setSingleChoiceItems(speedLabels, cur) { d, which ->
+                d.dismiss()
+                applySpeed(speedVals[which])
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
     private fun seekBy(sec: Int) {
         val dur = try { video.duration } catch (e: Exception) { -1 }
         if (dur <= 0) return   // canal en vivo: no se puede adelantar
@@ -433,7 +466,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (on && !playing) return
         if (!on && !fastOn) return
         try {
-            mp.playbackParams = PlaybackParams().setSpeed(if (on) fastVals[fastIdx()] else 1f)
+            mp.playbackParams = PlaybackParams().setSpeed(if (on) fastVals[fastIdx()] else curSpeed)   // [SPEED-1] al soltar vuelve a la velocidad elegida
             if (!on && !playing) video.pause()
             fastOn = on
         } catch (e: Exception) { }
@@ -1010,6 +1043,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         titleView.text = it.name.substringBeforeLast('.')
         mpRef = null   // [GESTO-2]
         fastOn = false
+        curSpeed = 1f   // [SPEED-1]
         abA = -1   // [AB-1]
         abB = -1
         video.setVideoURI(Uri.parse(it.uriString))
@@ -1461,7 +1495,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             "🔊 Volumen extra: " + boostPct() + " %",
             "ℹ️ Información del video",
             "🪟 Ventana flotante (PiP)",
-            "🔖 Marcadores (" + nMarks + ")…")   // [MARCAS-1]
+            "🔖 Marcadores (" + nMarks + ")…",   // [MARCAS-1]
+            "⏩ Velocidad: " + speedText())   // [SPEED-1]
         val labels = if (chapters.isNotEmpty()) baseLabels + ("📑 Capítulos (" + chapters.size + ")…") else baseLabels   // [CAPITULOS-1]
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
@@ -1475,7 +1510,8 @@ class VideoPlayerActivity : AppCompatActivity() {
                     5 -> showInfo()
                     6 -> if (!enterPip()) toast("Este teléfono no permite la ventana flotante")
                     7 -> showMarks()   // [MARCAS-1]
-                    8 -> showChapters()   // [CAPITULOS-1]
+                    8 -> showSpeedDialog()   // [SPEED-1]
+                    9 -> showChapters()   // [CAPITULOS-1]
                 }
             }
             .show()
