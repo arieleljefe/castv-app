@@ -408,6 +408,38 @@ object Store {
         if (changed) writeChFavMeta(meta)
     }
 
+    // ------------------------------------------------- [ESTILO-2] Canales vistos recientemente
+    // Clave nueva "chrecent" (JSON con enlace, nombre, grupo y logo), solo canales de listas M3U (no enlaces sueltos).
+    // Vive en castv_lib, así que el respaldo la incluye sola.
+
+    private const val MAX_RECENT_CH = 12
+
+    /** Últimos canales reproducidos, el más reciente primero. */
+    fun recentChannels(): List<M3uChannel> {
+        val out = ArrayList<M3uChannel>()
+        try {
+            val raw = prefs.getString("chrecent", null) ?: return out
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", ""), o.optString("l", "")))
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    /** Sube el canal al principio de "Continuar" (en modo incógnito no se guarda). */
+    fun rememberRecentChannel(c: M3uChannel) {
+        if (incognito) return
+        val l = recentChannels().filter { it.url != c.url }.toMutableList()
+        l.add(0, c)
+        try {
+            val arr = JSONArray()
+            for (x in l.take(MAX_RECENT_CH)) arr.put(JSONObject().put("u", x.url).put("n", x.name).put("g", x.group).put("l", x.logo))
+            prefs.edit().putString("chrecent", arr.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
     // ------------------------------------------------- Canales ocultos [OCULTAR-1]
     // Clave nueva "chhidden" (JSON con enlace, nombre y grupo). Las listas no se modifican: la pantalla de
     // canales solo deja de mostrar estos enlaces. Vive en castv_lib, así que el respaldo la incluye sola.

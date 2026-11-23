@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -39,6 +40,7 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var channelList: ListView
     private lateinit var chAdapter: ChannelAdapter
+    private lateinit var sections: LinearLayout   // [ESTILO-2] cabecera del ListView: Continuar y Favoritos
 
     private var txtColor = Color.BLACK
     private var mutedColor = Color.GRAY
@@ -194,13 +196,18 @@ class M3uActivity : AppCompatActivity() {
 
         chAdapter = ChannelAdapter()
         channelList = ListView(this)
+        sections = LinearLayout(this)   // [ESTILO-2] se llena en refreshSections()
+        sections.orientation = LinearLayout.VERTICAL
+        channelList.addHeaderView(sections, null, false)   // antes del adapter; la cabecera desplaza los índices
         channelList.adapter = chAdapter
         channelList.divider = null
         channelList.setOnItemClickListener { _, _, pos, _ ->
-            if (pos in shown.indices) openChannel(shown[pos])
+            val i = pos - channelList.headerViewsCount   // [ESTILO-2]
+            if (i in shown.indices) openChannel(shown[i])
         }
         channelList.setOnItemLongClickListener { _, _, pos, _ ->   // [OCULTAR-1] mantener pulsado el canal = quitarlo
-            if (pos in shown.indices) confirmHide(shown[pos])
+            val i = pos - channelList.headerViewsCount   // [ESTILO-2]
+            if (i in shown.indices) confirmHide(shown[i])
             true
         }
         root.addView(
@@ -486,6 +493,74 @@ class M3uActivity : AppCompatActivity() {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
                 (if (fromCache) " · sin conexión (copia guardada)" else "")
         }
+        refreshSections()   // [ESTILO-2]
+    }
+
+    // ------------------------------------------------------------ [ESTILO-2] Continuar y Favoritos
+
+    override fun onResume() {
+        super.onResume()
+        refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
+    }
+
+    /** Arma las dos filas de tarjetas de arriba. Se esconden al buscar, filtrar por grupo o con ★ Favs; una fila vacía no se muestra. */
+    private fun refreshSections() {
+        if (!::sections.isInitialized) return
+        sections.removeAllViews()
+        val plain = !favOnly && groupFilter == null && searchBox.text.isNullOrEmpty()
+        if (!plain) return
+        val h = hidden
+        val recent = Store.recentChannels().filter { !h.contains(it.url) }
+        val favList = Store.chFavChannels().filter { !h.contains(it.url) }.take(20)
+        addSection("🕘 Continuar", recent)
+        addSection("⭐ Favoritos", favList)
+    }
+
+    private fun addSection(title: String, list: List<M3uChannel>) {
+        if (list.isEmpty()) return
+        val t = TextView(this)
+        t.text = title
+        t.textSize = 14f
+        t.setTypeface(null, android.graphics.Typeface.BOLD)
+        t.setTextColor(txtColor)
+        t.setPadding(dp(4), dp(10), dp(4), dp(4))
+        sections.addView(t)
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.HORIZONTAL
+        for (c in list) row.addView(card(c), LinearLayout.LayoutParams(dp(84), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
+        val scroll = HorizontalScrollView(this)
+        scroll.isHorizontalScrollBarEnabled = false
+        scroll.addView(row)
+        sections.addView(scroll)
+    }
+
+    /** Tarjeta pequeña: logo y nombre. Tocar = mismo menú 📺 / 📱; mantener pulsado = quitar (como en la lista). */
+    private fun card(c: M3uChannel): View {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.gravity = Gravity.CENTER_HORIZONTAL
+        box.setPadding(dp(4), dp(6), dp(4), dp(6))
+        val logo = ImageView(this)
+        logo.scaleType = ImageView.ScaleType.FIT_CENTER
+        Logos.load(logo, c.logo)
+        if (c.logo.isEmpty()) {
+            logo.setImageResource(R.drawable.ic_tv)
+            logo.setColorFilter(mutedColor)
+        } else {
+            logo.clearColorFilter()
+        }
+        box.addView(logo, LinearLayout.LayoutParams(dp(56), dp(40)))
+        val name = TextView(this)
+        name.text = splitName(c.name).first
+        name.setTextColor(txtColor)
+        name.textSize = 12f
+        name.gravity = Gravity.CENTER_HORIZONTAL
+        name.maxLines = 2
+        name.ellipsize = TextUtils.TruncateAt.END
+        box.addView(name, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        box.setOnClickListener { openChannel(c) }
+        box.setOnLongClickListener { confirmHide(c); true }
+        return box
     }
 
     private fun pickGroup() {
@@ -758,7 +833,7 @@ class M3uActivity : AppCompatActivity() {
         val on = Store.toggleChFav(c.url)
         if (on) Store.rememberChFav(c) else Store.forgetChFav(c.url)   // [FAV-1]
         favs = Store.chFavs()
-        if (favOnly) { reloadFavChannels(); applyFilter() } else chAdapter.notifyDataSetChanged()
+        if (favOnly) { reloadFavChannels(); applyFilter() } else { chAdapter.notifyDataSetChanged(); refreshSections() }   // [ESTILO-2]
     }
 
     private fun isHls(url: String) = url.substringBefore('?').lowercase().endsWith(".m3u8")
@@ -776,6 +851,7 @@ class M3uActivity : AppCompatActivity() {
     /** Reproduce el canal y esta pantalla se queda abierta para cambiar de canal. */
     private fun playChannel(c: M3uChannel, toTv: Boolean) {
         Store.addLink(c.url, c.name)   // queda en el 🕘 Historial
+        Store.rememberRecentChannel(c)   // [ESTILO-2] fila "Continuar"
         if (toTv) sendToTv(c.url, c.name) else playOnPhone(c.url, c.name)
     }
 
