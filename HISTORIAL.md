@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v313
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v314
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -73,3 +73,5 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ESTILO-3 · 23 nov · fila de chips de ánimo en Canales (Relajarme, Entretenimiento, Aprender, Familia, Cine y series, Deportes, Informarme, Música) que filtra por categorías de iptv-org; no se mezcla con «Grupo» · `M3uActivity.kt`.
 - ZAP-1 · 23 nov · ⏮ ⏭ cambian de canal (circular, respetando búsqueda/grupo/ánimo) cuando hay un canal de lista en el TV, en la pantalla Reproduciendo y en la notificación; solo TV, no teléfono · `Zap.kt`, `M3uActivity.kt`, `MainActivity.kt`.
 - LISTA-VAL-1 · 23 nov · una descarga de lista vacía o dañada ya no pisa la copia guardada: se conserva la anterior con aviso y línea en el `/log` · `M3uActivity.kt`.
+- SPEED-1 (+ SPEED-1b) · 23 nov · Herramientas › Velocidad del video (0.5×–2×), por video y sin guardar; «mantener pulsado» vuelve a la velocidad elegida; no en canales en vivo; 1b corrige `FloatArray.indexOf` que rompía el build · `VideoPlayerActivity.kt`.
+- TAG-3.5 · 23 nov · etiqueta `v3.5` publicada y firmada (RECUP-1, ZAP-1, LISTA-VAL-1, SPEED-1); el actualizador de la app vuelve a funcionar · `build.yml`.
