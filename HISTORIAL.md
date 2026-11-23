@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v296
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v297
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -66,3 +66,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VERSION-2 · 23 nov · la cabecera de la pantalla principal lee `versionName` de la app (ya no "3.0" fijo) · `activity_main.xml`, `MainActivity.kt`.
 - ESTILO-1 · 23 nov · tamaños de texto, radios y espaciados reunidos en `values/dimens.xml` y estilos `TextAppearance.Castv.*` (sin cambiar cómo se ve nada) · `dimens.xml`, `styles.xml`, `activity_main.xml`, `item_file.xml`, `item_queue.xml`, `player_bar.xml`, `footer_credits.xml`, `bg_chip/bg_thumb/bg_search/bg_dialog.xml`.
 - ESTILO-2 · 23 nov · filas de tarjetas **Continuar** (últimos 12 canales vistos, clave `chrecent`) y **Favoritos** arriba de Canales; se esconden al buscar/filtrar · `M3uActivity.kt`, `Store.kt`.
+- UPDATE-2 · 23 nov · aviso «Hay una versión nueva» al abrir la app (cada 6 h máx.; Actualizar ahora abre Ajustes directo en la búsqueda; Más tarde = 24 h) + interruptor en Ajustes › Actualizaciones · `MainActivity.kt`, `SettingsActivity.kt`.
