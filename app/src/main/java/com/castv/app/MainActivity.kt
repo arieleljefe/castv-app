@@ -117,28 +117,22 @@ class MainActivity : AppCompatActivity() {
 
     // Salida de la música: false = TV, true = el propio teléfono (los videos siempre van al TV)
     private var outPhone = false
-    private var localPlayer: MediaPlayer? = null
-    @Volatile private var localActive = false
-    @Volatile private var localPrepared = false
-    private var pausedByFocus = false
+    // [SERVICIO-1a] El reproductor y su estado viven ahora en PlayerCore (fuera de la pantalla); aquí solo se leen y escriben.
+    private var localPlayer: MediaPlayer?
+        get() = PlayerCore.player
+        set(v) { PlayerCore.player = v }
+    private var localActive: Boolean
+        get() = PlayerCore.active
+        set(v) { PlayerCore.active = v }
+    private var localPrepared: Boolean
+        get() = PlayerCore.prepared
+        set(v) { PlayerCore.prepared = v }
+    private var pausedByFocus: Boolean
+        get() = PlayerCore.pausedByFocus
+        set(v) { PlayerCore.pausedByFocus = v }
     private lateinit var audioManager: AudioManager
 
-    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
-        when (change) {
-            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                if (localActive && localPrepared && localPlayer?.isPlaying == true) {
-                    pausedByFocus = true
-                    try { localPlayer?.pause() } catch (e: Exception) { }
-                }
-            }
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                if (pausedByFocus && localActive) {
-                    pausedByFocus = false
-                    try { localPlayer?.start() } catch (e: Exception) { }
-                }
-            }
-        }
-    }
+    private val focusListener = PlayerCore.focusListener   // [SERVICIO-1a]
 
     // Controles de la notificación
     companion object {
