@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v318
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v319
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -75,3 +75,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - LISTA-VAL-1 · 23 nov · una descarga de lista vacía o dañada ya no pisa la copia guardada: se conserva la anterior con aviso y línea en el `/log` · `M3uActivity.kt`.
 - SPEED-1 (+ SPEED-1b) · 23 nov · Herramientas › Velocidad del video (0.5×–2×), por video y sin guardar; «mantener pulsado» vuelve a la velocidad elegida; no en canales en vivo; 1b corrige `FloatArray.indexOf` que rompía el build · `VideoPlayerActivity.kt`.
 - TAG-3.5 · 23 nov · etiqueta `v3.5` publicada y firmada (RECUP-1, ZAP-1, LISTA-VAL-1, SPEED-1); el actualizador de la app vuelve a funcionar · `build.yml`.
+- SERVICIO-1a · 23 nov · `PlayerCore.kt` guarda el reproductor del teléfono, su estado y el foco de audio fuera de la pantalla; `MainActivity` los lee de ahí (sin cambio visible) · `PlayerCore.kt`, `MainActivity.kt`.
