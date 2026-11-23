@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v273
+# CASTV: CHANGELOG (cerebro) · v274
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -91,13 +91,17 @@ rm -f ~/storage/downloads/*_actual.*
 
 ### ▶ RETOMAR AQUÍ (22 nov 2026, 23:55)
 - **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Ahora:** CAPÍTULOS (abajo): Ariel pega la línea A para subir `VideoPlayerActivity.kt`; la IA verifica y presenta plan 🧪.
+- **Ahora:** CAPÍTULOS: plan 🧪 entregado (abajo); espera el "Dale" de Ariel.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### CAPÍTULOS · ⬜ · Capítulos de video (verificar primero)
-- **Qué:** ver si es posible mostrar/saltar capítulos de un video (MKV/MP4) sin cambiar de motor. Lo que se sabe: el reproductor es `VideoView`/`MediaPlayer`, que no expone capítulos; `MediaMetadataRetriever` tampoco. Habría que leerlos con código propio (MKV: elemento `Chapters` de Matroska; MP4: átomo `chpl` o pista de texto), mostrar una lista y hacer `seekTo`. Solo para videos locales (no para la TV por DLNA).
-- **Archivos para verificar:** `VideoPlayerActivity.kt` (confirmar el motor y dónde irían botón y lista).
-- **Siguiente paso:** Ariel pega la línea A (pide `VideoPlayerActivity.kt`); la IA confirma el motor y presenta plan 🧪 con veredicto honesto; espera el "Dale". Más adelante, para probar, un video suyo con capítulos (opcional).
+### CAPÍTULOS · 🧪 (solo plan, sin parche) · Capítulos de video
+- **Veredicto (verificado en `VideoPlayerActivity.kt`):** el reproductor es `SizedVideoView : VideoView` (→ `MediaPlayer`), sin API de capítulos. **Sí se puede sin cambiar de motor**, leyendo los capítulos con código propio del archivo (`it.uriString`, un `content://` del teléfono) y usando `video.seekTo(...)` como ya hacen los marcadores (MARCAS-1).
+- **Qué:** nueva entrada en Herramientas: "📑 Capítulos (N)…" (solo aparece con N>0), que abre una lista con título y tiempo; tocar uno salta ahí. Opcional: el capítulo actual se resalta en la lista.
+- **Formatos:** MKV/WebM (elemento `Chapters`, localizado por `SeekHead` y, si falta, recorriendo los elementos de nivel superior) y MP4/M4V/MOV con átomo `chpl` (el que escriben ffmpeg y mp4box). Otros (capítulos como pista de texto QuickTime, AVI, etc.): no se leen. Solo videos del teléfono; en la TV por DLNA no aplica.
+- **Archivos:** `Chapters.kt` (nuevo, ~150 líneas, solo lee: nunca escribe ni cambia el video) y `VideoPlayerActivity.kt` (entrada en `showToolsMenu`, `showChapters()`, lectura en un hilo al abrir el video; si falla o no hay capítulos, no cambia nada).
+- **Verificación aquí:** antes de entregar, el algoritmo se prueba en Python con MKV/MP4 con capítulos hechos con ffmpeg, y el Kotlin se porta igual; no hay compilador de Kotlin (si falla el build, pedir el mensaje de GitHub Actions).
+- **Cómo probar:** abrir un video con capítulos › Herramientas › "📑 Capítulos" › tocar uno: salta a ese tiempo › un video sin capítulos: la entrada no aparece › todo lo demás igual. Hace falta al menos un video de Ariel con capítulos (si no tiene, se prueba con uno de prueba hecho aquí).
+- **Siguiente paso:** espera el "Dale" de Ariel. No hace falta subir más archivos.
 
 ### Cola de pendientes (uno a la vez, en este orden)
 1. CAPÍTULOS (arriba) (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 2. Vocabulario en español (solo referencia) → 3. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
