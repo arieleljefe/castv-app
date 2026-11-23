@@ -335,6 +335,10 @@ class SettingsActivity : AppCompatActivity() {
             "Baja el modelo de voz elegido (una vez) y transcribe un video; mide la velocidad. Todavía no crea subtítulos",
             { startIaTranscribe() }))   // [IA-2b]
 
+        // [UPDATE-1] Actualizaciones desde GitHub
+        l.add(Entry("Actualizaciones", "Buscar actualización",
+            updateInstalledText() + " · se descarga de GitHub", { checkUpdate() }))
+
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
 
@@ -362,6 +366,7 @@ class SettingsActivity : AppCompatActivity() {
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Eliminado: papelera o permanente"
         "Avanzado" -> "Registro de la app y pruebas"
+        "Actualizaciones" -> "Buscar versiones nuevas e instalarlas"
         "Respaldo" -> "Exportar o importar"
         "Acerca de" -> "Versión, autor, redes y licencia"
         else -> null
@@ -697,6 +702,149 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------- [UPDATE-1] Actualizar desde la app
+
+    private fun updateInstalledText(): String = try {
+        "Instalada: " + (packageManager.getPackageInfo(packageName, 0).versionName ?: "?")
+    } catch (e: Exception) {
+        "Instalada: ?"
+    }
+
+    private fun onMobileData(): Boolean = try {
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        caps != null &&
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) &&
+            !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+    } catch (e: Exception) {
+        false
+    }
+
+    private fun simpleDialog(title: String, text: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(text)
+            .setPositiveButton("Cerrar", null)
+            .show()
+    }
+
+    private fun checkUpdate() {
+        val act = this@SettingsActivity
+        val msg = TextView(this)
+        msg.text = "Consultando GitHub…"
+        msg.setTextColor(txtColor)
+        msg.setPadding(dp(24), dp(16), dp(24), dp(8))
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Buscar actualización")
+            .setView(msg)
+            .setCancelable(false)
+            .create()
+        dlg.show()
+        Thread {
+            try { Updater.tidy(act) } catch (e: Exception) { }
+            val r = Updater.check(act)
+            try { DebugLog.add("UPDATE-1: consulta: ${r.message}") } catch (e: Exception) { }
+            runOnUiThread {
+                if (act.isFinishing || act.isDestroyed) return@runOnUiThread
+                try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
+                showUpdateResult(r)
+            }
+        }.start()
+    }
+
+    private fun showUpdateResult(r: Updater.CheckResult) {
+        val rel = r.release
+        if (!r.ok || rel == null) {
+            simpleDialog("⚠️ No se pudo buscar", r.message)
+            return
+        }
+        if (!r.newer) {
+            simpleDialog("✅ Estás al día", updateInstalledText() + "\nÚltima en GitHub: " + rel.tag)
+            return
+        }
+        val mb = String.format(java.util.Locale.US, "%.1f", rel.size / 1_000_000.0)
+        val notes = if (rel.notes.length > 1200) rel.notes.substring(0, 1200) + "…" else rel.notes
+        val sb = StringBuilder()
+        sb.append(updateInstalledText()).append("\nNueva: ").append(rel.tag)
+        sb.append("\nTamaño: ").append(mb).append(" MB")
+        if (warnMobile() && onMobileData()) {
+            sb.append("\n\n⚠️ Estás con datos móviles: la descarga gastará ").append(mb).append(" MB.")
+        }
+        if (notes.isNotBlank()) sb.append("\n\n").append(notes.trim())
+        val sv = ScrollView(this)
+        val tv = TextView(this)
+        tv.text = sb.toString()
+        tv.textSize = 14f
+        tv.setTextColor(txtColor)
+        tv.setPadding(dp(24), dp(12), dp(24), dp(8))
+        sv.addView(tv)
+        AlertDialog.Builder(this)
+            .setTitle("Nueva versión disponible")
+            .setView(sv)
+            .setPositiveButton("Descargar e instalar") { _, _ -> downloadUpdate(rel) }
+            .setNegativeButton("Ahora no", null)
+            .show()
+    }
+
+    private fun downloadUpdate(rel: Updater.Release) {
+        val act = this@SettingsActivity
+        val cancel = AtomicBoolean(false)
+        val msg = TextView(this)
+        msg.text = "Conectando…"
+        msg.setTextColor(txtColor)
+        msg.setPadding(dp(24), dp(16), dp(24), dp(8))
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Descargando " + rel.tag)
+            .setView(msg)
+            .setCancelable(false)
+            .setNegativeButton("Cancelar") { _, _ -> cancel.set(true) }
+            .create()
+        dlg.show()
+        dlg.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        Thread {
+            val d = Updater.download(act, rel, { pct, mb ->
+                runOnUiThread {
+                    msg.text = if (pct >= 0) "Avance: $pct % ($mb MB)" else "Descargado: $mb MB"
+                }
+            }, { cancel.get() })
+            val bad = if (d.ok && d.file != null) Updater.verify(act, d.file) else null
+            try {
+                DebugLog.add("UPDATE-1: descarga ${rel.tag}: ${d.message}" +
+                    (if (d.ok) (if (d.shaChecked) " (SHA-256 correcto)" else " (sin SHA-256 publicado)") else "") +
+                    (if (bad != null) " · rechazado: $bad" else ""))
+            } catch (e: Exception) { }
+            if (bad != null) {
+                try { d.file?.delete() } catch (e: Exception) { }
+            }
+            runOnUiThread {
+                if (act.isFinishing || act.isDestroyed) return@runOnUiThread
+                try { if (dlg.isShowing) dlg.dismiss() } catch (e: Exception) { }
+                if (d.cancelled) {
+                    toast("Descarga cancelada")
+                } else if (!d.ok || d.file == null) {
+                    simpleDialog("⚠️ No se pudo descargar", d.message)
+                } else if (bad != null) {
+                    simpleDialog("⚠️ No se instalará", bad)
+                } else {
+                    installUpdate(d.file)
+                }
+            }
+        }.start()
+    }
+
+    private fun installUpdate(f: File) {
+        try {
+            if (!Updater.install(this, f)) {
+                simpleDialog("Falta un permiso",
+                    "Activa «Permitir desde esta fuente» para CASTV, vuelve atrás y toca otra vez " +
+                    "Buscar actualización. La descarga se conserva, no hay que bajarla de nuevo.")
+            }
+        } catch (e: Exception) {
+            try { DebugLog.add("UPDATE-1: no se pudo abrir el instalador: ${e.message}") } catch (e2: Exception) { }
+            simpleDialog("⚠️ No se pudo abrir el instalador", e.message ?: "Error desconocido")
+        }
     }
 
     // ------------------------------------------------- [AJUSTES-2c] Avanzado: registro

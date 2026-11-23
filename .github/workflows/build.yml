@@ -59,6 +59,13 @@ jobs:
           echo "CASTV_KEY_PASSWORD=$KS_KEYPASS" >> $GITHUB_ENV
           echo "CASTV_STORE_PASSWORD=$KS_STOREPASS" >> $GITHUB_ENV
 
+      - name: Número de versión (UPDATE-1)
+        run: |
+          echo "CASTV_VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "CASTV_VERSION_NAME=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          fi
+
       - name: Compilar APK con Stacktrace
         run: |
           chmod +x gradlew

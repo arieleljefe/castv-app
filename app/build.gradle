@@ -3,6 +3,13 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// [UPDATE-1] versionCode y versionName los pone el workflow (CASTV_VERSION_CODE = número de ejecución,
+// CASTV_VERSION_NAME = etiqueta sin la "v"). En local se usan los valores por defecto.
+def castvVc = System.getenv("CASTV_VERSION_CODE")
+def castvVersionCode = (castvVc && castvVc.isInteger()) ? castvVc.toInteger() : 3
+def castvVn = System.getenv("CASTV_VERSION_NAME")
+def castvVersionName = castvVn ? castvVn : "3.1"
+
 android {
     namespace 'com.castv.app'
     compileSdk 34
@@ -11,8 +18,8 @@ android {
         applicationId "com.castv.app"
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName "3.0"
+        versionCode castvVersionCode
+        versionName castvVersionName
         // [ACERCA-1] fecha de compilación para la pantalla "Acerca de"
         buildConfigField "String", "BUILD_DATE", "\"${new Date().format('yyyy-MM-dd', TimeZone.getTimeZone('UTC'))}\""
 
