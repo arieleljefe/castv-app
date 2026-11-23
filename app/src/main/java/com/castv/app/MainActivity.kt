@@ -647,7 +647,21 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         fullDialog?.dismiss()   // [UI-3b]
         monitoring = false
-        stopLocal()
+        // [SERVICIO-1b] con música del teléfono sonando, la música sigue sin pantalla (PlayerCore); si no, se detiene como siempre
+        var handedOff = false
+        val curSong = playingItem
+        if (localActive && localPrepared && localPlayer != null && curSong != null && curSong.isMusic) {
+            try {
+                saveProgress()
+                releaseEffects()
+                PlayerCore.handOff(
+                    applicationContext, curSong, playlist, playIndex, queue,
+                    repeatMode.ordinal, playingFromQueue, sleepAfterTrack, sleepAtMs
+                )
+                handedOff = true
+            } catch (e: Exception) { }
+        }
+        if (!handedOff) stopLocal()
         if (noisyRegistered) {   // [FOCO-2]
             try { unregisterReceiver(noisyReceiver) } catch (e: Exception) { }
             noisyRegistered = false
@@ -658,7 +672,7 @@ class MainActivity : AppCompatActivity() {
         }
         try { mediaSession?.isActive = false; mediaSession?.release() } catch (e: Exception) { }
         mediaSession = null
-        postDefaultNotification()
+        if (!handedOff) postDefaultNotification()
         super.onDestroy()
     }
 
@@ -717,6 +731,59 @@ class MainActivity : AppCompatActivity() {
         startEverything()
     }
 
+    /** [SERVICIO-1b] Recoge la música que siguió sonando sin pantalla: lista, cola, repetir y temporizador. */
+    private fun adoptHeadless() {
+        val s = PlayerCore.adopt() ?: return
+        val mp = PlayerCore.player ?: return
+        outPhone = true
+        updateOutputButton()
+        playlist = s.list
+        playIndex = s.index
+        queue.clear(); queue.addAll(s.queue)
+        updateQueueBadge()
+        playingFromQueue = s.fromQueue
+        repeatMode = Repeat.values().getOrElse(s.repeat) { Repeat.OFF }
+        sleepAfterTrack = s.sleepAfter
+        sleepAtMs = s.sleepAt
+        val item = s.current
+        playingItem = item
+        linkOnTv = false; linkDurSec = 0
+        manualStop = false
+        wasPlaying = true
+        tvNowPlaying.text = prettyTitle(item)
+        bindNowPlaying(item)
+        resetProgress()
+        adapter.playingId = item.id
+        adapter.playingMusic = true
+        adapter.playingLocal = true
+        adapter.notifyDataSetChanged()
+        // los avisos del reproductor vuelven a esta pantalla
+        mp.setOnPreparedListener { p ->
+            if (localPlayer === p) {
+                localPrepared = true
+                p.start()
+                attachEffects(p)
+                applySpeed()
+                wasPlaying = true
+            }
+        }
+        mp.setOnCompletionListener { p ->
+            if (localPlayer === p) onLocalCompleted()
+        }
+        mp.setOnErrorListener { p, _, _ ->
+            if (localPlayer === p) {
+                stopLocal()
+                adapter.playingLocal = false
+                adapter.notifyDataSetChanged()
+                setStatus("❌ No se pudo reproducir en el teléfono (formato no compatible o archivo dañado)")
+            }
+            true
+        }
+        if (localPrepared) { attachEffects(mp); applySpeed() }
+        lastNotifKey = ""
+        refreshNotification()
+    }
+
     private fun startEverything() {
         if (monitoring) return
         val intent = Intent(this, CastvService::class.java)
@@ -727,6 +794,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (getSharedPreferences("castv", MODE_PRIVATE).getBoolean("lastMusic", false)) showMusic()
         else showMovies()
+        adoptHeadless()   // [SERVICIO-1b] si la música seguía sin pantalla, se recoge aquí
         monitoring = true
         applyPendingShortcut()   // [ATAJOS-1]
         thread { monitorLoop() }
