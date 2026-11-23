@@ -388,8 +388,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private var first = true
         private var endList = false
         private var targetMs = 6000L
-        private var cur: InputStream? = null
-        private var curConn: HttpURLConnection? = null
+        @Volatile private var cur: InputStream? = null   // [RECUP-1] @Volatile: lo cierra el vigilante del hub
+        @Volatile private var curConn: HttpURLConnection? = null
         @Volatile private var closed = false
         private var count = 0
         private var keyLogged = false
@@ -405,12 +405,26 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private val tsMux = TsMux()
         private var muxLogged = 0
         private var muxFails = 0
+        private var refreshFails = 0     // [RECUP-1] lecturas seguidas de la lista que fallaron
+        private var skipFails = 0        // [RECUP-1] fragmentos seguidos que no se pudieron abrir
 
         /** Primera lectura de la lista (antes de contestarle al TV): lanza LiveUnsupported si no se puede. */
         fun prepare() { refresh() }
 
         /** [AVISO-HLS] true si, tras la primera lectura, hay al menos un fragmento por entregar. */
         fun hasSegments(): Boolean = pending.isNotEmpty()
+
+        /** [RECUP-1] true si la lista terminó de verdad (#EXT-X-ENDLIST) y no queda nada: fin normal, no se reabre. */
+        fun isFinished(): Boolean = endList && pending.isEmpty()
+
+        /** [RECUP-1] Espera [ms] en pasos cortos, saliendo en cuanto se cierra el flujo. */
+        private fun sleepOr(ms: Long) {
+            var slept = 0L
+            while (slept < ms && !closed) {
+                try { Thread.sleep(250) } catch (_: InterruptedException) {}
+                slept += 250
+            }
+        }
 
         private fun resolveMedia() {
             val (text, base) = LiveHttp.text(startUrl)
@@ -593,10 +607,28 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         /** Deja abierto el siguiente fragmento. false = no hay más (o se cortó). */
         private fun nextSegment(): Boolean {
             var idleMs = 0L
+            var failMs = 0L   // [RECUP-1] espera acumulada por fallos al leer la lista
             while (!closed) {
                 if (pending.isEmpty()) {
                     if (endList) return false
-                    refresh()
+                    try {
+                        refresh()
+                        refreshFails = 0
+                    } catch (e: LiveUnsupported) {
+                        throw e
+                    } catch (e: Exception) {
+                        // [RECUP-1] un fallo pasajero de la lista ya no mata el canal: se espera y se reintenta
+                        refreshFails++
+                        val back = minOf(8000L, 1000L shl minOf(refreshFails - 1, 3))
+                        DebugLog.add("  LIVE lista falló ($refreshFails): ${e.javaClass.simpleName}: ${e.message}; reintento en ${back / 1000} s")
+                        failMs += back
+                        if (failMs > 45_000L) {
+                            DebugLog.add("  LIVE la lista no responde desde hace 45 s: se corta")
+                            return false
+                        }
+                        sleepOr(back)
+                        continue
+                    }
                     if (pending.isEmpty()) {
                         if (endList) return false
                         if (idleMs > 90_000L) {
@@ -614,7 +646,15 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     }
                 }
                 val vu = pending.removeFirst()
-                if (!openSegment(vu)) return false
+                if (!openSegment(vu)) {
+                    if (closed) return false
+                    // [RECUP-1] un fragmento que no abre se salta (en vivo se pierden unos segundos, no el canal)
+                    skipFails++
+                    DebugLog.add("  LIVE fragmento saltado ($skipFails/5)")
+                    if (skipFails >= 5) return false
+                    continue
+                }
+                skipFails = 0
                 if (audioListUrl != null) joinAudio(vu)   // [MUS-1]
                 return true
             }
@@ -1150,7 +1190,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         if (h == null) {
             if (start > LIVE_REACH) return null
-            h = LiveHub(openLiveStream(target))
+            h = LiveHub(openLiveStream(target)) { openLiveStream(target) }   // [RECUP-1] el 2.º es para reabrir
             h.start()
             hubs[token] = h
             DebugLog.add("  LIVE2 flujo nuevo del canal")
@@ -1162,7 +1202,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** Baja el canal (LiveHlsStream) en un hilo propio y guarda los bytes en un buffer circular numerado desde 0,
      *  como si fuera un archivo. Varias conexiones de la TV leen del mismo buffer, cada una desde su posición. */
-    private class LiveHub(private val src: LiveHlsStream) {
+    private class LiveHub(first: LiveHlsStream, private val opener: () -> LiveHlsStream) {
+        @Volatile private var src: LiveHlsStream = first   // [RECUP-1] se cambia al reabrir el origen
         private val cap = 16 * 1024 * 1024            // bytes que se conservan atrás
         private val look = 6L * 1024 * 1024           // cuánto se adelanta a lo ya entregado a la TV
         private val ring = ByteArray(cap)
@@ -1170,11 +1211,20 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private val cond = lock.newCondition()
         private var head = 0L                         // bytes producidos hasta ahora
         private var served = 0L                       // posición más alta entregada a la TV
-        private var ended = false
+        @Volatile private var ended = false
         @Volatile var closed = false
             private set
         @Volatile var lastUse = System.currentTimeMillis()
         val clients = java.util.concurrent.atomic.AtomicInteger(0)
+
+        // [RECUP-1] reconexión automática y detector de atascos
+        private val maxRetry = 6
+        private val stallMs = 25_000L
+        private var attempts = 0
+        private var goodSince = 0L
+        private var recovering = false
+        @Volatile private var reconnecting = false
+        @Volatile private var lastProduce = System.currentTimeMillis()
 
         private fun idleTooLong(): Boolean = clients.get() == 0 && System.currentTimeMillis() - lastUse > 30_000L
 
@@ -1199,7 +1249,83 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             lastUse = System.currentTimeMillis()
         }
 
+        /** [RECUP-1] Si el flujo se cortó a mitad de un paquete TS, lo completa con 0xFF para que la TV no pierda el ritmo de 188 bytes. */
+        private fun padToPacket() {
+            lock.lock()
+            try {
+                val rest = (head % 188L).toInt()
+                if (rest != 0) {
+                    var left = 188 - rest
+                    while (left > 0) {
+                        ring[(head % cap).toInt()] = 0xFF.toByte()
+                        head++
+                        left--
+                    }
+                    cond.signalAll()
+                }
+            } finally { lock.unlock() }
+        }
+
+        /** [RECUP-1] Reabre el origen con esperas crecientes (1-2-4-8-8-8 s, máx. [maxRetry] intentos).
+         *  false = no se pudo o se cerró: el flujo termina como antes. */
+        private fun reconnect(): Boolean {
+            reconnecting = true
+            try {
+                while (!closed && attempts < maxRetry) {
+                    attempts++
+                    val wait = minOf(8000L, 1000L shl minOf(attempts - 1, 3))
+                    DebugLog.add("  LIVE2 reconectando ($attempts/$maxRetry) en ${wait / 1000} s")
+                    var slept = 0L
+                    while (slept < wait && !closed) {
+                        try { Thread.sleep(250) } catch (_: InterruptedException) {}
+                        slept += 250
+                    }
+                    if (closed || idleTooLong()) return false
+                    try { src.close() } catch (_: Exception) {}
+                    try {
+                        val ns = opener()
+                        if (closed) { ns.close(); return false }
+                        src = ns
+                        recovering = true
+                        goodSince = 0L
+                        lastProduce = System.currentTimeMillis()
+                        return true
+                    } catch (e: Exception) {
+                        DebugLog.add("  LIVE2 la reconexión falló: ${e.javaClass.simpleName}: ${e.message}")
+                    }
+                }
+                if (!closed) DebugLog.add("  LIVE2 no se pudo recuperar el canal tras $attempts intentos")
+                return false
+            } finally { reconnecting = false }
+        }
+
+        /** [RECUP-1] Vigilante: si la TV está leyendo y llevan [stallMs] sin llegar bytes, cierra el origen
+         *  (eso desbloquea la lectura) y el hilo principal lo reabre. El freno por [look] no cuenta como atasco. */
+        private fun startWatchdog() {
+            val w = Thread {
+                try {
+                    while (!closed && !ended) {
+                        try { Thread.sleep(1000) } catch (_: InterruptedException) {}
+                        if (closed || ended || reconnecting) continue
+                        val braked = run {
+                            lock.lock()
+                            try { head - served >= look } finally { lock.unlock() }
+                        }
+                        if (!braked && clients.get() > 0 && System.currentTimeMillis() - lastProduce > stallMs) {
+                            DebugLog.add("  LIVE2 atasco: sin datos ${stallMs / 1000} s, se reabre el canal")
+                            lastProduce = System.currentTimeMillis()
+                            src.close()
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+            w.isDaemon = true
+            w.name = "castv-live-watch"
+            w.start()
+        }
+
         fun start() {
+            startWatchdog()
             val t = Thread {
                 val tmp = ByteArray(32768)
                 try {
@@ -1217,8 +1343,15 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                             }
                         } finally { lock.unlock() }
                         if (closed) break
+                        lastProduce = System.currentTimeMillis()
                         val n = src.read(tmp, 0, tmp.size)
-                        if (n < 0) break
+                        if (n < 0) {
+                            if (closed) break
+                            if (src.isFinished()) break   // [RECUP-1] lista cerrada de verdad: fin normal
+                            padToPacket()
+                            if (!reconnect()) break
+                            continue
+                        }
                         lock.lock()
                         try {
                             var o = 0
@@ -1231,6 +1364,14 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                             }
                             cond.signalAll()
                         } finally { lock.unlock() }
+                        // [RECUP-1] datos buenos: se anota y, tras 30 s seguidos, se reinicia el contador de intentos
+                        val tNow = System.currentTimeMillis()
+                        lastProduce = tNow
+                        if (recovering) { recovering = false; DebugLog.add("  LIVE2 recuperado: llegan datos otra vez") }
+                        if (attempts > 0) {
+                            if (goodSince == 0L) goodSince = tNow
+                            else if (tNow - goodSince > 30_000L) { attempts = 0; goodSince = 0L }
+                        }
                     }
                 } catch (e: Exception) {
                     DebugLog.add("  LIVE2 error del flujo: ${e.javaClass.simpleName}: ${e.message}")
