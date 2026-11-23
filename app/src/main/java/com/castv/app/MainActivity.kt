@@ -386,6 +386,10 @@ class MainActivity : AppCompatActivity() {
         tabFavs = findViewById(R.id.tabFavs)
         tabResume = findViewById(R.id.tabResume)
         tvIncog = findViewById(R.id.tvIncog)   // [INCOG-2]
+        // [VERSION-2] La versión de la cabecera sale de la app instalada (ya no es un texto fijo)
+        findViewById<TextView>(R.id.tvVersion).text = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (e: Exception) { "" }
         navVideo = findViewById(R.id.navVideo)
         navAudio = findViewById(R.id.navAudio)
         navFolders = findViewById(R.id.navFolders)
