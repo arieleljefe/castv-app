@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v303
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v309
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -71,3 +71,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - UPDATE-2 · 23 nov · aviso «Hay una versión nueva» al abrir la app (cada 6 h máx.; Actualizar ahora abre Ajustes directo en la búsqueda; Más tarde = 24 h) + interruptor en Ajustes › Actualizaciones · `MainActivity.kt`, `SettingsActivity.kt`.
 - TV-2 · 23 nov · al pasar a modo TV busca los TVs del Wi-Fi: uno solo se usa, varios salen en un recuadro para elegir, ninguno avisa con Reintentar; `connectTv()` compartida con ⋮ › Elegir TV · `MainActivity.kt`.
 - ESTILO-3 · 23 nov · fila de chips de ánimo en Canales (Relajarme, Entretenimiento, Aprender, Familia, Cine y series, Deportes, Informarme, Música) que filtra por categorías de iptv-org; no se mezcla con «Grupo» · `M3uActivity.kt`.
+- ZAP-1 · 23 nov · ⏮ ⏭ cambian de canal (circular, respetando búsqueda/grupo/ánimo) cuando hay un canal de lista en el TV, en la pantalla Reproduciendo y en la notificación; solo TV, no teléfono · `Zap.kt`, `M3uActivity.kt`, `MainActivity.kt`.
