@@ -12,6 +12,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      KS_KEYPASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      KS_STOREPASS: ${{ secrets.ANDROID_STORE_PASSWORD }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -39,20 +44,41 @@ jobs:
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" "ndk;25.1.8937393" "cmake;3.22.1"
 
+      - name: Exigir clave de firma en las etiquetas (FIRMA-1)
+        if: startsWith(github.ref, 'refs/tags/') && env.KS_B64 == ''
+        run: |
+          echo "Faltan los secretos de firma: un Release sin la clave estable no se podria actualizar."
+          exit 1
+
+      - name: Preparar clave de firma (FIRMA-1)
+        if: env.KS_B64 != ''
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/castv-release.jks"
+          echo "CASTV_KEYSTORE=$RUNNER_TEMP/castv-release.jks" >> $GITHUB_ENV
+          echo "CASTV_KEY_ALIAS=$KS_ALIAS" >> $GITHUB_ENV
+          echo "CASTV_KEY_PASSWORD=$KS_KEYPASS" >> $GITHUB_ENV
+          echo "CASTV_STORE_PASSWORD=$KS_STOREPASS" >> $GITHUB_ENV
+
       - name: Compilar APK con Stacktrace
         run: |
           chmod +x gradlew
-          ./gradlew clean assembleDebug --stacktrace
+          ./gradlew clean assembleRelease --stacktrace
+
+      - name: Mostrar huella de la firma (FIRMA-1)
+        run: |
+          APKSIGNER=$(ls /usr/local/lib/android/sdk/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "certificate SHA-256|Verified" || true
+          if [ -z "$KS_B64" ]; then echo "AVISO: sin clave estable, APK firmado con clave debug (solo pruebas)"; fi
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: castv-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Preparar APK para el Release
         if: startsWith(github.ref, 'refs/tags/')
-        run: cp app/build/outputs/apk/debug/app-debug.apk "CASTV-${{ github.ref_name }}.apk"
+        run: cp app/build/outputs/apk/release/app-release.apk "CASTV-${{ github.ref_name }}.apk"
 
       - name: Publicar Release
         if: startsWith(github.ref, 'refs/tags/')

@@ -35,9 +35,24 @@ android {
         }
     }
 
+    // [FIRMA-1] clave de firma estable: sale de variables de entorno (GitHub Secrets).
+    // Nunca hay claves dentro del repo. Sin variables, se usa la clave debug (solo pruebas).
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("CASTV_KEYSTORE")
+            if (ksPath) {
+                storeFile file(ksPath)
+                storePassword System.getenv("CASTV_STORE_PASSWORD")
+                keyAlias System.getenv("CASTV_KEY_ALIAS")
+                keyPassword System.getenv("CASTV_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig System.getenv("CASTV_KEYSTORE") ? signingConfigs.release : signingConfigs.debug
         }
     }
 
