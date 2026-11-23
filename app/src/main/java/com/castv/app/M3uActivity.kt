@@ -58,6 +58,7 @@ class M3uActivity : AppCompatActivity() {
     private val moodMaskCache = HashMap<String, Int>()
     private var loadGen = 0
     private var fromCache = false
+    private var cacheNote = " · sin conexión (copia guardada)"   // [LISTA-VAL-1] texto del pie cuando se usa la copia
     private var favs: Set<String> = emptySet()
     private var favOnly = false
     private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
@@ -266,18 +267,28 @@ class M3uActivity : AppCompatActivity() {
         thread {
             var text: String? = null
             var offline = false
+            var bad = false                          // [LISTA-VAL-1] la descarga llegó vacía o dañada
+            var pre: List<M3uChannel>? = null        // [LISTA-VAL-1] ya parseada (no se parsea dos veces)
             try {
                 val t = M3uParser.download(l.url)
-                text = t
-                try { cache.writeText(t) } catch (e: Exception) { }
+                val p = M3uParser.parse(t)
+                if (p.isNotEmpty()) {
+                    text = t
+                    pre = p
+                    try { cache.writeText(t) } catch (e: Exception) { }
+                } else {
+                    // [LISTA-VAL-1] no se pisa la copia buena con algo vacío o dañado
+                    bad = true
+                    DebugLog.add("M3U: la lista nueva llegó vacía o dañada, se conserva la anterior: ${l.url}")
+                }
             } catch (e: Exception) {
                 DebugLog.add("M3U: no se pudo descargar ${l.url}: ${e.javaClass.simpleName}: ${e.message}")
-                if (cache.exists()) {
-                    try { text = cache.readText(); offline = true } catch (x: Exception) { }
-                }
+            }
+            if (text == null && cache.exists()) {
+                try { text = cache.readText(); offline = true } catch (x: Exception) { }
             }
             val body = text
-            val parsed = if (body != null) M3uParser.parse(body) else emptyList()
+            val parsed = pre ?: (if (body != null) M3uParser.parse(body) else emptyList())
             val list = parsed.distinctBy { it.url }   // [CATALOGO-1] sin enlaces repetidos
             Store.backfillChFavs(list)   // [FAV-1] completa el nombre de los favoritos de esta lista
             if (list.size != parsed.size) DebugLog.add("M3U: ${l.name}: ${parsed.size - list.size} repetidos quitados")
@@ -287,8 +298,10 @@ class M3uActivity : AppCompatActivity() {
                 channels = list
                 normNames = names
                 fromCache = offline
+                cacheNote = if (bad) " · lista nueva dañada (copia guardada)" else " · sin conexión (copia guardada)"   // [LISTA-VAL-1]
                 applyFilter()
-                if (body == null) statusView.text = "❌ No se pudo descargar la lista. Revisa el enlace y tu conexión."
+                if (body == null) statusView.text = if (bad) "❌ La lista llegó vacía o dañada. Revisa el enlace."
+                    else "❌ No se pudo descargar la lista. Revisa el enlace y tu conexión."
                 else if (list.isEmpty()) statusView.text = "La lista no tiene canales http/https."
             }
         }
@@ -360,6 +373,7 @@ class M3uActivity : AppCompatActivity() {
         val results = arrayOfNulls<List<M3uChannel>>(total)
         val done = java.util.concurrent.atomic.AtomicInteger(0)
         val failed = java.util.concurrent.atomic.AtomicInteger(0)
+        val kept = java.util.concurrent.atomic.AtomicInteger(0)   // [LISTA-VAL-1] listas que llegaron dañadas y usaron su copia
         val normCache = java.util.concurrent.ConcurrentHashMap<String, String>()
         val applied = IntArray(1)   // solo se toca en el hilo de la interfaz
         val pool = Executors.newFixedThreadPool(4)
@@ -369,19 +383,28 @@ class M3uActivity : AppCompatActivity() {
                 val l = lists[idx]
                 val cache = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
                 var text: String? = null
+                var pre: List<M3uChannel>? = null   // [LISTA-VAL-1] ya parseada
                 try {
                     val t = M3uParser.download(l.url)
-                    text = t
-                    try { cache.writeText(t) } catch (e: Exception) { }
+                    val p = M3uParser.parse(t)
+                    if (p.isNotEmpty()) {
+                        text = t
+                        pre = p
+                        try { cache.writeText(t) } catch (e: Exception) { }
+                    } else {
+                        // [LISTA-VAL-1] no se pisa la copia buena con algo vacío o dañado
+                        kept.incrementAndGet()
+                        DebugLog.add("M3U región: la lista nueva llegó vacía o dañada, se conserva la anterior: ${l.url}")
+                    }
                 } catch (e: Exception) {
                     DebugLog.add("M3U región: no se pudo descargar ${l.url}: ${e.javaClass.simpleName}: ${e.message}")
-                    if (cache.exists()) {
-                        try { text = cache.readText() } catch (x: Exception) { }
-                    }
+                }
+                if (text == null && cache.exists()) {
+                    try { text = cache.readText() } catch (x: Exception) { }
                 }
                 val body = text
                 if (body == null) failed.incrementAndGet()
-                val parsed = if (body != null) M3uParser.parse(body) else emptyList()
+                val parsed = pre ?: (if (body != null) M3uParser.parse(body) else emptyList())
                 synchronized(results) { results[idx] = parsed }
                 val n = done.incrementAndGet()
                 // Une todo lo que ya llegó, en el orden de las listas (el primero que trae un enlace gana)
@@ -417,6 +440,7 @@ class M3uActivity : AppCompatActivity() {
                         statusView.text = if (n < total) "Descargando $n de $total listas… · $vn canales"
                             else "$vn canales de $total listas (sin repetidos)" +
                                 (if (failed.get() > 0) " · ${failed.get()} sin conexión" else "") +
+                                (if (kept.get() > 0) " · ${kept.get()} con copia anterior" else "") +   // [LISTA-VAL-1]
                                 (if (capped) " · tope de $regionMax" else "")
                     }
                 }
@@ -514,7 +538,7 @@ class M3uActivity : AppCompatActivity() {
                 else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)"
         } else if (channels.isNotEmpty()) {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
-                (if (fromCache) " · sin conexión (copia guardada)" else "")
+                (if (fromCache) cacheNote else "")
         }
         refreshSections()   // [ESTILO-2]
         refreshMoods()   // [ESTILO-3]
