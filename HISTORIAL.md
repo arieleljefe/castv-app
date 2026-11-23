@@ -23,6 +23,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - REMOTO-1 (REMOTO-0, DIAG, 1a, 1b) · 22 nov · diagnóstico: la TV solo es MediaRenderer, sin teclas; volumen y 🔇 en la pantalla Reproduciendo; silencio = `SetVolume 0` con restauración porque la TV ignora `SetMute` · `MainActivity.kt`, `TvController.kt`.
 
 - FIRMA-1 · 23 nov · firma estable del APK: clave propia `castv` (RSA 4096) guardada en GitHub Secrets, `assembleRelease` firmado, huella SHA-256 impresa en el build (`4dd1f018…dc558e`); instalado una sola vez desinstalando; las siguientes versiones se instalan encima · `app/build.gradle`, `.github/workflows/build.yml`.
+- RECUP-1 · 23 nov · los canales en vivo se recuperan solos: reintento de la lista con espera creciente, fragmentos que fallan se saltan, detector de atascos (25 s) y reapertura del origen (6 intentos) con el flujo continuo hacia la TV · `MediaServer.kt`.
 
 ## Canales y catálogo
 - 13-B.1 / 13-B.2 · 17 nov · Listas M3U, favoritos de canales · `M3uParser.kt`, `M3uActivity.kt`, `Store.kt`.
