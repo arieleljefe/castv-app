@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v291
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v292
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -63,3 +63,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - IA-1 (extraer audio), IA-2a (whisper.cpp compila), IA-2b (descarga modelo y transcribe), IA-3 (generar `.srt` desde 💬), IA-4 (idioma y modelo Rápido/Preciso), IA-5 (borrar modelo) · 20-21 nov · `AudioExtractor.kt`, `WhisperLib.kt`, `WhisperModel.kt`, `SubtitleGen.kt`, `jni_whisper.cpp`, `build.gradle`, `build.yml`.
 - CACHE-1 · 19 nov · caché de Gradle en el workflow.
 - UPDATE-1 · 23 nov · actualizar desde la app (Ajustes › Actualizaciones: lee el último Release público, descarga, comprueba SHA-256/firma/versionCode y abre el instalador; `versionCode` = n.º de ejecución, `versionName` = etiqueta) · `Updater.kt`, `file_paths.xml`, `SettingsActivity.kt`, `AndroidManifest.xml`, `build.gradle`, `build.yml`.
+- VERSION-2 · 23 nov · la cabecera de la pantalla principal lee `versionName` de la app (ya no "3.0" fijo) · `activity_main.xml`, `MainActivity.kt`.
