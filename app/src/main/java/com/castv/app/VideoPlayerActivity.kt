@@ -1014,6 +1014,46 @@ class VideoPlayerActivity : AppCompatActivity() {
         abB = -1
         video.setVideoURI(Uri.parse(it.uriString))
         loadSavedSub(it)
+        loadChapters(it)   // [CAPITULOS-1]
+    }
+
+    // ------------------------------------------------------------ [CAPITULOS-1] Capítulos
+
+    private var chapters: List<Chapter> = emptyList()
+    private var chapGen = 0
+
+    /** Lee los capítulos del video en segundo plano (solo videos del teléfono). Si no hay o falla, no cambia nada. */
+    private fun loadChapters(m: MediaItem) {
+        chapters = emptyList()
+        if (m.id == 0L) return
+        val gen = ++chapGen
+        val u = m.uriString
+        thread {
+            val list = try { Chapters.read(this, u) } catch (e: Exception) { emptyList() }
+            runOnUiThread { if (gen == chapGen && !isFinishing) chapters = list }
+        }
+    }
+
+    private fun showChapters() {
+        val list = chapters
+        if (list.isEmpty()) return
+        val pos = curPos()
+        var cur = 0
+        for (i in list.indices) if (list[i].startMs <= pos) cur = i
+        val labels = Array(list.size) { i ->
+            val c = list[i]
+            (if (i == cur) "▶ " else "") + fmt(c.startMs.toInt()) + " · " + c.title.ifBlank { "Capítulo " + (i + 1) }
+        }
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("📑 Capítulos")
+            .setItems(labels) { _, which ->
+                val c = list[which]
+                video.seekTo(c.startMs.toInt())
+                showHud("⏩ " + fmt(c.startMs.toInt()))
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+        try { dlg.listView?.setSelection(cur) } catch (e: Exception) { }
     }
 
     private fun saveProgress() {
@@ -1413,7 +1453,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun showToolsMenu() {
         val nMarks = items.getOrNull(index)?.let { if (it.id != 0L) Store.marks(it).size else 0 } ?: 0   // [MARCAS-1]
-        val labels = arrayOf(
+        val baseLabels = arrayOf(
             "⏱ Saltar a un tiempo…",
             "🔁 Marcar A (inicio) aquí",
             "🔁 Marcar B (fin) aquí",
@@ -1422,6 +1462,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             "ℹ️ Información del video",
             "🪟 Ventana flotante (PiP)",
             "🔖 Marcadores (" + nMarks + ")…")   // [MARCAS-1]
+        val labels = if (chapters.isNotEmpty()) baseLabels + ("📑 Capítulos (" + chapters.size + ")…") else baseLabels   // [CAPITULOS-1]
         AlertDialog.Builder(this)
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
@@ -1434,6 +1475,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                     5 -> showInfo()
                     6 -> if (!enterPip()) toast("Este teléfono no permite la ventana flotante")
                     7 -> showMarks()   // [MARCAS-1]
+                    8 -> showChapters()   // [CAPITULOS-1]
                 }
             }
             .show()
