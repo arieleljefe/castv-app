@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v311
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v313
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -72,3 +72,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TV-2 · 23 nov · al pasar a modo TV busca los TVs del Wi-Fi: uno solo se usa, varios salen en un recuadro para elegir, ninguno avisa con Reintentar; `connectTv()` compartida con ⋮ › Elegir TV · `MainActivity.kt`.
 - ESTILO-3 · 23 nov · fila de chips de ánimo en Canales (Relajarme, Entretenimiento, Aprender, Familia, Cine y series, Deportes, Informarme, Música) que filtra por categorías de iptv-org; no se mezcla con «Grupo» · `M3uActivity.kt`.
 - ZAP-1 · 23 nov · ⏮ ⏭ cambian de canal (circular, respetando búsqueda/grupo/ánimo) cuando hay un canal de lista en el TV, en la pantalla Reproduciendo y en la notificación; solo TV, no teléfono · `Zap.kt`, `M3uActivity.kt`, `MainActivity.kt`.
+- LISTA-VAL-1 · 23 nov · una descarga de lista vacía o dañada ya no pisa la copia guardada: se conserva la anterior con aviso y línea en el `/log` · `M3uActivity.kt`.
