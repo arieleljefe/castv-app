@@ -968,7 +968,11 @@ class M3uActivity : AppCompatActivity() {
     private fun playChannel(c: M3uChannel, toTv: Boolean) {
         Store.addLink(c.url, c.name)   // queda en el 🕘 Historial
         Store.rememberRecentChannel(c)   // [ESTILO-2] fila "Continuar"
-        if (toTv) sendToTv(c.url, c.name) else playOnPhone(c.url, c.name)
+        if (toTv) {
+            // [ZAP-1] la lista que se ve ahora queda como contexto para cambiar de canal con ⏮ ⏭
+            Zap.remember(if (shown.any { it.url == c.url }) shown else visible(channels), c)
+            sendToTv(c.url, c.name)
+        } else playOnPhone(c.url, c.name)
     }
 
     /** [RED-1b] true si la conexión activa es de datos móviles (no Wi-Fi ni cable); también con VPN sobre datos. */

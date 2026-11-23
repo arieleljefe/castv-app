@@ -183,6 +183,7 @@ class MainActivity : AppCompatActivity() {
                         adapter.notifyDataSetChanged()
                     }
                     val t = intent?.getStringExtra("title") ?: "Canal"
+                    Zap.confirm(t)   // [ZAP-1]
                     linkOnTv = true; linkDurSec = 0; linkGen++
                     linkTitleNow = t
                     linkIsLive = intent?.getBooleanExtra("live", false) ?: false
@@ -1472,6 +1473,20 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------- Reproducción
 
     private fun step(delta: Int) {
+        // [ZAP-1] con un canal de una lista en el TV, ⏮ ⏭ cambian de canal (y no tocan la música ni el video)
+        if (linkOnTv && Zap.matches(linkTitleNow)) {
+            toast("Cambiando de canal…")
+            Zap.zap(this, delta) { ch, msg ->
+                runOnUiThread {
+                    if (ch != null) {
+                        Store.addLink(ch.url, ch.name)
+                        Store.rememberRecentChannel(ch)
+                    }
+                    toast(msg)
+                }
+            }
+            return
+        }
         if (delta > 0 && queue.isNotEmpty()) {
             val next = queue.removeAt(0)
             updateQueueBadge()
@@ -2168,7 +2183,8 @@ class MainActivity : AppCompatActivity() {
         updateQuickIcon(playing)
         updateSessionState(playing)
         val title = linkTitleNow ?: "Enlace en el TV"
-        val key = "link|$title|$playing|$linkIsLive"
+        val zapOn = Zap.matches(linkTitleNow)   // [ZAP-1] ⏮ ⏭ en la notificación del canal
+        val key = "link|$title|$playing|$linkIsLive|$zapOn"
         if (key == lastNotifKey) return
         lastNotifKey = key
         try {
@@ -2186,7 +2202,7 @@ class MainActivity : AppCompatActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             flags
         )
-        val n = NotificationCompat.Builder(this, CHANNEL_ID)
+        val nb = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(title)
             .setContentText(if (playing) (if (linkIsLive) "En vivo en el TV" else "Sonando en el TV") else "En pausa · TV")
@@ -2194,14 +2210,18 @@ class MainActivity : AppCompatActivity() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(
-                if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                if (playing) "Pausa" else "Reproducir", toggle
-            )
-            .setStyle(
+        if (zapOn) nb.addAction(android.R.drawable.ic_media_previous, "Anterior",
+            PendingIntent.getBroadcast(this, 1, Intent(ACT_PREV).setPackage(packageName), flags))
+        nb.addAction(
+            if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+            if (playing) "Pausa" else "Reproducir", toggle
+        )
+        if (zapOn) nb.addAction(android.R.drawable.ic_media_next, "Siguiente",
+            PendingIntent.getBroadcast(this, 3, Intent(ACT_NEXT).setPackage(packageName), flags))
+        val n = nb.setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
-                    .setShowActionsInCompactView(0)
+                    .setShowActionsInCompactView(*(if (zapOn) intArrayOf(0, 1, 2) else intArrayOf(0)))
             )
             .build()
         try {
