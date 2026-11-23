@@ -431,6 +431,7 @@ class MainActivity : AppCompatActivity() {
             }
             setStatus(if (outPhone) "📱 La música y los videos se verán en el teléfono"
                       else "📺 La música y los videos irán al TV")
+            if (!outPhone) offerTvPicker()   // [TV-2]
         }
 
         adapter = FileAdapter()
@@ -3658,24 +3659,87 @@ class MainActivity : AppCompatActivity() {
                     setStatus("Elige el dispositivo donde quieres reproducir")
                     AlertDialog.Builder(this)
                         .setTitle("Elegir TV")
-                        .setItems(labels.toTypedArray()) { _, which ->
-                            val tv = tvs[which]
-                            getSharedPreferences("castv", MODE_PRIVATE).edit().putString("tvIp", tv.ip).apply()
-                            setStatus("🔌 Conectando con ${tv.name}...")
-                            thread {
-                                TvController.select(tv)
-                                tvFails = 0
-                                tvOnline = true
-                                runOnUiThread {
-                                    updateOutputButton()
-                                    setStatus("✅ TV: " + TvController.tvName.ifEmpty { tv.ip })
-                                }
-                            }
-                        }
+                        .setItems(labels.toTypedArray()) { _, which -> connectTv(tvs[which]) }   // [TV-2]
                         .show()
                 }
             }
         }
+    }
+
+    /** [TV-2] Usa el TV elegido: lo recuerda, lee sus rutas UPnP y actualiza el botón de salida. */
+    private fun connectTv(tv: TvController.Tv) {
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putString("tvIp", tv.ip).apply()
+        setStatus("🔌 Conectando con ${tv.name}...")
+        thread {
+            TvController.select(tv)
+            tvFails = 0
+            tvOnline = true
+            runOnUiThread {
+                updateOutputButton()
+                setStatus("✅ TV: " + TvController.tvName.ifEmpty { tv.ip })
+            }
+        }
+    }
+
+    // ------------------------------------------- [TV-2] Recuadro de TVs al activar el modo TV
+
+    @Volatile private var tvScanBusy = false
+
+    /**
+     * Al pasar a modo TV busca los TVs del Wi-Fi.
+     * Uno solo y aún sin TV elegido → se usa; el mismo ya elegido → solo se confirma;
+     * varios (o uno distinto del elegido) → recuadro para elegir; ninguno → aviso con Reintentar
+     * (si ya había un TV elegido, solo se avisa en la barra de estado y se sigue con ese).
+     */
+    private fun offerTvPicker() {
+        if (tvScanBusy) return
+        tvScanBusy = true
+        setStatus("🔎 Buscando TVs en la red...")
+        thread {
+            val tvs = try { TvController.scanAll() } catch (e: Exception) { emptyList() }
+            tvScanBusy = false
+            runOnUiThread {
+                if (isFinishing || isDestroyed || outPhone) return@runOnUiThread   // ya volvió a modo teléfono
+                val cur = TvController.tvIp
+                when {
+                    tvs.isEmpty() -> {
+                        if (cur != null) {
+                            setStatus("⚠️ No se encontró ningún TV ahora; se sigue con " +
+                                TvController.tvName.ifEmpty { cur })
+                        } else {
+                            showNoTvDialog()
+                        }
+                    }
+                    tvs.size == 1 && cur == null -> connectTv(tvs[0])
+                    tvs.size == 1 && tvs[0].ip == cur ->
+                        setStatus("✅ TV: " + TvController.tvName.ifEmpty { tvs[0].name })
+                    else -> showTvDialog(tvs)
+                }
+            }
+        }
+    }
+
+    private fun showTvDialog(tvs: List<TvController.Tv>) {
+        val labels = tvs.map { t ->
+            (if (t.ip == TvController.tvIp) "✓ " else "") + t.name + "  (" + t.ip + ")"
+        }
+        setStatus("Elige el TV donde quieres reproducir")
+        AlertDialog.Builder(this)
+            .setTitle("📺 TVs en tu Wi-Fi")
+            .setItems(labels.toTypedArray()) { _, which -> connectTv(tvs[which]) }
+            .setNeutralButton("Reintentar") { _, _ -> offerTvPicker() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun showNoTvDialog() {
+        setStatus("⚠️ No se encontró ningún TV en esta red")
+        AlertDialog.Builder(this)
+            .setTitle("No encontré TVs")
+            .setMessage("Revisa que el TV esté encendido y en el mismo Wi-Fi que el teléfono.")
+            .setPositiveButton("Reintentar") { _, _ -> offerTvPicker() }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     // ---------------------------------------------------------- Adaptador
