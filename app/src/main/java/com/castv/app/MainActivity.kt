@@ -1757,6 +1757,59 @@ class MainActivity : AppCompatActivity() {
             System.currentTimeMillis() - lastScanMs > 60_000L) {
             loadMedia(showingMusic, keepFilters = true)
         }
+        if (!updateAsked) { updateAsked = true; maybeAnnounceUpdate() }   // [UPDATE-2]
+    }
+
+    // ------------------------------------------------- [UPDATE-2] Aviso de versión nueva al abrir la app
+
+    private var updateAsked = false
+
+    /** Una vez al abrir la app (y como mucho cada 6 h) mira el último Release; si es más nuevo, avisa. Sin conexión: silencio. */
+    private fun maybeAnnounceUpdate() {
+        val sp = getSharedPreferences("castv", MODE_PRIVATE)
+        if (!sp.getBoolean("upd_notify", true)) return
+        val now = System.currentTimeMillis()
+        if (now - sp.getLong("upd_last", 0L) < 6L * 3600_000L) return
+        thread {
+            val r = try { Updater.check(this) } catch (e: Exception) { return@thread }
+            val rel = r.release
+            runOnUiThread {
+                if (isFinishing || isDestroyed || !r.ok || rel == null) return@runOnUiThread
+                if (!r.newer) {
+                    sp.edit().putLong("upd_last", now).apply()
+                    return@runOnUiThread
+                }
+                // "Más tarde" reciente para esta misma versión: no molestar
+                if (sp.getString("upd_later_tag", "") == rel.tag && now < sp.getLong("upd_later_until", 0L)) {
+                    sp.edit().putLong("upd_last", now).apply()
+                    return@runOnUiThread
+                }
+                // si ya se salió de esta pantalla (p. ej. a un video), no se muestra y se intenta en la próxima apertura
+                if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@runOnUiThread
+                sp.edit().putLong("upd_last", now).apply()
+                showUpdateNotice(rel, sp)
+            }
+        }
+    }
+
+    private fun showUpdateNotice(rel: Updater.Release, sp: android.content.SharedPreferences) {
+        val installed = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
+        val mb = String.format(java.util.Locale.US, "%.1f", rel.size / 1_000_000.0)
+        val later = {
+            sp.edit().putString("upd_later_tag", rel.tag)
+                .putLong("upd_later_until", System.currentTimeMillis() + 24L * 3600_000L).apply()
+        }
+        AlertDialog.Builder(this)
+            .setTitle("🆕 Hay una versión nueva")
+            .setMessage("Instalada: $installed\nNueva: ${rel.tag} ($mb MB)\n\n¿Quieres actualizar ahora?")
+            .setPositiveButton("Actualizar ahora") { _, _ ->
+                // Ajustes abre directo la búsqueda de actualización (muestra tamaño, notas y aviso de datos móviles)
+                startActivityForResult(
+                    Intent(this, SettingsActivity::class.java).putExtra("autoUpdate", true), reqSettings)
+            }
+            .setNegativeButton("Más tarde") { _, _ -> later() }
+            .setOnCancelListener { later() }
+            .show()
     }
 
     private fun startPlayback(item: MediaItem, resumeAt: Int = 0) {

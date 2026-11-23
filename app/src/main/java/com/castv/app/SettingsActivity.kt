@@ -188,14 +188,18 @@ class SettingsActivity : AppCompatActivity() {
 
         // [PARENTAL-1] con PIN activo, Ajustes solo se abre con el PIN
         unlocked = savedInstanceState?.getBoolean("unlocked") ?: false
+        // [UPDATE-2] viene del aviso "Hay una versión nueva" → abre directo la búsqueda de actualización
+        val autoUpdate = savedInstanceState == null && intent.getBooleanExtra("autoUpdate", false)
         if (pinSet() && !unlocked) {
             content.visibility = View.INVISIBLE
             askPin("Ajustes bloqueados", exitOnCancel = true) {
                 unlocked = true
                 content.visibility = View.VISIBLE
+                if (autoUpdate) checkUpdate()
             }
         } else {
             unlocked = true
+            if (autoUpdate) checkUpdate()
         }
     }
 
@@ -338,6 +342,9 @@ class SettingsActivity : AppCompatActivity() {
         // [UPDATE-1] Actualizaciones desde GitHub
         l.add(Entry("Actualizaciones", "Buscar actualización",
             updateInstalledText() + " · se descarga de GitHub", { checkUpdate() }))
+        l.add(Entry("Actualizaciones", "Avisar de versiones nuevas",   // [UPDATE-2]
+            if (updateNotify()) "Sí: al abrir la app avisa si hay una versión nueva" else "No: solo buscas a mano",
+            { toggleUpdateNotify() }))
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
@@ -366,7 +373,7 @@ class SettingsActivity : AppCompatActivity() {
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Eliminado: papelera o permanente"
         "Avanzado" -> "Registro de la app y pruebas"
-        "Actualizaciones" -> "Buscar versiones nuevas e instalarlas"
+        "Actualizaciones" -> "Buscar versiones nuevas, instalarlas y avisos"
         "Respaldo" -> "Exportar o importar"
         "Acerca de" -> "Versión, autor, redes y licencia"
         else -> null
@@ -845,6 +852,17 @@ class SettingsActivity : AppCompatActivity() {
             try { DebugLog.add("UPDATE-1: no se pudo abrir el instalador: ${e.message}") } catch (e2: Exception) { }
             simpleDialog("⚠️ No se pudo abrir el instalador", e.message ?: "Error desconocido")
         }
+    }
+
+    // ------------------------------------------------- [UPDATE-2] Aviso al abrir la app
+
+    private fun updateNotify(): Boolean = prefs().getBoolean("upd_notify", true)
+
+    private fun toggleUpdateNotify() {
+        val now = !updateNotify()
+        prefs().edit().putBoolean("upd_notify", now).apply()
+        toast(if (now) "🆕 Se avisará si hay una versión nueva" else "🆕 Sin aviso de versiones nuevas")
+        render()
     }
 
     // ------------------------------------------------- [AJUSTES-2c] Avanzado: registro
