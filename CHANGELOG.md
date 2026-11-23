@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v285
+# CASTV: CHANGELOG (cerebro) · v287
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -13,6 +13,7 @@ Estados: ✅ confirmado por Ariel · 🧪 entregado/pendiente de probar · ⏳ e
 |---|---|
 | Usuario GitHub | `arieleljefe` |
 | Repo | `castv-app` (rama `main`) → https://github.com/arieleljefe/castv-app |
+| Visibilidad del repo | **Público** (Ariel, 23 nov). La API de Releases se puede leer sin token |
 | Carpeta local del repo (Termux) | `~/castv-nuevo/castv-fresh` |
 | Código Kotlin | `app/src/main/java/com/castv/app/` |
 | Layouts / drawables / values | `app/src/main/res/layout/`, `res/drawable/`, `res/values/` |
@@ -89,16 +90,21 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (23 nov 2026, 11:58)
-- **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1, VOCABULARIO-1 y VOCABULARIO-2 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Ahora:** nada en prueba. Ariel saltó LOG-1 (23 nov, 11:57). **Sigue LISTA-VAL-1:** la IA pide los archivos con la plantilla A (`M3uActivity.kt`, `M3uParser.kt`, `Store.kt`), lee el código y presenta el plan en 🧪 para el "Dale" de Ariel.
+### ▶ RETOMAR AQUÍ (23 nov 2026, 12:34)
+- **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1, VOCABULARIO-1 y VOCABULARIO-2 (ver `HISTORIAL`). WIDGET-1 en pausa.
+- **Decisión de Ariel (23 nov, 12:30):** quiere sobre todo **Actualización dentro de la app** y **Estilos y organización de pantallas**; dio carta blanca ("haz lo que tengas que hacer") y confirmó que el repo es público. La IA reordenó la cola: FIRMA-1 › UPDATE-1 › ESTILO-1/2/3 › LISTA-VAL-1 › RECUP-1.
+- **Progreso de FIRMA-1 (23 nov, 12:41):** paso 1 a medias: la clave `~/castv-release.jks` (PKCS12, alias `castv`) YA está creada en Termux (en Termux el paquete es `openjdk-21`; `openjdk-17` ya no existe). **Falta:** (a) correr la línea de `base64` + copia a Download y confirmar que salen `castv-ks-b64.txt` y `castv-release.jks`; (b) guardar el `.jks` fuera del teléfono; (c) paso 2: crear los 4 secretos en GitHub; (d) paso 3: línea B+C con `CHANGELOG_v287.md`/`HISTORIAL_v287.md`; (e) paso 4: build verde con huella SHA-256 y reinstalar una vez. Después borrar de Download `castv-ks-b64.txt` y `castv-release.jks`. La contraseña de la clave solo la sabe Ariel (nunca por chat).
+- **Ahora en 🧪: FIRMA-1** (parche `firma1.patch` entregado). Falta que Ariel haga los pasos de clave y secretos, aplique la línea B+C y confirme. Nada se marca ✅ hasta su "ya funciona".
+- **Siguiente:** cuando FIRMA-1 sea ✅, la IA presenta el plan de UPDATE-1 (sección de abajo) y pide el "Dale".
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### Cola de pendientes (uno a la vez, en este orden; selección de Ariel del 23 nov, tomada de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. **LISTA-VAL-1** ⭐ Validar la lista antes de reemplazar: si la nueva llega vacía o dañada, conservar la anterior (sin plan aún; archivos probables `M3uActivity.kt`, `M3uParser.kt`, `Store.kt`; pedir con plantilla A al empezar).
-2. **RECUP-1** ⭐ Recuperación automática de canales en vivo: reintentos con espera creciente y detector de atascos (sin plan aún; toca `MediaServer.kt`/`/live`; cuidar que no entre en bucle y probar con la TV).
-3. **UPDATE-1** ⭐ Actualizar desde la app (GitHub Releases › descargar APK › instalar). **Antes de planear, verificar** que las APK de GitHub Actions se firmen siempre con la misma clave: si el `assembleDebug` usa una clave debug distinta en cada build, Android rechazará la actualización. Pide el permiso de instalar apps; subir `versionName` a 3.1; comprobar hash y paquete del APK antes de instalar.
-4. Al final: idioma "Automático" de los subtítulos con IA (PAUSADO; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
+0. **FIRMA-1** 🧪 · Firma estable del APK. **Qué:** `build.gradle` lee la clave de variables de entorno (`CASTV_KEYSTORE`, `CASTV_KEY_ALIAS`, `CASTV_KEY_PASSWORD`, `CASTV_STORE_PASSWORD`); `build.yml` decodifica el secreto `ANDROID_KEYSTORE_BASE64`, compila con `assembleRelease`, imprime la huella SHA-256 de la firma y **falla en las etiquetas `v*` si faltan los secretos**. Sin secretos y sin etiqueta compila con clave debug (solo pruebas). **Archivos:** `app/build.gradle`, `.github/workflows/build.yml`. **Pasos de Ariel:** (1) crear la clave en Termux y guardar copia fuera del teléfono; (2) crear 4 secretos en GitHub (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_STORE_PASSWORD`); (3) línea B+C; (4) hacer respaldo con BACKUP-1, desinstalar la app e instalar el APK firmado (solo esta vez, porque cambia la firma). **Cómo probar:** el build sale verde y el paso "Mostrar huella de la firma" imprime un SHA-256; dos builds seguidos dan la MISMA huella. **Riesgos:** perder el `.jks` = no se puede actualizar nunca más; nunca pasar claves por el chat ni subirlas al repo (R9). **Siguiente paso:** la IA da la línea de la etiqueta (`v3.1.x`) para el primer Release firmado.
+1. **UPDATE-1** ⭐ ⬜ · Actualizar desde la app (necesita FIRMA-1 ✅). **Plan:** Ajustes › Actualizaciones: leer `https://api.github.com/repos/arieleljefe/castv-app/releases/latest` (público, sin token; límite 60 consultas/hora), comparar versión, mostrar novedades, descargar el APK a almacenamiento interno, comprobar SHA-256 (campo `digest` del asset) y que el paquete sea `com.castv.app`, abrir el instalador de Android. Solo se aceptan URLs `https://github.com/arieleljefe/castv-app/releases/download/…`, tamaño máximo y que el nombre acabe en `.apk`. **Archivos:** `Updater.kt` nuevo, `SettingsActivity.kt`, `AndroidManifest.xml` (`REQUEST_INSTALL_PACKAGES` y `FileProvider` + `res/xml/file_paths.xml`), `build.gradle` (`versionName` 3.1 y `versionCode` que suba en cada release; decidir si sale del número de ejecución del workflow). **Riesgos:** si falla la firma, Android rechaza; manejar sin red y sin permiso de instalar.
+2. **ESTILO-1/2/3** ⬜ · Estilos y organización de pantallas (ideas de `kino-light`, sin copiar código): ESTILO-1 reunir radios, espaciados y estilos de botones, tarjetas y textos en `values/` a partir de `vlc_*` y acentos; ESTILO-2 Inicio en secciones (Continuar, Recientes, Favoritos, Canales); ESTILO-3 Canales por categorías y ánimo (idea de `movie-hub`). `res/values/themes.xml` NO existe en el repo (el tema `Theme.Castv` está en otro archivo de `values/`; pedirlo con plantilla A). Antes de planear: pedir con plantilla A los layouts y `themes`/`styles` que falten (`activity_main_actual.xml` y `colors_actual.xml` ya se tienen).
+3. **LISTA-VAL-1** ⭐ Validar la lista antes de reemplazar: si la nueva llega vacía o dañada, conservar la anterior (ya se pasaron `M3uActivity.kt`, `M3uParser.kt`, `Store.kt`; falta el plan en 🧪).
+4. **RECUP-1** ⭐ Recuperación automática de canales en vivo: reintentos con espera creciente y detector de atascos (toca `MediaServer.kt`/`/live`; cuidar bucles y probar con la TV).
+5. Al final: idioma "Automático" de los subtítulos con IA (PAUSADO; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
 - ⬜ Ideas de referencia NO elegidas (23 nov; con su contra): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · ATOMIC-1 guardado seguro de ajustes/favoritos (toca `Store.kt`) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · TESTS-1 pruebas automáticas en GitHub Actions · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
@@ -111,6 +117,7 @@ rm -f ~/storage/downloads/*_actual.*
 - Verificado 23 nov: temporizador de apagado y velocidad ya existen en música (`MainActivity.kt`); el temporizador también en video (GESTO-2). Velocidad en video: sin verificar.
 
 ### Descartado (⛔)
+`Platzi-Download` y `Youtube_Downloader` (23 nov): no aportan a castv y descargan contenido de terceros; no se toman ideas de ellos.
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
 LOG-1 (ocultar claves en el `/log`): Ariel lo salta el 23 nov porque no comparte el log. Idea: `redact()` en `DebugLog.kt` que cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …` (no cubre claves en la ruta del enlace). Se retoma solo si Ariel empieza a compartir el log.
 
