@@ -233,7 +233,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // [RED-1] Red
         l.add(Entry("Red", "Avisar con datos móviles",
-            if (warnMobile()) "Sí: pregunta antes de reproducir un enlace en el móvil" else "No",
+            if (warnMobile()) "Sí: pregunta antes de reproducir un enlace en el teléfono" else "No",
             { toggleWarnMobile() }))
 
         // [PUERTO-1] Puerto real del servidor interno (solo informativo)
@@ -243,27 +243,27 @@ class SettingsActivity : AppCompatActivity() {
             else "${ServerPort.port} (se busca uno libre del 8000 al 8010)", null))
 
         // [GESTO-1] Vídeo
-        l.add(Entry("Vídeo", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
+        l.add(Entry("Video", "Salto con doble toque", "${dtapSec()} segundos (en el reproductor de video)", { pickDtap() }))
         // [GESTOS-AJ-1] cada gesto se puede activar o desactivar; velocidad, controles y botones
-        l.add(Entry("Vídeo", "Deslizar de lado: adelantar", gState("g_seek"), { toggleG("g_seek", "Deslizar de lado") }))
-        l.add(Entry("Vídeo", "Deslizar a la derecha: brillo", gState("g_bright"), { toggleG("g_bright", "Brillo") }))
-        l.add(Entry("Vídeo", "Deslizar a la izquierda: volumen", gState("g_vol"), { toggleG("g_vol", "Volumen") }))
-        l.add(Entry("Vídeo", "Doble toque", gState("g_dtap") + " (con el doble toque apagado, dos toques muestran u ocultan los controles)", { toggleG("g_dtap", "Doble toque") }))
-        l.add(Entry("Vídeo", "Mantener pulsado: acelerar", gState("g_hold"), { toggleG("g_hold", "Mantener pulsado") }))
-        l.add(Entry("Vídeo", "Velocidad al mantener pulsado", fastNames[fastIdx()], { pickFast() }))
-        l.add(Entry("Vídeo", "Zoom con pellizco", gState("g_pinch"), { toggleG("g_pinch", "Zoom con pellizco") }))
-        l.add(Entry("Vídeo", "Tiempo de los controles", "Se esconden a los ${hideLabels[hideIdx()]}", { pickHide() }))
-        l.add(Entry("Vídeo", "Salto de los botones −N / +N", btnLabel(btnSecPref()), { pickBtn() }))
-        l.add(Entry("Vídeo", "Recordar brillo",   // [GESTO-2]
+        l.add(Entry("Video", "Deslizar de lado: adelantar", gState("g_seek"), { toggleG("g_seek", "Deslizar de lado") }))
+        l.add(Entry("Video", "Deslizar a la derecha: brillo", gState("g_bright"), { toggleG("g_bright", "Brillo") }))
+        l.add(Entry("Video", "Deslizar a la izquierda: volumen", gState("g_vol"), { toggleG("g_vol", "Volumen") }))
+        l.add(Entry("Video", "Doble toque", gState("g_dtap") + " (con el doble toque apagado, dos toques muestran u ocultan los controles)", { toggleG("g_dtap", "Doble toque") }))
+        l.add(Entry("Video", "Mantener pulsado: acelerar", gState("g_hold"), { toggleG("g_hold", "Mantener pulsado") }))
+        l.add(Entry("Video", "Velocidad al mantener pulsado", fastNames[fastIdx()], { pickFast() }))
+        l.add(Entry("Video", "Zoom con pellizco", gState("g_pinch"), { toggleG("g_pinch", "Zoom con pellizco") }))
+        l.add(Entry("Video", "Tiempo de los controles", "Se esconden a los ${hideLabels[hideIdx()]}", { pickHide() }))
+        l.add(Entry("Video", "Salto de los botones −N / +N", btnLabel(btnSecPref()), { pickBtn() }))
+        l.add(Entry("Video", "Recordar brillo",   // [GESTO-2]
             if (rememberBright()) "Sí: el video se abre con el último brillo que pusiste"
             else "No: el video usa el brillo del teléfono", { toggleRememberBright() }))
-        l.add(Entry("Vídeo", "Preguntar antes de continuar",   // [CONFIRMAR-1]
+        l.add(Entry("Video", "Preguntar antes de continuar",   // [CONFIRMAR-1]
             if (resumeAsk()) "Sí: al abrir un video con punto guardado pregunta si seguir o empezar de nuevo"
             else "No: continúa solo desde donde lo dejaste", { toggleResumeAsk() }))
-        l.add(Entry("Vídeo", "Ventana flotante al pulsar Inicio",   // [PIP-2]
+        l.add(Entry("Video", "Ventana flotante al pulsar Inicio",   // [PIP-2]
             if (pipAuto()) "Sí: el video sigue en una ventana flotante al salir con Inicio"
             else "No: el video se pausa al salir (la ventana manual sigue en 🛠 › 🪟)", { togglePipAuto() }))
-        l.add(Entry("Vídeo", "Consejos de gestos", "Cómo usar los gestos del reproductor de video", { sendAction("tips") }))   // [NOVEDADES-1]
+        l.add(Entry("Video", "Consejos de gestos", "Cómo usar los gestos del reproductor de video", { sendAction("tips") }))   // [NOVEDADES-1]
 
         // [BIBLIO-1] Biblioteca
         l.add(Entry("Biblioteca", "Re-escanear ahora", "Vuelve a leer tus videos y tu música", { sendAction("rescan") }))
@@ -354,13 +354,13 @@ class SettingsActivity : AppCompatActivity() {
         "Interfaz" -> "Tema y color de acento"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
-        "Vídeo" -> "Gestos, velocidad, controles y brillo"
+        "Video" -> "Gestos, velocidad, controles y brillo"
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
         "Emisión al TV" -> "Salida al abrir, TV detectada e IP del teléfono"
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
-        "Almacenamiento" -> "Borrado: papelera o permanente"
+        "Almacenamiento" -> "Eliminado: papelera o permanente"
         "Avanzado" -> "Registro de la app y pruebas"
         "Respaldo" -> "Exportar o importar"
         "Acerca de" -> "Versión, autor, redes y licencia"
@@ -1355,7 +1355,7 @@ class SettingsActivity : AppCompatActivity() {
 
     // [SALIDA-INI-1] Salida al abrir la app: 0 = Teléfono, 1 = TV, 2 = recordar la última
     private val outStartNames = arrayOf(
-        "Teléfono (la música y los videos suenan en el móvil)",
+        "Teléfono (la música y los videos suenan en el teléfono)",
         "TV (como antes)",
         "Recordar la última que usé")
 

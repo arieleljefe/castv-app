@@ -275,7 +275,7 @@
             android:paddingTop="8dp"
             android:paddingEnd="4dp"
             android:paddingBottom="6dp"
-            android:text="Vídeo"
+            android:text="Video"
             android:textColor="@color/vlc_muted"
             android:textSize="11sp" />
 

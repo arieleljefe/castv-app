@@ -509,7 +509,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                 else if (e.x > w * 2f / 3f) seekBy(dtapSec())
                 else {   // [GESTO-2] centro: pausar / reanudar
                     togglePlay()
-                    showHud(if (video.isPlaying) "▶ Reanudar" else "⏸ Pausa")
+                    showHud(if (video.isPlaying) "▶ Continuar" else "⏸ Pausa")
                 }
                 return true
             }
@@ -1205,7 +1205,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             .setTitle("Falta el modelo de voz")
             .setMessage("Hay que bajar el modelo de Whisper (${WhisperModel.selected(this).sizeText}, una sola vez). Conviene estar con Wi-Fi.")
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Bajar y generar") { _, _ -> aiRun(cur) }
+            .setPositiveButton("Descargar y generar") { _, _ -> aiRun(cur) }
             .show()
     }
 
@@ -1233,7 +1233,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             try {
                 if (!WhisperModel.isReady(app)) {
                     val d = WhisperModel.download(app, { pct, mb ->
-                        val t = if (pct >= 0) "Bajando el modelo… $pct %" else "Bajando el modelo… $mb MB"
+                        val t = if (pct >= 0) "Descargando el modelo… $pct %" else "Descargando el modelo… $mb MB"
                         SubtitleGen.notifyProgress(app, if (pct >= 0) pct else 0, t)
                         runOnUiThread { if (!isFinishing && aiDialog === dlg) dlg.setMessage(t) }
                     }, { aiCancel })

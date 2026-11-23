@@ -766,7 +766,7 @@ class M3uActivity : AppCompatActivity() {
     private fun openChannel(c: M3uChannel) {
         val labels = arrayOf(
             if (isHls(c.url)) "📺 Al TV (HLS: puede no funcionar)" else "📺 Al TV",
-            "📱 En el móvil")
+            "📱 En el teléfono")
         AlertDialog.Builder(this)
             .setTitle(c.name)
             .setItems(labels) { _, which -> playChannel(c, which == 0) }
@@ -796,7 +796,7 @@ class M3uActivity : AppCompatActivity() {
         if (!skipWarn && getSharedPreferences("castv", MODE_PRIVATE).getBoolean("warn_mobile", true) && onMobileData()) {
             AlertDialog.Builder(this)
                 .setTitle("📶 Estás usando datos móviles")
-                .setMessage("Ver «$title» en el móvil gastará datos de tu plan. ¿Seguir?")
+                .setMessage("Ver «$title» en el teléfono gastará datos de tu plan. ¿Seguir?")
                 .setPositiveButton("Reproducir") { _, _ -> playOnPhone(url, title, true) }
                 .setNegativeButton("Cancelar", null)
                 .show()
@@ -812,8 +812,8 @@ class M3uActivity : AppCompatActivity() {
     private fun warnChannel(url: String, title: String, why: String) {
         AlertDialog.Builder(this)
             .setTitle("⚠️ Este canal puede no verse en el TV")
-            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el móvil o probar en el TV de todas formas.")
-            .setPositiveButton("📱 En el móvil") { _, _ -> playOnPhone(url, title) }
+            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el teléfono o probar en el TV de todas formas.")
+            .setPositiveButton("📱 En el teléfono") { _, _ -> playOnPhone(url, title) }
             .setNeutralButton("📺 Enviar igual") { _, _ -> sendToTv(url, title, true) }
             .setNegativeButton("Cancelar", null)
             .show()

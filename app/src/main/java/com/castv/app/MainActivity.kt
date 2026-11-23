@@ -761,7 +761,7 @@ class MainActivity : AppCompatActivity() {
                 "• Mantén pulsado: se ve al doble de velocidad hasta que sueltes.\n" +
                 "• Pellizca con dos dedos: acercas la imagen.\n" +
                 "• 😴 (barra de arriba): temporizador de apagado.\n\n" +
-                "Puedes volver a verlo en Ajustes › Vídeo › Consejos de gestos.")
+                "Puedes volver a verlo en Ajustes › Video › Consejos de gestos.")
             .setPositiveButton("Entendido", null)
             .show()
     }
@@ -1128,7 +1128,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 12, 10, "Tema: " + themeLabel())
         menu.add(0, 13, 11, "Color: " + accentNames[savedAccent().coerceIn(0, 3)])
         if (Build.VERSION.SDK_INT >= 30) {
-            menu.add(0, 14, 11, if (useTrash()) "Borrado: a la papelera" else "Borrado: permanente")
+            menu.add(0, 14, 11, if (useTrash()) "Eliminado: a la papelera" else "Eliminado: permanente")
         }
         menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
         menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
@@ -1486,7 +1486,7 @@ class MainActivity : AppCompatActivity() {
             playIndex = -1
         }
         if (playlist.isEmpty()) {
-            setStatus("⚠️ Playlist vacía")
+            setStatus("⚠️ Lista vacía")
             return
         }
         playIndex = if (playIndex < 0) 0 else Math.floorMod(playIndex + delta, playlist.size)
@@ -1495,7 +1495,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun shuffleAndPlay() {
         if (currentList.isEmpty()) {
-            setStatus("⚠️ Playlist vacía")
+            setStatus("⚠️ Lista vacía")
             return
         }
         currentList = currentList.shuffled()
@@ -1531,7 +1531,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Reproducir enlace")
             .setView(box)
             .setPositiveButton("📺 Al TV") { _, _ -> playLink(input.text.toString().trim(), true) }
-            .setNegativeButton("📱 En el móvil") { _, _ -> playLink(input.text.toString().trim(), false) }
+            .setNegativeButton("📱 En el teléfono") { _, _ -> playLink(input.text.toString().trim(), false) }
             .setNeutralButton("🕘 Historial") { _, _ -> showLinkHistory() }
             .show()
     }
@@ -1558,7 +1558,7 @@ class MainActivity : AppCompatActivity() {
     private fun showLinkActions(l: SavedLink) {
         val labels = arrayOf(
             "📺 Al TV",
-            "📱 En el móvil",
+            "📱 En el teléfono",
             if (l.fav) "☆ Quitar de favoritos" else "★ Marcar favorito",
             "🗑 Quitar del historial")
         AlertDialog.Builder(this)
@@ -1586,8 +1586,8 @@ class MainActivity : AppCompatActivity() {
     private fun warnLink(url: String, title: String, why: String, titleOverride: String?) {
         AlertDialog.Builder(this)
             .setTitle("⚠️ Este canal puede no verse en el TV")
-            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el móvil o probar en el TV de todas formas.")
-            .setPositiveButton("📱 En el móvil") { _, _ -> playLink(url, false, titleOverride) }
+            .setMessage("«$title»\n\n$why\n\nPuedes verlo en el teléfono o probar en el TV de todas formas.")
+            .setPositiveButton("📱 En el teléfono") { _, _ -> playLink(url, false, titleOverride) }
             .setNeutralButton("📺 Enviar igual") { _, _ -> playLink(url, true, titleOverride, true) }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -1616,7 +1616,7 @@ class MainActivity : AppCompatActivity() {
         if (!toTv && !skipCheck && getSharedPreferences("castv", MODE_PRIVATE).getBoolean("warn_mobile", true) && onMobileData()) {
             AlertDialog.Builder(this)
                 .setTitle("📶 Estás usando datos móviles")
-                .setMessage("Reproducir \"$title\" en el móvil gastará datos de tu plan. ¿Seguir?")
+                .setMessage("Reproducir \"$title\" en el teléfono gastará datos de tu plan. ¿Seguir?")
                 .setPositiveButton("Reproducir") { _, _ -> playLink(url, false, titleOverride, true) }
                 .setNegativeButton("Cancelar", null)
                 .show()
@@ -3547,7 +3547,7 @@ class MainActivity : AppCompatActivity() {
     private fun openPlaylistMenu(name: String) {
         AlertDialog.Builder(this)
             .setTitle(name)
-            .setItems(arrayOf("📂 Abrir", "🗑 Eliminar lista")) { _, which ->
+            .setItems(arrayOf("📂 Abrir", "🗑 Quitar lista")) { _, which ->
                 if (which == 0) {
                     selectedPlaylist = name
                     viewMode = ViewMode.ALL
@@ -3558,7 +3558,7 @@ class MainActivity : AppCompatActivity() {
                         selectedPlaylist = null
                         applyFilters()
                     }
-                    toast("Lista eliminada")
+                    toast("Lista quitada")
                 }
             }
             .show()
@@ -3588,7 +3588,7 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------- Elegir TV
 
     private fun pickTv() {
-        setStatus("🔎 Buscando aparatos en la red...")
+        setStatus("🔎 Buscando dispositivos en la red...")
         thread {
             val tvs = TvController.scanAll()
             runOnUiThread {
@@ -3598,7 +3598,7 @@ class MainActivity : AppCompatActivity() {
                     val labels = tvs.map { t ->
                         (if (t.ip == TvController.tvIp) "✓ " else "") + t.name + "  (" + t.ip + ")"
                     }
-                    setStatus("Elige el aparato donde quieres reproducir")
+                    setStatus("Elige el dispositivo donde quieres reproducir")
                     AlertDialog.Builder(this)
                         .setTitle("Elegir TV")
                         .setItems(labels.toTypedArray()) { _, which ->
