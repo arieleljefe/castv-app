@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v279
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v280
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -34,6 +34,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - RED-1/RED-1b · 19 nov · aviso con datos móviles · `MainActivity.kt`, `M3uActivity.kt`.
 
 ## Interfaz y Ajustes
+- VOCABULARIO-1 · 23 nov · lista de referencia de términos y diferencias de texto de la app, sin cambiar código · `VOCABULARIO.md`.
 - UI-1/UI-1b · 18 nov · pestaña Más y pantalla Ajustes · `SettingsActivity.kt`.
 - UI-5 · 18 nov · Canales en la barra inferior, Carpetas en Más.
 - AJUSTES-2a/2b/2c, AJUSTES-3 · 19 nov · buscador, subpáginas, registro, TV/historial · `SettingsActivity.kt`.

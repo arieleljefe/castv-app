@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v279
+# CASTV: CHANGELOG (cerebro) · v280
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,16 +89,30 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (23 nov 2026, 00:55)
+### ▶ RETOMAR AQUÍ (23 nov 2026, 01:05)
 - **Hecho y ✅:** REMOTO-1, ATAJOS-1 y CAPÍTULOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Ahora:** VOCABULARIO-1 🧪: `VOCABULARIO.md` entregado como referencia (sin código); falta que Ariel lo revise y diga si está bien. Con su "ya está" pasa a ✅ y a `HISTORIAL`.
+- **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1 y VOCABULARIO-1.
+- **Ahora:** VOCABULARIO-2 🧪: plan abajo; falta el "Dale" de Ariel al plan para generar el parche.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
+
+### VOCABULARIO-2 · 🧪 (solo plan, 23 nov 2026) · Unificar textos de la app
+- **Qué:** solo cambia texto visible, sin tocar lógica. Según `VOCABULARIO.md` (sección 2). Código de `castv-src.zip` (HEAD del 23 nov), ya leído: no hace falta pedir archivos.
+- **Cambios (~35 líneas, 5 archivos):**
+  - `MainActivity.kt`: "En el móvil" → "En el teléfono" (botones y avisos, 5 sitios: 1534, 1561, 1589, 1590, 1619); "Playlist vacía" → "Lista vacía" (1489, 1498); "aparato(s)" → "dispositivo(s)" (3591, 3601); "Borrado: a la papelera/permanente" → "Eliminado: …" (1131); "🗑 Eliminar lista" → "🗑 Quitar lista" (3550); "Vídeo" → "Video" (764).
+  - `M3uActivity.kt`: "móvil" → "teléfono" (769, 799, 815, 816).
+  - `VideoPlayerActivity.kt`: "Bajar y generar" → "Descargar y generar" (1208); "Bajando el modelo…" → "Descargando el modelo…" (1236); "▶ Reanudar" → "▶ Continuar" (512).
+  - `SettingsActivity.kt`: "Vídeo" → "Video" en todas las entradas y en el subtítulo de sección (~17 sitios, mismo cambio en todas para que sigan agrupadas); "en el móvil" → "en el teléfono" (236, 1358); "Borrado: papelera o permanente" → "Eliminado: papelera o permanente" (363).
+  - `res/layout/activity_main.xml`: texto "Vídeo" → "Video" (278).
+- **Fuera de alcance:** los 4 avisos de error con texto técnico (sección 2.4), comentarios del código y nombres internos.
+- **Al preparar el parche:** revisar los avisos vecinos de "Quitar lista" (el aviso al quitar debe decir "quitada", no "eliminada").
+- **Riesgo:** bajo. Lo único delicado es "Vídeo" → "Video" en Ajustes, porque es el nombre que agrupa las entradas: se cambia en todas a la vez.
+- **Cómo probar:** build en verde › Ajustes: aparece la sección "Video" con todas sus entradas › ⋮ › menú de Almacenamiento dice "Eliminado: …" › Listas: la opción dice "Quitar lista" y funciona › enlace con datos móviles: el aviso dice "teléfono" › subtítulos con IA: "Descargando el modelo…" › lo demás igual.
+- **Siguiente paso:** "Dale" de Ariel → `VOCABULARIO-2.patch` (verificado con `git apply --check`; el Kotlin no se compila aquí) y línea B+C.
 
 ### Cola de pendientes (uno a la vez, en este orden)
 1. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
-- ⬜ VOCABULARIO-2 (opcional): parche de textos (Quitar/Eliminar/Borrar, teléfono/móvil, dispositivo, Video, Descargando, Continuar). Solo si Ariel dice "Dale".
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
 - ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
