@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v271
+# CASTV: CHANGELOG (cerebro) · v273
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,24 +89,26 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (22 nov 2026, 9:25)
-- **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). Nada 🧪 pendiente de prueba.
-- **Siguiente:** WIDGET-1 (abajo). Ariel pega la línea A para subir `CastvService.kt`; luego plan 🧪 y "Dale".
+### ▶ RETOMAR AQUÍ (22 nov 2026, 23:55)
+- **Hecho y ✅:** REMOTO-1 y ATAJOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
+- **Ahora:** CAPÍTULOS (abajo): Ariel pega la línea A para subir `VideoPlayerActivity.kt`; la IA verifica y presenta plan 🧪.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### WIDGET-1 · ⬜ · Widget con ⏮ ⏯ ⏭
-- **Qué:** widget de pantalla de inicio con anterior / ▶⏸ / siguiente y el título de lo que suena.
-- **Punto delicado:** hoy `notifReceiver` (que atiende `ACT_PREV/TOGGLE/NEXT`) vive en `MainActivity` (se registra en `onCreate` y se quita en `onDestroy`); con la pantalla cerrada nadie escucharía al widget. Hay que ver `CastvService.kt` para decidir dónde atender los botones.
-- **Siguiente paso:** Ariel pega la línea A (pide `CastvService.kt`); la IA presenta el plan 🧪 y espera el "Dale".
+### CAPÍTULOS · ⬜ · Capítulos de video (verificar primero)
+- **Qué:** ver si es posible mostrar/saltar capítulos de un video (MKV/MP4) sin cambiar de motor. Lo que se sabe: el reproductor es `VideoView`/`MediaPlayer`, que no expone capítulos; `MediaMetadataRetriever` tampoco. Habría que leerlos con código propio (MKV: elemento `Chapters` de Matroska; MP4: átomo `chpl` o pista de texto), mostrar una lista y hacer `seekTo`. Solo para videos locales (no para la TV por DLNA).
+- **Archivos para verificar:** `VideoPlayerActivity.kt` (confirmar el motor y dónde irían botón y lista).
+- **Siguiente paso:** Ariel pega la línea A (pide `VideoPlayerActivity.kt`); la IA confirma el motor y presenta plan 🧪 con veredicto honesto; espera el "Dale". Más adelante, para probar, un video suyo con capítulos (opcional).
 
 ### Cola de pendientes (uno a la vez, en este orden)
-1. WIDGET-1 (arriba) (widget con ⏮ ⏯ ⏭) → 2. CAPÍTULOS (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 3. Vocabulario en español (solo referencia) → 4. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+1. CAPÍTULOS (arriba) (el reproductor es `VideoView`/`MediaPlayer` y no lee capítulos: verificar y decir con honestidad si es posible sin cambiar de motor) → 2. Vocabulario en español (solo referencia) → 3. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
 - ⬜ Etiqueta `git tag v3.0 && git push origin v3.0` (publica `CASTV-v3.0.apk`), si Ariel aún no la puso.
-- ⬜ Ideas: Android Auto / Android TV, widgets (ver WIDGET-1).
+- ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
+- ⬜ Idea grande (sin planear): que la reproducción sobreviva a cerrar la app (mover el reproductor a un servicio); arreglaría notificación y widget.
+- ⬜ Ideas: Android Auto / Android TV.
 
 ### Descartado (⛔)
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
