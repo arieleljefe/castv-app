@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v281
+# CASTV: CHANGELOG (cerebro) · v285
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -89,32 +89,19 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (23 nov 2026, 01:15)
-- **Hecho y ✅:** REMOTO-1, ATAJOS-1 y CAPÍTULOS-1 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
-- **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1 y VOCABULARIO-1.
-- **Ahora:** VOCABULARIO-2 🧪: parche entregado (abajo); falta que Ariel lo suba, espere el build en verde y lo pruebe.
+### ▶ RETOMAR AQUÍ (23 nov 2026, 11:58)
+- **Hecho y ✅:** REMOTO-1, ATAJOS-1, CAPÍTULOS-1, VOCABULARIO-1 y VOCABULARIO-2 (ver `HISTORIAL`). WIDGET-1 queda en pausa (no lo necesita).
+- **Ahora:** nada en prueba. Ariel saltó LOG-1 (23 nov, 11:57). **Sigue LISTA-VAL-1:** la IA pide los archivos con la plantilla A (`M3uActivity.kt`, `M3uParser.kt`, `Store.kt`), lee el código y presenta el plan en 🧪 para el "Dale" de Ariel.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
-### VOCABULARIO-2 · 🧪 (parche `VOCABULARIO-2.patch`, 23 nov 2026) · Unificar textos de la app
-- **Qué:** solo cambia texto visible, sin tocar lógica. Según `VOCABULARIO.md` (sección 2). Código de `castv-src.zip` (HEAD del 23 nov), ya leído: no hace falta pedir archivos.
-- **Cambios (~35 líneas, 5 archivos):**
-  - `MainActivity.kt`: "En el móvil" → "En el teléfono" (botones y avisos, 5 sitios: 1534, 1561, 1589, 1590, 1619); "Playlist vacía" → "Lista vacía" (1489, 1498); "aparato(s)" → "dispositivo(s)" (3591, 3601); "Borrado: a la papelera/permanente" → "Eliminado: …" (1131); "🗑 Eliminar lista" → "🗑 Quitar lista" (3550); "Vídeo" → "Video" (764).
-  - `M3uActivity.kt`: "móvil" → "teléfono" (769, 799, 815, 816).
-  - `VideoPlayerActivity.kt`: "Bajar y generar" → "Descargar y generar" (1208); "Bajando el modelo…" → "Descargando el modelo…" (1236); "▶ Reanudar" → "▶ Continuar" (512).
-  - `SettingsActivity.kt`: "Vídeo" → "Video" en todas las entradas y en el subtítulo de sección (~17 sitios, mismo cambio en todas para que sigan agrupadas); "en el móvil" → "en el teléfono" (236, 1358); "Borrado: papelera o permanente" → "Eliminado: papelera o permanente" (363).
-  - `res/layout/activity_main.xml`: texto "Vídeo" → "Video" (278).
-- **Fuera de alcance:** los 4 avisos de error con texto técnico (sección 2.4), comentarios del código y nombres internos.
-- **Al preparar el parche:** revisar los avisos vecinos de "Quitar lista" (el aviso al quitar debe decir "quitada", no "eliminada").
-- **Riesgo:** bajo. Lo único delicado es "Vídeo" → "Video" en Ajustes, porque es el nombre que agrupa las entradas: se cambia en todas a la vez.
-- **Cómo probar:** build en verde › Ajustes: aparece la sección "Video" con todas sus entradas › ⋮ › menú de Almacenamiento dice "Eliminado: …" › Listas: la opción dice "Quitar lista" y funciona › enlace con datos móviles: el aviso dice "teléfono" › subtítulos con IA: "Descargando el modelo…" › lo demás igual.
-- **Entregado:** 5 archivos, 39 líneas cambiadas (+39/−39). Verificado con `git apply --check` + `git apply` sobre el código real (`castv-src.zip`); las llaves no cambian (el desfase 471/472 en `VideoPlayerActivity.kt` ya existía antes por llaves dentro de textos). El Kotlin no se compiló aquí.
-- **Cambios extra respecto al plan:** el aviso "Lista eliminada" pasa a "Lista quitada" (coherente con "Quitar lista"). Se deja igual el título "Borrado" de la entrada de Ajustes › Almacenamiento (solo cambió su subtítulo y el menú).
-- **Siguiente paso:** build en verde + prueba de Ariel; con el "ya funciona" pasa a ✅ y a `HISTORIAL`. Si falla el build, pasar el mensaje de GitHub Actions.
-
-### Cola de pendientes (uno a la vez, en este orden)
-1. Idioma "Automático" de los subtítulos con IA (PAUSADO hasta el final; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
+### Cola de pendientes (uno a la vez, en este orden; selección de Ariel del 23 nov, tomada de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
+1. **LISTA-VAL-1** ⭐ Validar la lista antes de reemplazar: si la nueva llega vacía o dañada, conservar la anterior (sin plan aún; archivos probables `M3uActivity.kt`, `M3uParser.kt`, `Store.kt`; pedir con plantilla A al empezar).
+2. **RECUP-1** ⭐ Recuperación automática de canales en vivo: reintentos con espera creciente y detector de atascos (sin plan aún; toca `MediaServer.kt`/`/live`; cuidar que no entre en bucle y probar con la TV).
+3. **UPDATE-1** ⭐ Actualizar desde la app (GitHub Releases › descargar APK › instalar). **Antes de planear, verificar** que las APK de GitHub Actions se firmen siempre con la misma clave: si el `assembleDebug` usa una clave debug distinta en cada build, Android rechazará la actualización. Pide el permiso de instalar apps; subir `versionName` a 3.1; comprobar hash y paquete del APK antes de instalar.
+4. Al final: idioma "Automático" de los subtítulos con IA (PAUSADO; pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 
 ### Pendientes sueltos
+- ⬜ Ideas de referencia NO elegidas (23 nov; con su contra): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · ATOMIC-1 guardado seguro de ajustes/favoritos (toca `Store.kt`) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · TESTS-1 pruebas automáticas en GitHub Actions · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
 - ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
@@ -125,6 +112,7 @@ rm -f ~/storage/downloads/*_actual.*
 
 ### Descartado (⛔)
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
+LOG-1 (ocultar claves en el `/log`): Ariel lo salta el 23 nov porque no comparte el log. Idea: `redact()` en `DebugLog.kt` que cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …` (no cubre claves en la ruta del enlace). Se retoma solo si Ariel empieza a compartir el log.
 
 ---
 

@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v281
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v285
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -35,6 +35,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 
 ## Interfaz y Ajustes
 - VOCABULARIO-1 · 23 nov · lista de referencia de términos y diferencias de texto de la app, sin cambiar código · `VOCABULARIO.md`.
+- VOCABULARIO-2 · 23 nov · textos unificados: teléfono (no "móvil"), dispositivo, Video, Quitar lista, Eliminado, Descargando, Continuar · `MainActivity.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `SettingsActivity.kt`, `activity_main.xml`.
 - UI-1/UI-1b · 18 nov · pestaña Más y pantalla Ajustes · `SettingsActivity.kt`.
 - UI-5 · 18 nov · Canales en la barra inferior, Carpetas en Más.
 - AJUSTES-2a/2b/2c, AJUSTES-3 · 19 nov · buscador, subpáginas, registro, TV/historial · `SettingsActivity.kt`.
