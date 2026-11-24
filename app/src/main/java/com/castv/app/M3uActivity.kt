@@ -901,6 +901,7 @@ class M3uActivity : AppCompatActivity() {
         val g = groupFilter
         val mood = moodFilter   // [ESTILO-3]
         val out = ArrayList<M3uChannel>()
+        val byProg = toks.isNotEmpty() && Epg.enabled(this)   // [EPG-BUSCAR-1] también se busca en el programa de ahora
         // [FAV-1] con ★ Favs activo la base son los favoritos de TODAS las listas
         val base = if (favOnly) favChannels else channels
         val baseNames = if (favOnly) favNorm else normNames
@@ -911,6 +912,13 @@ class M3uActivity : AppCompatActivity() {
             if (!favOnly && mood >= 0 && (moodMask(c.group) and (1 shl mood)) == 0) continue   // [ESTILO-3]
             val n = baseNames[i]
             if (toks.all { n.contains(it) }) out.add(c)
+            else if (byProg) {   // [EPG-BUSCAR-1]
+                val pt = Epg.nowTitle(c)
+                if (pt != null) {
+                    val pn = norm(pt)
+                    if (toks.all { pn.contains(it) }) out.add(c)
+                }
+            }
         }
         // Favoritos primero (el orden es estable: el resto conserva su orden)
         shown = if (favs.isEmpty()) out else out.sortedByDescending { favs.contains(it.url) }
