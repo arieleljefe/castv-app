@@ -98,6 +98,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvFilter: TextView
     private lateinit var tvEmpty: TextView
     private lateinit var tvEmptyAction: TextView   // [VACIO-1]
+    private lateinit var tvSearchChannels: TextView   // [BUSCA-1]
     private lateinit var btnPlay: ImageButton
     private lateinit var fab: View
     private lateinit var footerView: View
@@ -403,6 +404,8 @@ class MainActivity : AppCompatActivity() {
         tvFilter = findViewById(R.id.tvFilter)
         tvEmpty = findViewById(R.id.tvEmpty)
         tvEmptyAction = findViewById(R.id.tvEmptyAction)   // [VACIO-1]
+        tvSearchChannels = findViewById(R.id.tvSearchChannels)   // [BUSCA-1]
+        tvSearchChannels.setOnClickListener { openChannelsSearch() }
         btnPlay = findViewById(R.id.btnPlay)
         fab = findViewById(R.id.fabShuffle)
 
@@ -476,6 +479,8 @@ class MainActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {
                 query = s?.toString()?.trim() ?: ""
                 btnClearSearch.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
+                tvSearchChannels.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE   // [BUSCA-1]
+                tvSearchChannels.text = "📡 Buscar «$query» en Canales ›"
                 applyFilters()
             }
         })

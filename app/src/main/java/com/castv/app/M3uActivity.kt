@@ -284,6 +284,7 @@ class M3uActivity : AppCompatActivity() {
         val saved = Store.m3uLists()
         val last = Store.lastM3u
         val start = saved.firstOrNull { it.url == last } ?: saved.firstOrNull()
+        intent.getStringExtra("q")?.takeIf { it.isNotBlank() }?.let { searchBox.setText(it) }   // [BUSCA-1] viene del buscador de la pantalla principal
         if (start != null) {
             loadList(start)
         } else {
