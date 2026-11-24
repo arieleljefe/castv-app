@@ -122,6 +122,18 @@ class M3uActivity : AppCompatActivity() {
         return tv.data
     }
 
+    /** [ICONOS-2] Pone «icono + texto» en un botón (el icono va dentro del texto, así se centra con él). [tint] por defecto = color del texto. */
+    private fun iconLabel(btn: TextView, res: Int, label: String, tint: Int = btn.currentTextColor) {
+        val d = ContextCompat.getDrawable(this, res)?.mutate()
+        if (d == null) { btn.text = label; return }
+        d.setTint(tint)
+        val s = (btn.textSize * 1.2f).toInt()
+        d.setBounds(0, 0, s, s)
+        val sp = android.text.SpannableString("\u00A0 $label")
+        sp.setSpan(android.text.style.ImageSpan(d, android.text.style.ImageSpan.ALIGN_BASELINE), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        btn.text = sp
+    }
+
     /** [ICONOS-1] Botón con icono vectorial del mismo color del texto (alternativa a un emoji). */
     private fun iconBtn(res: Int, desc: String, onClick: () -> Unit): ImageView = ImageView(this).apply {
         setImageResource(res)
@@ -221,6 +233,9 @@ class M3uActivity : AppCompatActivity() {
             row1.addView(b)
         }
         (favBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0
+        iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
+        iconLabel(addBtn, R.drawable.ic_add, "Lista")
+        iconLabel(delBtn, R.drawable.ic_delete, "Quitar")
         updateHiddenBtn()
         root.addView(row1)
 
@@ -268,6 +283,7 @@ class M3uActivity : AppCompatActivity() {
         checkBtn = chip("🔎 Revisar") { onCheckClick() }
         checkBtn.textSize = 13f
         checkBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        iconLabel(checkBtn, R.drawable.ic_search, "Revisar")   // [ICONOS-2]
         failBtn = chip("⚠") { showFailedDialog() }   // [FUENTES-1]
         failBtn.contentDescription = "Canales que fallan"
         failBtn.textSize = 13f
@@ -277,6 +293,7 @@ class M3uActivity : AppCompatActivity() {
         guideBtn.contentDescription = "Guía de programación"
         guideBtn.textSize = 13f
         guideBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        iconLabel(guideBtn, R.drawable.ic_event, "Guía")   // [ICONOS-2]
         guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE
         statusRow.addView(guideBtn)
         statusRow.addView(failBtn)
@@ -1227,7 +1244,7 @@ class M3uActivity : AppCompatActivity() {
 
     private fun updateHiddenBtn() {
         val n = hidden.size
-        hiddenBtn.text = "👁 $n"
+        iconLabel(hiddenBtn, R.drawable.ic_visibility, "$n")   // [ICONOS-2]
         hiddenBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 
@@ -1304,7 +1321,7 @@ class M3uActivity : AppCompatActivity() {
     private fun updateFailBtn() {
         if (!::failBtn.isInitialized) return
         val n = failedNow().size
-        failBtn.text = if (n == 1) "⚠ 1 falla" else "⚠ $n fallan"   // [CANALES-1]
+        iconLabel(failBtn, R.drawable.ic_warning, if (n == 1) "1 falla" else "$n fallan")   // [CANALES-1] [ICONOS-2]
         failBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 
@@ -1372,7 +1389,7 @@ class M3uActivity : AppCompatActivity() {
         val oks = java.util.concurrent.ConcurrentLinkedQueue<String>()   // [FUENTES-1]
         val pool = Executors.newFixedThreadPool(8)
         checkPool = pool
-        checkBtn.text = "⏹ 0/$total"
+        iconLabel(checkBtn, R.drawable.ic_stop, "0/$total")   // [ICONOS-2]
         statusView.text = "🔎 Revisando $total canales…"
         val listName = listBtn.text.toString()
         for (c in list) {
@@ -1388,7 +1405,7 @@ class M3uActivity : AppCompatActivity() {
                 } else if (n % 5 == 0) {
                     runOnUiThread {
                         if (!isFinishing && gen == checkGen) {
-                            checkBtn.text = "⏹ $n/$total"
+                            iconLabel(checkBtn, R.drawable.ic_stop, "$n/$total")
                             statusView.text = "🔎 Revisando… $n de $total · ${fails.size} sin respuesta"
                         }
                     }
@@ -1404,7 +1421,7 @@ class M3uActivity : AppCompatActivity() {
         checkPool?.shutdownNow()
         checkPool = null
         checking = false
-        checkBtn.text = "🔎 Revisar"
+        iconLabel(checkBtn, R.drawable.ic_search, "Revisar")
         if (msg != null) {
             toast(msg)
             applyFilter()
@@ -1414,7 +1431,7 @@ class M3uActivity : AppCompatActivity() {
     private fun finishCheck(total: Int, fails: List<CheckFail>, listName: String) {
         checkPool = null
         checking = false
-        checkBtn.text = "🔎 Revisar"
+        iconLabel(checkBtn, R.drawable.ic_search, "Revisar")
         DebugLog.add("CHECK-1: $listName: $total revisados, ${fails.size} sin respuesta")
         failed = Store.failedChannels()   // [FUENTES-1]
         applyFilter()
@@ -1483,7 +1500,7 @@ class M3uActivity : AppCompatActivity() {
 
     private fun toggleFavOnly() {
         favOnly = !favOnly
-        favBtn.text = if (favOnly) "★ Favs" else "☆ Favs"
+        if (favOnly) iconLabel(favBtn, R.drawable.ic_star, "Favs", accent()) else iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         if (favOnly) reloadFavChannels()   // [FAV-1]
         applyFilter()
     }
