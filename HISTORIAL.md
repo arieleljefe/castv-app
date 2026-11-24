@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v391
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v393
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -127,3 +127,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ICONOS-2 · 24 nov · los botones de Canales (Favs, Lista, Quitar, ocultos, Guía, fallan, Revisar) usan iconos vectoriales dentro del texto · `M3uActivity.kt`, 7 drawables `ic_*`
 - ICONOS-3/4/5 · 24 nov · los menús del reproductor de video (⋯, Herramientas, Subtítulos y Estilo del subtítulo) usan iconos vectoriales dentro del texto, del color del texto del diálogo; `CastvIcons.item(ctx, res, texto)` y 23 drawables `ic_vp_*` (Material Icons, Apache 2.0); los índices `which` no cambian; avisos, HUD y títulos con emoji no se tocaron · `CastvUtils.kt`, `VideoPlayerActivity.kt`, `res/drawable/ic_vp_*.xml`
 - ICONOS-6/7/8 · 24 nov · más menús con iconos vectoriales (`CastvIcons.item`): selector «Al TV / En el teléfono» al tocar un canal, acciones de un enlace del Historial (Al TV, En el teléfono, favorito, quitar) y lista de Marcadores con sus acciones (Saltar aquí, Borrar marcador); drawables `ic_vp_tv`, `ic_vp_phone`, `ic_vp_star`, `ic_vp_star_border`, `ic_vp_delete`, `ic_vp_play`, `ic_vp_add`; botones de diálogo, avisos y HUD siguen con emoji · `M3uActivity.kt`, `MainActivity.kt`, `VideoPlayerActivity.kt`
+- ICONOS-9 · 24 nov · los submenús de `MainActivity` pasan a iconos vectoriales (`CastvIcons.item`): Respaldo (Exportar, Importar, Compartir…, Restaurar copia), Compartir (completo, historial, favoritos), preset de ecualizador (Usar, Editar, Eliminar) y lista (Abrir, Quitar lista); 8 drawables `ic_mn_*` (Material Icons, Apache 2.0) · `MainActivity.kt`
