@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v404
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v406
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -133,3 +133,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - BORRAR-1 · 24 nov · «Borrar» pasa a «Eliminar» en «Eliminar historial», el menú «Eliminar» de selección, los diálogos de Ajustes (historial de enlaces, puntos de reanudación, modelo de voz) y «Eliminar marcador»; «Borrar datos» de Ajustes se queda (texto de Android) · `MainActivity.kt`, `VideoPlayerActivity.kt`, `SettingsActivity.kt`
 - TAG-3.10 · 24 nov · etiqueta `v3.10` publicada e instalada desde Ajustes › Actualizaciones (ICONOS-1 a 10, BORRAR-1, WIDGET-1); Release `CASTV-v3.10.apk` · `build.yml`
 - EPG-DEFECTO-1 · 24 nov · la guía de programación viene encendida por defecto en instalaciones nuevas (si ya estaba guardada en Ajustes › Video, se respeta) · `Epg.kt`, `SettingsActivity.kt`
+- SINPANTALLA-1 · 24 nov · con la música sonando sin pantalla, `PlayerCore` pone el ecualizador (preset del sistema o propio) y los graves leídos de las preferencias `castv` (`eqPreset`, `bassOn`, `eq_user_on`, `eq_user`) y reaplica la velocidad en cada pista y al reanudar; al reabrir la app se recoge la velocidad (`Snapshot.speed`) · `PlayerCore.kt`, `MainActivity.kt`
