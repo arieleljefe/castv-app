@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v359
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v361
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -100,3 +100,5 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - EPG-1b · 24 nov · con una cabecera de más de 3 guías (Free-TV), se eligen las guías de los países de los `tvg-id` de los canales (hasta 3 países con 3+ canales, 2 guías por país, 6 descargas); sin coincidencia, las 3 primeras; `/log` anota «EPG: guías elegidas»; `epgUrls(text, limit)` · `Epg.kt`, `M3uParser.kt`, `EpgPickTest.kt`
 - QR-2a · 24 nov · enviar la lista abierta a otro móvil por QR: ＋ Lista › «📤 Enviar esta lista a otro móvil» abre un recuadro con QR y `http://<IP>:<puerto>/send/<clave>` (24 caracteres, un solo uso; se cierra a los 5 min, al entregar, al cerrar, al salir de Canales o tras 5 claves malas); el otro móvil pulsa «Recibir lista» y ve nombre y enlace con «Copiar enlace»; solo red local; no se envían listas Xtream ni enlaces con usuario y clave; la clave no sale en `/log` · `Qr.kt` (`QrSend`), `MediaServer.kt`, `M3uActivity.kt`, `QrSendTest.kt`
 - QR-2b · 24 nov · enviar el respaldo a otro móvil por QR: Ajustes › Respaldo › «Enviar respaldo a otro móvil» (confirmación previa), QR con `http://<IP>:<puerto>/send/<clave>`; el otro móvil baja `castv-respaldo.json` con «Descargar respaldo» (se arma al bajarlo con `Backup.build`: sin claves Xtream, IP del TV ni PIN); un solo uso, 5 min, solo red local, sin clave en `/log`; `QrSend` entrega listas o respaldos, cada puerta rechaza lo del otro tipo · `Qr.kt`, `MediaServer.kt`, `SettingsActivity.kt`, `QrSendTest.kt`
+- TAG-3.9 · 24 nov · etiqueta `v3.9` publicada e instalada desde Ajustes › Actualizaciones (EPG-1, XTREAM-1, QR-1, EPG-1b, QR-2a, QR-2b); Release `CASTV-v3.9.apk` · `build.yml`
+- TV-INFO-1 · 24 nov · datos de la TV tomados de su pantalla «Acerca de»: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711`; sirve para COMPAT-TV-1 · `CHANGELOG.md`
