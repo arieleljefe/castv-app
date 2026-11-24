@@ -68,6 +68,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var subText: TextView
     private lateinit var topBar: LinearLayout
     private lateinit var titleView: TextView
+    private lateinit var favChip: TextView   // [FAV-REPRO-1] ★ del canal que se está viendo
     // [UI-2b] barra de control propia (reemplaza al MediaController del sistema)
     private lateinit var bottomBar: LinearLayout
     private lateinit var seek: SeekBar
@@ -288,6 +289,9 @@ class VideoPlayerActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        favChip = chip("☆") { toggleChannelFav() }   // [FAV-REPRO-1]
+        favChip.visibility = View.GONE
+        topBar.addView(favChip)
         topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
         topBar.addView(chip("🔒") { lock() })     // [UI-2a]
         topBar.addView(chip("🖼") { cycleSize() })   // [UI-2c]
@@ -1044,6 +1048,28 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** Canales de la lista desde la que se abrió este canal (vacía si es un video o un enlace suelto). */
     private var zapList: List<M3uChannel> = emptyList()
 
+    // ------------------------------------------------------------ [FAV-REPRO-1] ★ en el reproductor
+
+    /** El canal de lista que se está viendo (null si es un video o un enlace suelto). */
+    private fun currentChannel(): M3uChannel? = if (zapList.isNotEmpty()) zapList.getOrNull(index) else null
+
+    /** Muestra la ★ solo con canales de lista; llena si ya es favorito. */
+    private fun refreshFavChip() {
+        if (!::favChip.isInitialized) return
+        val c = currentChannel()
+        if (c == null) { favChip.visibility = View.GONE; return }
+        favChip.visibility = View.VISIBLE
+        favChip.text = if (Store.chFavs().contains(c.url)) "★" else "☆"
+    }
+
+    private fun toggleChannelFav() {
+        val c = currentChannel() ?: return
+        val on = Store.toggleChFav(c.url)
+        if (on) Store.rememberChFav(c) else Store.forgetChFav(c.url)   // igual que en la lista de canales
+        refreshFavChip()
+        toast(if (on) "★ En Favoritos: " + c.name else "☆ Quitado de Favoritos")
+    }
+
     /** ⏮ ⏭: con una lista de canales pasan al vecino (dando la vuelta); con videos normales, como siempre. */
     private fun stepOrZap(delta: Int) {
         if (zapList.size < 2) { playAt(index + delta); return }
@@ -1067,6 +1093,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         shownCue = null
         subText.visibility = View.GONE
         titleView.text = it.name.substringBeforeLast('.')
+        refreshFavChip()   // [FAV-REPRO-1]
         mpRef = null   // [GESTO-2]
         fastOn = false
         curSpeed = 1f   // [SPEED-1]

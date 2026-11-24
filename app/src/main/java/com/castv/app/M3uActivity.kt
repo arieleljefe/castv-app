@@ -644,6 +644,8 @@ class M3uActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        favs = Store.chFavs()   // [FAV-REPRO-1] la ★ pudo cambiar en el reproductor
+        if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else chAdapter.notifyDataSetChanged() }
         refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
     }
 
