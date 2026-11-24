@@ -1331,7 +1331,7 @@ class M3uActivity : AppCompatActivity() {
 
     private fun openChannel(c: M3uChannel) {
         val labels = arrayOf(
-            if (isHls(c.url)) "📺 Al TV (HLS: puede no funcionar)" else "📺 Al TV",
+            "📺 Al TV",   // [HLS-TEXTO-1] los canales HLS ya van bien al TV
             "📱 En el teléfono")
         AlertDialog.Builder(this)
             .setTitle(c.name)
