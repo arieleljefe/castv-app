@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v327
+# CASTV: CHANGELOG (cerebro) · v328
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -111,12 +111,18 @@ rm -f ~/storage/downloads/*_actual.*
 - **TAG-3.5 ✅ (23 nov):** `v3.5` publicada y firmada; el actualizador de la app funciona de nuevo. Línea en `HISTORIAL`.
 - **SERVICIO-1a ✅ (23 nov):** Ariel: «Ya funciona». `PlayerCore.kt` nuevo guarda el `MediaPlayer` del teléfono y su estado; `MainActivity` los lee de ahí. Línea en `HISTORIAL`.
 - **SERVICIO-1b ✅ (23 nov):** Ariel: «Ya todo funciona bien». La música del teléfono sigue sonando si Android cierra `MainActivity` («modo sin pantalla» en `PlayerCore`: avanza sola, cola/repetir/temporizador, notificación ⏮ ⏯ ⏭; al reabrir la app se recoge con `adoptHeadless()`). Límites: sin pantalla no hay ecualizador ni velocidad hasta reabrir. Línea en `HISTORIAL`. **Propuesta:** etiqueta `v3.6` (cambio grande, R12).
-- **Ahora en 🧪:** nada.
+- **Ahora en 🧪: LOG-1 (ocultar claves en el `/log`; PLAN, esperando «Dale» de Ariel).** Se retoma (24 nov, a elección de la IA con carta blanca) porque COMPAT-TV-1 exige que Ariel pase el `/log` de la TV del amigo, y el log guarda enlaces de canales (`ZAP: <url> -> <enlace al TV>`, `/live`, `/relay`) que pueden traer token, usuario y clave. Archivo a ver: `DebugLog.kt` (más `MediaServer.kt` solo si el `/log` no lee de ahí).
+  - **Qué:** `redact()` en `DebugLog.kt`, aplicada al GUARDAR cada línea (así el `/log`, el visor de Ajustes y lo que se copie salen ya limpios). Cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `password`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …`, también cuando el enlace va codificado dentro de otro (`token%3Dabc`, caso de `TvSend.liveUrl/relayUrl`).
+  - **Qué NO cubre:** claves que vayan en la ruta del enlace (`/abc123/stream.m3u8`). IPs, nombres de canal, puertos y errores quedan igual para poder diagnosticar.
+  - **Archivos:** `DebugLog.kt`. Nada más salvo que haga falta.
+  - **Riesgos:** (a) sin compilador de Kotlin (R4); (b) un valor que no sea secreto pero se llame `key` o `user` se verá como `[OCULTO]` (no afecta al diagnóstico de red); (c) lo ya guardado antes de la actualización no se limpia (el log vive en memoria: se limpia con `?clear` o al reiniciar la app).
+  - **Cómo probar:** 1) mandar un canal cuyo enlace tenga `?token=…` (o usar `http://192.168.100.43:8001/log` después de abrir cualquier canal con parámetros); 2) en `/log` ver `token=[OCULTO]` y lo mismo en la versión codificada; 3) un enlace con `usuario:clave@` sale como `[OCULTO]@`; 4) el resto de líneas (IP del TV, puertos, errores) sigue legible; 5) `?clear` sigue limpiando.
+  - **Siguiente paso:** Ariel dice «Dale» → se entrega `LOG-1.patch` (línea B+C). Sin etiqueta propia (R12).
 - **Propuesta aún sin etiquetar:** `v3.6` (SERVICIO-1b + AUTORESPALDO-1; R12).
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-(vacía: Ariel elige de «Pendientes sueltos» o pide algo nuevo)
+1. **LOG-1** (plan en 🧪, esperando «Dale»; prepara el `/log` para la visita a la TV del amigo). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo.
 
 ### Pendientes sueltos
 - ⬜ Ideas de referencia NO elegidas (23 nov; con su contra): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · ATOMIC-1 guardado seguro de ajustes/favoritos (toca `Store.kt`) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · TESTS-1 pruebas automáticas en GitHub Actions · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
@@ -132,7 +138,7 @@ rm -f ~/storage/downloads/*_actual.*
 Subtítulos con IA (Whisper), idioma «Automático» y mejoras: **CERRADO por Ariel (23 nov)**; no tocar ni proponer. Si algún día quiere mejorarlo, él avisa (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 `Platzi-Download` y `Youtube_Downloader` (23 nov): no aportan a castv y descargan contenido de terceros; no se toman ideas de ellos.
 Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
-LOG-1 (ocultar claves en el `/log`): Ariel lo salta el 23 nov porque no comparte el log. Idea: `redact()` en `DebugLog.kt` que cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …` (no cubre claves en la ruta del enlace). Se retoma solo si Ariel empieza a compartir el log.
+LOG-1 (ocultar claves en el `/log`): Ariel lo saltó el 23 nov porque no compartía el log; **retomado el 24 nov (ver 🧪)** porque COMPAT-TV-1 lo exige. Idea: `redact()` en `DebugLog.kt` que cambia por `[OCULTO]` el valor de `token`, `key`, `pass`, `secret`, `auth`, `sig`, `session`, `user`, `usuario:clave@` y `Bearer …` (no cubre claves en la ruta del enlace). Se retoma solo si Ariel empieza a compartir el log.
 
 ---
 
