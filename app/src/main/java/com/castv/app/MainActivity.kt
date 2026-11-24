@@ -897,11 +897,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun nameKey(m: MediaItem): String = nameKeyCache.getOrPut(m.id) { norm(m.name) }
 
-    /** Mismo título (sin extensión ni etiquetas tipo "(MP3_160K)") y duración casi igual
-     *  (±2 s) = copia del mismo archivo. Se conserva la más antigua. */
+    // [DUP-1] sufijos de copia al final del nombre: "_1" o " (1)"
+    private val dupSuffixRe = Regex("(_\\d{1,2}|\\s\\(\\d{1,2}\\))$")
+
+    private fun dupKey(name: String): String =
+        norm(prettyTitle(name).replace(dupSuffixRe, "").trimEnd('_', '-', ' '))
+
+    /** Mismo título (sin extensión, etiquetas tipo "(MP3_160K)" ni sufijo de copia "_1" / " (1)")
+     *  y duración casi igual (±2 s) = copia del mismo archivo. Se conserva la más antigua. */
     private fun computeDups(items: List<MediaItem>): Set<Long> {
         val d = HashSet<Long>()
-        for (g in items.groupBy { norm(prettyTitle(it.name)) }.values) {
+        for (g in items.groupBy { dupKey(it.name) }.values) {
             if (g.size < 2) continue
             val sorted = g.sortedBy { it.durationSec }
             var start = 0
