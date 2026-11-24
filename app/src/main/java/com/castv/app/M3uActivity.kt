@@ -652,11 +652,11 @@ class M3uActivity : AppCompatActivity() {
         t.textSize = 14f
         t.setTypeface(null, android.graphics.Typeface.BOLD)
         t.setTextColor(txtColor)
-        t.setPadding(dp(4), dp(10), dp(4), dp(4))
+        t.setPadding(dp(4), dp(6), dp(4), dp(2))   // [VISTA-2]
         sections.addView(t)
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
-        for (c in list) row.addView(card(c), LinearLayout.LayoutParams(dp(84), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
+        for (c in list) row.addView(card(c), LinearLayout.LayoutParams(dp(96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
         val scroll = HorizontalScrollView(this)
         scroll.isHorizontalScrollBarEnabled = false
         scroll.addView(row)
@@ -668,7 +668,7 @@ class M3uActivity : AppCompatActivity() {
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
         box.gravity = Gravity.CENTER_HORIZONTAL
-        box.setPadding(dp(4), dp(6), dp(4), dp(6))
+        box.setPadding(dp(4), dp(4), dp(4), dp(4))   // [VISTA-2]
         val logo = ImageView(this)
         logo.scaleType = ImageView.ScaleType.FIT_CENTER
         Logos.load(logo, c.logo)
@@ -679,11 +679,11 @@ class M3uActivity : AppCompatActivity() {
             logo.clearColorFilter()
         }
         styleLogo(logo, c.logo.isNotEmpty())   // [VISTA-1]
-        box.addView(logo, LinearLayout.LayoutParams(dp(56), dp(40)))
+        box.addView(logo, LinearLayout.LayoutParams(dp(64), dp(36)))   // [VISTA-2]
         val name = TextView(this)
         name.text = splitName(c.name).first
         name.setTextColor(txtColor)
-        name.textSize = 12f
+        name.textSize = 11f   // [VISTA-2] tarjeta más ancha y letra algo menor: caben más nombres completos
         name.gravity = Gravity.CENTER_HORIZONTAL
         name.maxLines = 2
         name.ellipsize = TextUtils.TruncateAt.END
