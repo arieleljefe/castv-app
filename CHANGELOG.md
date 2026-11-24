@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v330
+# CASTV: CHANGELOG (cerebro) · v331
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -18,7 +18,7 @@ Estados: ✅ confirmado por Ariel · 🧪 entregado/pendiente de probar · ⏳ e
 | Código Kotlin | `app/src/main/java/com/castv/app/` |
 | Layouts / drawables / values | `app/src/main/res/layout/`, `res/drawable/`, `res/values/` |
 | Manifest / Gradle | `app/src/main/AndroidManifest.xml`, `app/build.gradle` |
-| Workflow | `.github/workflows/build.yml` (compila `assembleDebug`; etiqueta `v*` publica APK) |
+| Workflow | `.github/workflows/build.yml` (compila `assembleRelease` firmado; etiqueta `v*` publica APK; paso de pruebas TESTS-1 antes de compilar) |
 | **Carpeta de intercambio (Download del móvil)** | `~/storage/downloads/` |
 | Teléfono | Android + Termux · IP `192.168.100.43` (DHCP; si falla, revisar Ajustes › Wi-Fi) |
 | App | puerto `8001` · log: `http://192.168.100.43:8001/log` (`?clear` para limpiar) |
@@ -111,15 +111,22 @@ rm -f ~/storage/downloads/*_actual.*
 - **TAG-3.5 ✅ (23 nov):** `v3.5` publicada y firmada; el actualizador de la app funciona de nuevo. Línea en `HISTORIAL`.
 - **SERVICIO-1a ✅ (23 nov):** Ariel: «Ya funciona». `PlayerCore.kt` nuevo guarda el `MediaPlayer` del teléfono y su estado; `MainActivity` los lee de ahí. Línea en `HISTORIAL`.
 - **SERVICIO-1b ✅ (23 nov):** Ariel: «Ya todo funciona bien». La música del teléfono sigue sonando si Android cierra `MainActivity` («modo sin pantalla» en `PlayerCore`: avanza sola, cola/repetir/temporizador, notificación ⏮ ⏯ ⏭; al reabrir la app se recoge con `adoptHeadless()`). Límites: sin pantalla no hay ecualizador ni velocidad hasta reabrir. Línea en `HISTORIAL`. **Propuesta:** etiqueta `v3.6` (cambio grande, R12).
-- **Ahora en 🧪:** nada. Siguiente: probar la TV del amigo y pasar el `/log` (COMPAT-TV-1), o que Ariel elija de «Pendientes sueltos».
+- **Ahora en 🧪: ATOMIC-1 y TESTS-1 (entregados 23 nov; Ariel dijo «vamos por todas»: v3.6 › ATOMIC-1 › TESTS-1). Pendientes de probar.**
+  - **ATOMIC-1 · `Store.kt`:** (1) los métodos que leen y luego escriben (favoritos, historial de enlaces, listas M3U, canales favoritos/ocultos/recientes, listas de reproducción, marcadores) ahora son `@Synchronized`, para que dos hilos no se pisen ni den `ConcurrentModificationException`; (2) si un dato guardado (`links`, `m3u`, `chfav`, `chfavmeta`, `chrecent`, `chhidden`, `lists`, `bm|…`) no se puede leer, se guarda una copia del texto original en el archivo de preferencias `castv_bad` (fuera del respaldo) y una línea `STORE: no pude leer …` en el `/log`, antes de que una escritura posterior lo pise. Sin cambio visible. Límite: no hay pantalla para recuperar esa copia todavía; solo existe como seguro (si hiciera falta, se lee a mano o se añade luego). Android ya escribe las preferencias de forma atómica; esto cubre carreras entre hilos y JSON dañado, no cortes de luz.
+  - **ATOMIC-1 cómo probar:** instalar y usar la app normal: ⭐ favoritos, historial de enlaces, listas M3U, ocultar/restaurar canales, listas de reproducción, marcadores, respaldo/restaurar; todo debe comportarse igual. No hay forma sencilla de forzar el JSON dañado: basta con que nada se rompa.
+  - **TESTS-1 · `app/src/test/…`, `app/build.gradle`, `build.yml`:** pruebas automáticas (JUnit) de `DebugLog.redact` (7 casos) y `M3uParser.parse` (7 casos). Se corren en GitHub Actions en un paso nuevo «Pruebas automaticas (TESTS-1)» antes de compilar. Va con `continue-on-error: true` a propósito: si una prueba falla (o el paso tarda/da error) se ve el aviso pero el APK se sigue construyendo. Tras un par de corridas en verde, quitar esa línea para que las pruebas bloqueen el build.
+  - **TESTS-1 cómo probar:** subir y mirar en GitHub Actions el paso «Pruebas automaticas (TESTS-1)»: verde = OK. Si sale rojo, pasar el mensaje (puede ser una expectativa mal escrita por mí, ya que aquí no hay compilador de Kotlin, R4).
+  - **Riesgos:** (a) sin compilador de Kotlin (R4); (b) el paso de pruebas compila la variante debug y suma tiempo al build; (c) `@Synchronized` no debería causar bloqueos (Store no llama a nada que a su vez llame a Store con otro candado).
+  - **Archivos:** `Store.kt` (ATOMIC-1.patch); `DebugLogRedactTest.kt`, `M3uParserTest.kt`, `build.gradle`, `build.yml` (TESTS-1.patch).
+  - **Siguiente paso:** Ariel prueba y dice «ya funciona» (build en verde + uso normal) → cada uno pasa a ✅ y a `HISTORIAL`. Sin etiqueta propia (R12).
 - **Propuesta aún sin etiquetar:** `v3.6` (SERVICIO-1b + AUTORESPALDO-1; R12).
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-Cola vacía: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera el `/log` de la TV del amigo (ya sale sin claves, LOG-1 ✅).
+1. **ATOMIC-1** (🧪, pendiente de probar). 2. **TESTS-1** (🧪, pendiente de probar). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
 
 ### Pendientes sueltos
-- ⬜ Ideas de referencia NO elegidas (23 nov; con su contra): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · ATOMIC-1 guardado seguro de ajustes/favoritos (toca `Store.kt`) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · TESTS-1 pruebas automáticas en GitHub Actions · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
+- ⬜ Ideas de referencia NO elegidas (23 nov; con su contra; ATOMIC-1 y TESTS-1 ya se eligieron, ver 🧪): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅; el `/log` ya oculta claves con LOG-1 ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
 - ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
