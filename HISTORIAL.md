@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v367
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v369
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -104,3 +104,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TV-INFO-1 · 24 nov · datos de la TV tomados de su pantalla «Acerca de»: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711`; sirve para COMPAT-TV-1 · `CHANGELOG.md`
 - IP-1 · 24 nov · comprobado: la app detecta sola la IP del teléfono y la del TV (Ajustes › Emisión al TV); la IP del teléfono cambia (DHCP, MAC aleatoria), por eso el changelog ya no la fija · `CHANGELOG.md`
 - DUP-1 · 24 nov · «Duplicados» detecta también copias con sufijo `_1`…`_99` o ` (1)`…` (99)` en el nombre (misma duración ±2 s; conserva la más antigua; no borra nada) · `MainActivity.kt` (`dupKey`, `dupSuffixRe`, `computeDups`)
+- HLS-TEXTO-1 · 24 nov · el selector de un canal HLS dice solo «📺 Al TV» (sin «puede no funcionar»); AVISO-HLS-2 sigue igual · `M3uActivity.kt`
+- VOCAB-3 · 24 nov · «móvil» → «teléfono» en lo visible (enviar lista/respaldo por QR, páginas que abre el otro dispositivo, mensajes de Xtream) y «Borrado» → «Eliminado» en Ajustes › Almacenamiento; «Datos móviles» se queda · `M3uActivity.kt`, `SettingsActivity.kt`, `Qr.kt`
+- ARTISTA-1 · 24 nov · un artista o álbum que solo trae «?» cuenta como «sin dato» y ya no sale en «Filtrar por artista» · `MediaScanner.kt` (`cleanArtist`)
+- ALMAC-1 · 24 nov · revisado en el código: `toggleTrash()` guarda, avisa y repinta; el desajuste del video era por dos toques seguidos, no un fallo · sin cambios
