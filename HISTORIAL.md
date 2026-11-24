@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v398
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v399
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -130,3 +130,5 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ICONOS-9 · 24 nov · los submenús de `MainActivity` pasan a iconos vectoriales (`CastvIcons.item`): Respaldo (Exportar, Importar, Compartir…, Restaurar copia), Compartir (completo, historial, favoritos), preset de ecualizador (Usar, Editar, Eliminar) y lista (Abrir, Quitar lista); 8 drawables `ic_mn_*` (Material Icons, Apache 2.0) · `MainActivity.kt`
 - ICONOS-10 · 24 nov · más menús de `MainActivity` con iconos vectoriales: menú ⋮ de una fila (a la cola, a continuación, favorito, a lista, quitar, eliminar, olvidar punto, visto), «Continuar desde… / Desde el inicio», «Mis listas», «Nueva lista…» y «Mis presets»; 7 drawables `ic_mn_*`; Ajustes no llevaba emoji en sus menús · `MainActivity.kt`
 - WIDGET-1 · 24 nov · widget de inicio «CASTV» (título, estado y ⏮ ⏯ ⏭; tocar el título abre la app); botones con `ACT_PREV/TOGGLE/NEXT` como la notificación, solo con la app viva; `MainActivity` lo actualiza en `refreshNotification`, `refreshLinkNotification`, `postDefaultNotification` y `onDestroy` · `CastvWidget.kt`, `widget_castv.xml`, `widget_castv_info.xml`, 5 drawables `wdg_*`, `AndroidManifest.xml`, `MainActivity.kt`
+- BORRAR-1 · 24 nov · «Borrar» pasa a «Eliminar» en «Eliminar historial», el menú «Eliminar» de selección, los diálogos de Ajustes (historial de enlaces, puntos de reanudación, modelo de voz) y «Eliminar marcador»; «Borrar datos» de Ajustes se queda (texto de Android) · `MainActivity.kt`, `VideoPlayerActivity.kt`, `SettingsActivity.kt`
+- TAG-3.10 · 24 nov · etiqueta `v3.10` publicada e instalada desde Ajustes › Actualizaciones (ICONOS-1 a 10, BORRAR-1, WIDGET-1); Release `CASTV-v3.10.apk` · `build.yml`
