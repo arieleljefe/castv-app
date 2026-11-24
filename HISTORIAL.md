@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v348
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v349
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -95,3 +95,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ZAP-3 · 24 nov · con canales de una lista, deslizar en la franja central (1/3 a 2/3 del ancho) arriba = canal siguiente y abajo = anterior (70 dp, cambia al soltar; reusa `stepOrZap`); interruptor Ajustes › Video «Deslizar al centro: cambiar de canal» (`g_zap`) · `VideoPlayerActivity.kt`, `SettingsActivity.kt`
 - FUENTES-1 · 24 nov · salud de canales: el teléfono anota fallos y aciertos (error del reproductor, `probeLive`, 🔎 Revisar, TV acepta); con 2 fallos seguidos sale «⚠» en tarjetas y lista; botón «⚠ N» junto a 🔎 Revisar para ocultar a mano los marcados u «Olvidar avisos»; clave `chhealth` (tope 600), sin anotar en incógnito · `Store.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `Zap.kt`
 - XTREAM-1 · 24 nov · listas Xtream con usuario y clave: botón «🔑 Xtream» en «＋ Lista», lista `xtream://<id>` con el acceso en `castv_xt` (fuera de respaldos, autocopia y archivos para compartir), `/log` tapa usuario, clave y tokens, y los respaldos quitan los enlaces con claves; favoritos, ocultos, Continuar e Historial de canales Xtream no viajan en respaldos · `Xtream.kt`, `M3uActivity.kt`, `Backup.kt`, `DebugLog.kt`
+- EPG-1 · 24 nov · guía XMLTV, apagada por defecto (Ajustes › Video): «▶ programa · hasta HH:MM» en Canales y tarjetas, «📅 Guía: ahora y siguiente» en el ⋯ del reproductor y botón 📅 con URL manual; fuente: URL manual › Xtream (`xmltv.php`) › `url-tvg` de la lista (hasta 3); emparejado por `tvg-id` o nombre; copia de 12 h en `cacheDir`; con datos móviles solo a mano · `Epg.kt`, `M3uParser.kt`, `Xtream.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `SettingsActivity.kt`
