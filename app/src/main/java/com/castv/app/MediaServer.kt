@@ -127,6 +127,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
     override fun serve(session: IHTTPSession): Response {
         // [QR-1] puerta temporal para recibir una lista desde otro dispositivo; va ANTES del registro de abajo para que la clave no quede en el /log
         if (session.uri == "/qr" || session.uri.startsWith("/qr/")) return serveQr(session)
+        // [QR-2a] puerta temporal para ENVIAR una lista a otro dispositivo; también antes del registro (la clave no queda en el /log)
+        if (session.uri == "/send" || session.uri.startsWith("/send/")) return serveSend(session)
         if (session.uri == "/log") {
             if (session.parameters.containsKey("clear")) DebugLog.clear()
             return newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", DebugLog.dump())
@@ -159,6 +161,23 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         DebugLog.add("404 ${session.uri}")
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
+    }
+
+    /** [QR-2a] GET /send/<clave>: botón «Recibir lista»; con ?go=1 entrega la lista (una sola vez). Cualquier otra cosa: 404 (sin pistas). */
+    private fun serveSend(session: IHTTPSession): Response {
+        fun html(body: String): Response {
+            val r = newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", body)
+            r.addHeader("Cache-Control", "no-store")
+            r.addHeader("Referrer-Policy", "no-referrer")
+            return r
+        }
+        val notFound = { newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain; charset=utf-8", "No encontrado") }
+        if (session.method != Method.GET) return notFound()
+        val tok = session.uri.removePrefix("/send").trim('/')
+        if (!QrSend.accept(tok, session.headers["remote-addr"] ?: "")) return notFound()
+        if (session.parameters["go"] == null) return html(QrSend.askHtml(tok))
+        val p = QrSend.take(tok) ?: return notFound()
+        return html(QrSend.listHtml(p.first, p.second))
     }
 
     /** [QR-1] GET /qr/<clave>: formulario; con ?n=nombre&u=enlace recibe la lista. Cualquier otra cosa: 404 (sin pistas). */

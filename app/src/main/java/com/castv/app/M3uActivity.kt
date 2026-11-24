@@ -599,6 +599,16 @@ class M3uActivity : AppCompatActivity() {
         qrLink.setPadding(0, dp(16), 0, dp(8))
         qrLink.setOnClickListener { addDlg?.dismiss(); startQr() }
         box.addView(qrLink)
+        val curList = current
+        if (curList != null) {   // [QR-2a] enviar la lista abierta a otro móvil
+            val sendLink = TextView(this)
+            sendLink.text = "📤 Enviar esta lista a otro móvil"
+            sendLink.textSize = 15f
+            sendLink.setTextColor(accent())
+            sendLink.setPadding(0, dp(8), 0, dp(8))
+            sendLink.setOnClickListener { addDlg?.dismiss(); sendList(curList) }
+            box.addView(sendLink)
+        }
         addDlg = AlertDialog.Builder(this)
             .setTitle("Añadir lista M3U")
             .setView(box)
@@ -619,7 +629,7 @@ class M3uActivity : AppCompatActivity() {
     }
 
     /** [QR-1] Comprueba que el servidor de CASTV responde y, si sí, abre el recuadro con el QR. */
-    private fun startQr() {
+    private fun startQr(onReady: (String) -> Unit = { showQrDialog(it) }) {   // [QR-2a] onReady: qué recuadro abrir
         val ip = CastvNet.localIpAddress(null)
         if (ip == null) { toast("Conéctate a un Wi-Fi para usar esto"); return }
         thread {
@@ -629,7 +639,7 @@ class M3uActivity : AppCompatActivity() {
             } catch (e: Exception) { false }
             runOnUiThread {
                 if (isFinishing) return@runOnUiThread
-                if (ok) showQrDialog(ip) else toast("El servidor de CASTV no está activo. Abre la pantalla principal y vuelve a intentarlo.")
+                if (ok) onReady(ip) else toast("El servidor de CASTV no está activo. Abre la pantalla principal y vuelve a intentarlo.")
             }
         }
     }
@@ -670,6 +680,59 @@ class M3uActivity : AppCompatActivity() {
             .setView(box)
             .setNegativeButton("Cerrar", null)
             .setOnDismissListener { QrAdd.close("recuadro cerrado") }
+            .show()
+        val d = dlg
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (d != null && d.isShowing) d.dismiss() }, 5L * 60_000L)
+    }
+
+    /** [QR-2a] Envía la lista abierta a otro móvil. Las listas con usuario y clave no se envían: se explica por qué. */
+    private fun sendList(l: M3uList) {
+        val why = QrSend.check(l.url)
+        if (why != null) {
+            AlertDialog.Builder(this)
+                .setTitle("No se puede enviar esta lista")
+                .setMessage(why)
+                .setPositiveButton("Entendido", null)
+                .show()
+            return
+        }
+        startQr { ip -> showSendDialog(ip, l) }
+    }
+
+    /** [QR-2a] Recuadro con el QR y la dirección de envío. Se cierra solo al entregar la lista, a los 5 minutos o con «Cerrar». */
+    private fun showSendDialog(ip: String, l: M3uList) {
+        var dlg: AlertDialog? = null
+        val tok = QrSend.open(l.name, l.url) {
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                dlg?.dismiss()
+                toast("📤 Lista enviada: ${l.name}")
+            }
+        }
+        if (tok == null) { toast("Esta lista no se puede enviar"); return }
+        val addr = "http://$ip:${ServerPort.port}/send/$tok"
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.gravity = Gravity.CENTER_HORIZONTAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val bmp = QrImage.make(addr, dp(240))
+        if (bmp != null) {
+            val img = ImageView(this)
+            img.setImageBitmap(bmp)
+            box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
+        }
+        val t = TextView(this)
+        t.text = "Con el otro móvil del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra sola al entregar la lista o en 5 minutos."
+        t.textSize = 13f
+        t.setTextColor(mutedColor)
+        t.setPadding(0, dp(12), 0, 0)
+        t.setTextIsSelectable(true)
+        box.addView(t)
+        dlg = AlertDialog.Builder(this)
+            .setTitle("📤 Enviar «${l.name}»")
+            .setView(box)
+            .setNegativeButton("Cerrar", null)
+            .setOnDismissListener { QrSend.close("recuadro cerrado") }
             .show()
         val d = dlg
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (d != null && d.isShowing) d.dismiss() }, 5L * 60_000L)
@@ -1237,6 +1300,7 @@ class M3uActivity : AppCompatActivity() {
     override fun onDestroy() {
         checkGen++   // [CHECK-1] si se sale de la pantalla, la revisión se detiene
         QrAdd.close("pantalla cerrada")   // [QR-1]
+        QrSend.close("pantalla cerrada")   // [QR-2a]
         checkPool?.shutdownNow()
         super.onDestroy()
     }
