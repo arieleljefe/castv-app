@@ -25,6 +25,7 @@ object Store {
     private lateinit var prefs: SharedPreferences
     private lateinit var resumePrefs: SharedPreferences
     private lateinit var statsPrefs: SharedPreferences
+    private lateinit var badPrefs: SharedPreferences   // [ATOMIC-1] copias de texto ilegible
     private var favs: MutableSet<String> = HashSet()
     private var lists: LinkedHashMap<String, MutableList<String>> = LinkedHashMap()
 
@@ -34,11 +35,13 @@ object Store {
         prefs = app.getSharedPreferences("castv_lib", Context.MODE_PRIVATE)
         resumePrefs = app.getSharedPreferences("castv_resume", Context.MODE_PRIVATE)
         statsPrefs = app.getSharedPreferences("castv_stats", Context.MODE_PRIVATE)
+        badPrefs = app.getSharedPreferences("castv_bad", Context.MODE_PRIVATE)
         favs = HashSet(prefs.getStringSet("fav", emptySet()) ?: emptySet())
         loadLists()
     }
 
     /** Vuelve a leer favoritos y listas desde las preferencias (se usa tras importar un respaldo). */
+    @Synchronized
     fun reload() {
         if (!::prefs.isInitialized) return
         favs = HashSet(prefs.getStringSet("fav", emptySet()) ?: emptySet())
@@ -48,11 +51,28 @@ object Store {
     fun key(item: MediaItem): String =
         (if (item.isMusic) "a" else "v") + "|" + item.name.lowercase() + "|" + item.durationSec
 
+    /**
+     * [ATOMIC-1] Si un dato guardado no se puede leer (JSON dañado), se guarda aparte una copia del texto
+     * original (archivo "castv_bad", fuera del respaldo) antes de que una escritura posterior lo pise.
+     * Solo se vuelve a guardar si el texto ilegible es distinto del que ya se copió.
+     */
+    private fun rescue(name: String, raw: String?, e: Exception) {
+        if (raw == null) return
+        try {
+            if (::badPrefs.isInitialized && badPrefs.getString(name, null) != raw) {
+                badPrefs.edit().putString(name, raw).putLong("t|" + name, System.currentTimeMillis()).apply()
+                DebugLog.add("STORE: no pude leer '" + name + "' (" + e.javaClass.simpleName + "), copia guardada")
+            }
+        } catch (x: Exception) { }
+    }
+
     // ------------------------------------------------------------ Favoritos
 
+    @Synchronized
     fun isFav(item: MediaItem): Boolean = favs.contains(key(item))
 
     /** Devuelve true si quedó como favorito. */
+    @Synchronized
     fun toggleFav(item: MediaItem): Boolean {
         val k = key(item)
         val now = if (favs.contains(k)) { favs.remove(k); false } else { favs.add(k); true }
@@ -90,6 +110,7 @@ object Store {
     }
 
     /** Borra todo rastro de un archivo eliminado: favoritos, listas, punto guardado y estadísticas. */
+    @Synchronized
     fun forget(item: MediaItem) {
         val k = key(item)
         if (favs.remove(k)) prefs.edit().putStringSet("fav", HashSet(favs)).apply()
@@ -124,7 +145,7 @@ object Store {
                 val o = arr.getJSONObject(i)
                 VideoMark(o.getInt("t"), o.optString("n", ""))
             }.sortedBy { it.sec }
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Exception) { rescue("bm|" + key(item), raw, e); emptyList() }
     }
 
     private fun saveMarks(item: MediaItem, list: List<VideoMark>) {
@@ -136,6 +157,7 @@ object Store {
     }
 
     /** Devuelve false si no se guardó (modo incógnito o demasiados marcadores). */
+    @Synchronized
     fun addMark(item: MediaItem, sec: Int, name: String): Boolean {
         if (incognito) return false
         val list = marks(item).filter { it.sec != sec }
@@ -144,6 +166,7 @@ object Store {
         return true
     }
 
+    @Synchronized
     fun removeMark(item: MediaItem, sec: Int) {
         saveMarks(item, marks(item).filter { it.sec != sec })
     }
@@ -186,14 +209,14 @@ object Store {
 
     private fun readLinks(): MutableList<SavedLink> {
         val out = ArrayList<SavedLink>()
+        val raw = prefs.getString("links", null) ?: return out
         try {
-            val raw = prefs.getString("links", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 out.add(SavedLink(o.getString("u"), o.optString("n", ""), o.optBoolean("f", false), o.optLong("t", 0L)))
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("links", raw, e) }
         return out
     }
 
@@ -210,6 +233,7 @@ object Store {
         readLinks().sortedWith(compareByDescending<SavedLink> { it.fav }.thenByDescending { it.t })
 
     /** Guarda (o sube al principio) un enlace. Los favoritos no se borran; de los demás quedan los 20 más recientes. */
+    @Synchronized
     fun addLink(url: String, title: String) {
         if (incognito) return   // [INCOG-1]
         val all = readLinks()
@@ -222,6 +246,7 @@ object Store {
     }
 
     /** Devuelve true si quedó como favorito. */
+    @Synchronized
     fun toggleLinkFav(url: String): Boolean {
         var now = false
         val out = readLinks().map {
@@ -231,11 +256,13 @@ object Store {
         return now
     }
 
+    @Synchronized
     fun removeLink(url: String) {
         writeLinks(readLinks().filter { it.url != url })
     }
 
     /** Borra los enlaces que no son favoritos. */
+    @Synchronized
     fun clearRecentLinks() {
         writeLinks(readLinks().filter { it.fav })
     }
@@ -244,14 +271,14 @@ object Store {
 
     fun m3uLists(): List<M3uList> {
         val out = ArrayList<M3uList>()
+        val raw = prefs.getString("m3u", null) ?: return out
         try {
-            val raw = prefs.getString("m3u", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 out.add(M3uList(o.optString("n", ""), o.getString("u")))
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("m3u", raw, e) }
         return out
     }
 
@@ -264,12 +291,14 @@ object Store {
     }
 
     /** Añade la lista (si el enlace ya existía, se reemplaza el nombre). */
+    @Synchronized
     fun addM3uList(name: String, url: String) {
         val l = m3uLists().filter { it.url != url }.toMutableList()
         l.add(M3uList(name, url))
         writeM3u(l)
     }
 
+    @Synchronized
     fun removeM3uList(url: String) {
         writeM3u(m3uLists().filter { it.url != url })
     }
@@ -286,6 +315,7 @@ object Store {
      * No toca las listas del usuario y no vuelve a poner las que el usuario quitó después.
      * Devuelve cuántas listas añadió.
      */
+    @Synchronized
     fun installCatalog(version: Int, items: List<M3uList>): Int {
         if (prefs.getInt("catV", 0) >= version) return 0
         val seen = HashSet<String>()
@@ -322,15 +352,16 @@ object Store {
     /** Enlaces de los canales marcados con ★ en Listas M3U. */
     fun chFavs(): Set<String> {
         val out = HashSet<String>()
+        val raw = prefs.getString("chfav", null) ?: return out
         try {
-            val raw = prefs.getString("chfav", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) out.add(arr.getString(i))
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("chfav", raw, e) }
         return out
     }
 
     /** Devuelve true si el canal quedó como favorito. */
+    @Synchronized
     fun toggleChFav(url: String): Boolean {
         val s = chFavs().toMutableSet()
         val now = if (s.contains(url)) { s.remove(url); false } else { s.add(url); true }
@@ -347,14 +378,14 @@ object Store {
 
     private fun readChFavMeta(): MutableList<M3uChannel> {
         val out = ArrayList<M3uChannel>()
+        val raw = prefs.getString("chfavmeta", null) ?: return out
         try {
-            val raw = prefs.getString("chfavmeta", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", ""), o.optString("l", "")))
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("chfavmeta", raw, e) }
         return out
     }
 
@@ -380,6 +411,7 @@ object Store {
     }
 
     /** Guarda (o actualiza) el nombre y el grupo de un canal favorito. */
+    @Synchronized
     fun rememberChFav(c: M3uChannel) {
         val l = readChFavMeta()
         val i = l.indexOfFirst { it.url == c.url }
@@ -388,12 +420,14 @@ object Store {
     }
 
     /** Borra el nombre guardado de un canal que ya no es favorito. */
+    @Synchronized
     fun forgetChFav(url: String) {
         val l = readChFavMeta()
         if (l.removeAll { it.url == url }) writeChFavMeta(l)
     }
 
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
+    @Synchronized
     fun backfillChFavs(list: List<M3uChannel>) {
         val urls = chFavs()
         if (urls.isEmpty()) return
@@ -417,18 +451,19 @@ object Store {
     /** Últimos canales reproducidos, el más reciente primero. */
     fun recentChannels(): List<M3uChannel> {
         val out = ArrayList<M3uChannel>()
+        val raw = prefs.getString("chrecent", null) ?: return out
         try {
-            val raw = prefs.getString("chrecent", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", ""), o.optString("l", "")))
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("chrecent", raw, e) }
         return out
     }
 
     /** Sube el canal al principio de "Continuar" (en modo incógnito no se guarda). */
+    @Synchronized
     fun rememberRecentChannel(c: M3uChannel) {
         if (incognito) return
         val l = recentChannels().filter { it.url != c.url }.toMutableList()
@@ -446,14 +481,14 @@ object Store {
 
     private fun readHidden(): MutableList<M3uChannel> {
         val out = ArrayList<M3uChannel>()
+        val raw = prefs.getString("chhidden", null) ?: return out
         try {
-            val raw = prefs.getString("chhidden", null) ?: return out
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 out.add(M3uChannel(o.optString("n", ""), o.getString("u"), o.optString("g", "")))
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("chhidden", raw, e) }
         return out
     }
 
@@ -476,6 +511,7 @@ object Store {
     }
 
     /** Oculta un canal (por enlace de stream). Si era favorito, también se le quita la ★. */
+    @Synchronized
     fun hideChannel(c: M3uChannel) {
         val l = readHidden()
         if (l.none { it.url == c.url }) { l.add(c); writeHidden(l) }
@@ -484,6 +520,7 @@ object Store {
     }
 
     /** [CHECK-1] Oculta varios canales de una vez (una sola escritura). A los que eran favoritos también se les quita la ★. */
+    @Synchronized
     fun hideChannels(cs: List<M3uChannel>) {
         if (cs.isEmpty()) return
         val l = readHidden()
@@ -499,6 +536,7 @@ object Store {
     }
 
     /** Devuelve a la vista los canales con esos enlaces. */
+    @Synchronized
     fun unhideChannels(urls: Collection<String>) {
         val set = HashSet<String>(urls)
         val l = readHidden()
@@ -509,8 +547,8 @@ object Store {
 
     private fun loadLists() {
         lists = LinkedHashMap()
+        val raw = prefs.getString("lists", null) ?: return
         try {
-            val raw = prefs.getString("lists", null) ?: return
             val obj = JSONObject(raw)
             val names = obj.keys()
             while (names.hasNext()) {
@@ -520,7 +558,7 @@ object Store {
                 for (i in 0 until arr.length()) l.add(arr.getString(i))
                 lists[n] = l
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { rescue("lists", raw, e) }
     }
 
     private fun saveLists() {
@@ -535,10 +573,13 @@ object Store {
         } catch (e: Exception) { }
     }
 
+    @Synchronized
     fun listNames(): List<String> = ArrayList(lists.keys)
 
+    @Synchronized
     fun listSize(name: String): Int = lists[name]?.size ?: 0
 
+    @Synchronized
     fun createList(name: String): Boolean {
         val n = name.trim()
         if (n.isEmpty() || lists.containsKey(n)) return false
@@ -547,13 +588,16 @@ object Store {
         return true
     }
 
+    @Synchronized
     fun deleteList(name: String) {
         if (lists.remove(name) != null) saveLists()
     }
 
+    @Synchronized
     fun inList(name: String, item: MediaItem): Boolean = lists[name]?.contains(key(item)) == true
 
     /** Devuelve true si se añadió (false si ya estaba). */
+    @Synchronized
     fun addToList(name: String, item: MediaItem): Boolean {
         val l = lists[name] ?: return false
         val k = key(item)
@@ -563,6 +607,7 @@ object Store {
         return true
     }
 
+    @Synchronized
     fun removeFromList(name: String, item: MediaItem) {
         if (lists[name]?.remove(key(item)) == true) saveLists()
     }
