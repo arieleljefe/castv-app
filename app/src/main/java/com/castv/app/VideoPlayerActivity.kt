@@ -1095,8 +1095,14 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------ [FAV-REPRO-1] ★ en el reproductor
 
-    /** El canal de lista que se está viendo (null si es un video o un enlace suelto). */
-    private fun currentChannel(): M3uChannel? = if (zapList.isNotEmpty()) zapList.getOrNull(index) else null
+    /** El canal que se está viendo (null si es un video del teléfono). [FAV-REPRO-2] Si se abrió sin lista (Continuar, Favoritos, Historial…), se arma con su título y enlace, y con logo y grupo si ya estaba en «Continuar». */
+    private fun currentChannel(): M3uChannel? {
+        if (zapList.isNotEmpty()) return zapList.getOrNull(index)
+        val item = items.getOrNull(index) ?: return null
+        if (item.id != 0L) return null   // video del teléfono
+        val u = item.uriString
+        return Store.recentChannels().firstOrNull { it.url == u } ?: M3uChannel(item.name, u, "")
+    }
 
     /** Muestra la ★ solo con canales de lista; llena si ya es favorito. */
     private fun refreshFavChip() {
