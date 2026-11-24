@@ -309,6 +309,7 @@ class SettingsActivity : AppCompatActivity() {
         // [AJUSTES-2b] Emisión al TV (solo informativo)
         val tvIp = TvController.tvIp
         l.add(Entry("Emisión al TV", "Salida al abrir la app", outStartNames[outStartIdx()], { pickOutStart() }))   // [SALIDA-INI-1]
+        l.add(Entry("Emisión al TV", "Calidad en TV", tvQualityNames[tvQualityIdx()], { pickTvQuality() }))   // [CALIDAD-1]
         l.add(Entry("Emisión al TV", "TV detectada", tvIp?.toString() ?: "Ninguna todavía", null))
         l.add(Entry("Emisión al TV", "IP del teléfono", CastvNet.localIpAddress(tvIp) ?: "Sin conexión Wi-Fi", null))
 
@@ -373,7 +374,7 @@ class SettingsActivity : AppCompatActivity() {
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
-        "Emisión al TV" -> "Salida al abrir, TV detectada e IP del teléfono"
+        "Emisión al TV" -> "Salida al abrir, calidad en TV, TV detectada e IP del teléfono"
         "Historial" -> "Enlaces, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Eliminado: papelera o permanente"
         "Avanzado" -> "Registro de la app y pruebas"
@@ -1565,6 +1566,26 @@ class SettingsActivity : AppCompatActivity() {
                 prefs().edit().putInt("out_start", which).apply()
                 d.dismiss()
                 toast("Se aplica la próxima vez que abras la app")
+                render()
+            }
+            .show()
+    }
+
+    // [CALIDAD-1] Calidad de los canales en vivo al TV: 0 = Baja (la de siempre), 1 = Media, 2 = Alta
+    private val tvQualityNames = arrayOf(
+        "Baja (la de siempre, la más estable)",
+        "Media",
+        "Alta (puede atascarse con un Wi-Fi flojo)")
+
+    private fun tvQualityIdx(): Int = prefs().getInt("tv_quality", 0).let { if (it in 0..2) it else 0 }
+
+    private fun pickTvQuality() {
+        AlertDialog.Builder(this)
+            .setTitle("Calidad en TV")
+            .setSingleChoiceItems(tvQualityNames, tvQualityIdx()) { d, which ->
+                prefs().edit().putInt("tv_quality", which).apply()
+                d.dismiss()
+                toast("Se aplica al abrir el próximo canal en el TV")
                 render()
             }
             .show()

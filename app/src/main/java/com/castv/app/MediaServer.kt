@@ -22,6 +22,9 @@ import java.net.URL
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     companion object {
+        /** [CALIDAD-1] Calidad de los canales en vivo al TV: 0 = Baja (la de siempre), 1 = Media, 2 = Alta. Se lee de Ajustes al abrir cada canal. */
+        @Volatile var liveQuality: Int = 0
+
         /** [AVISO-HLS] Revisa, antes de mandar un canal HLS al TV, si se puede preparar (misma lectura de lista que
          *  usa /live). Devuelve null si todo va bien, o el motivo en español. No abre fragmentos ni deja nada abierto. */
         fun probeLive(url: String): String? {
@@ -474,6 +477,17 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             }
         }
 
+        /** [CALIDAD-1] Elige la variante según Ajustes › Emisión al TV › Calidad en TV. */
+        private fun pickByQuality(pool: List<Triple<Long, String, Boolean>>): Triple<Long, String, Boolean> {
+            val sorted = pool.sortedBy { it.first }
+            val known = sorted.filter { it.first < Long.MAX_VALUE - 1 }.ifEmpty { sorted }
+            return when (MediaServer.liveQuality) {
+                2 -> known.last()
+                1 -> known[(known.size - 1) / 2]
+                else -> sorted.first()
+            }
+        }
+
         private fun resolveMedia() {
             val (text, base) = LiveHttp.text(startUrl)
             if (!text.trimStart('\uFEFF', ' ', '\r', '\n').startsWith("#EXTM3U")) throw LiveUnsupported("no es una lista HLS")
@@ -503,7 +517,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             }
             if (cands.isEmpty()) throw LiveUnsupported("lista maestra sin variantes")
             val pool = cands.filter { it.third }.ifEmpty { cands }
-            val best = pool.minByOrNull { it.first }!!
+            val best = pickByQuality(pool)   // [CALIDAD-1] (Baja = la de menor BANDWIDTH, igual que antes)
             mediaUrl = best.second
             // [MUS-1] si el audio va en una lista aparte, se anota para unirlo al video
             audioListUrl = null
@@ -521,7 +535,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 audioListUrl = chosen
                 if (chosen != null) DebugLog.add("  LIVE audio aparte (grupo $grp): $chosen")
             }
-            DebugLog.add("  LIVE variante elegida BANDWIDTH=${if (best.first >= Long.MAX_VALUE - 1) "?" else best.first.toString()} -> ${best.second}")
+            DebugLog.add("  LIVE variante elegida (calidad ${MediaServer.liveQuality}) BANDWIDTH=${if (best.first >= Long.MAX_VALUE - 1) "?" else best.first.toString()} -> ${best.second}")
         }
 
         /** Lee la lista hija y agrega a [pending] los fragmentos nuevos. */
@@ -1198,6 +1212,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** [GZIP-1] Crea el flujo del canal y lee la primera lista; ante un fallo pasajero reintenta una vez. */
     private fun openLiveStream(target: String): LiveHlsStream {
+        liveQuality = context.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("tv_quality", 0).let { if (it in 0..2) it else 0 }   // [CALIDAD-1]
         var stream = LiveHlsStream(target)
         try {
             stream.prepare()
