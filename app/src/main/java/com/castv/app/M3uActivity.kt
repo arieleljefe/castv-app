@@ -163,24 +163,36 @@ class M3uActivity : AppCompatActivity() {
         root.addView(header)
 
         // Fila 1: lista actual, añadir, quitar
-        val row1 = LinearLayout(this)
-        row1.gravity = Gravity.CENTER_VERTICAL
+        // [VISTA-3] Fila 1a: la lista actual con su nombre completo, a lo ancho
         listBtn = chip("📡 Sin lista ▾") { chooseList() }
         listBtn.maxLines = 1
         listBtn.ellipsize = TextUtils.TruncateAt.END
         (listBtn.layoutParams as LinearLayout.LayoutParams).apply {
-            width = 0
-            weight = 1f
+            width = ViewGroup.LayoutParams.MATCH_PARENT
             leftMargin = 0
         }
-        row1.addView(listBtn)
+        root.addView(listBtn)
+        // [VISTA-3] Fila 1b: acciones con texto, repartidas a partes iguales
+        val row1 = LinearLayout(this)
+        row1.gravity = Gravity.CENTER_VERTICAL
+        row1.setPadding(0, dp(8), 0, 0)
         favBtn = chip("☆ Favs") { toggleFavOnly() }
-        row1.addView(favBtn)
         hiddenBtn = chip("👁") { showHiddenDialog() }   // [OCULTAR-1]
-        row1.addView(hiddenBtn)
+        hiddenBtn.contentDescription = "Canales ocultos"
+        val addBtn = chip("＋ Lista") { addListDialog() }
+        val delBtn = chip("🗑 Quitar") { removeCurrent() }
+        for (b in listOf(favBtn, hiddenBtn, addBtn, delBtn)) {
+            b.textSize = 13f
+            b.maxLines = 1
+            b.setPadding(dp(6), dp(8), dp(6), dp(8))
+            (b.layoutParams as LinearLayout.LayoutParams).apply {
+                width = 0
+                weight = 1f
+            }
+            row1.addView(b)
+        }
+        (favBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0
         updateHiddenBtn()
-        row1.addView(chip("＋") { addListDialog() })
-        row1.addView(chip("🗑") { removeCurrent() })
         root.addView(row1)
 
         // Fila 2: buscador y grupo
