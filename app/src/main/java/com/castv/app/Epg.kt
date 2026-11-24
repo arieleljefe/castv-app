@@ -24,7 +24,7 @@ import java.util.zip.GZIPInputStream
  * - Se lee en flujo (no se carga el XML entero), acepta `.gz`, y solo se guardan los canales de la lista y las
  *   próximas 24 horas. El resultado queda en `cacheDir` (no entra en respaldos) y se refresca cada 12 horas.
  * - Emparejado: primero `tvg-id` del canal con el `id` de la guía; si falta, el nombre normalizado ([key]).
- * - Apagada por defecto (clave `epg_on` en las preferencias `castv`). La URL manual vive en `castv_epg`, que NO está
+ * - Encendida por defecto en instalaciones nuevas (clave `epg_on` en las preferencias `castv`; si Ariel ya la guardó, se respeta). La URL manual vive en `castv_epg`, que NO está
  *   en la lista de archivos de [Backup].
  */
 object Epg {
@@ -46,7 +46,7 @@ object Epg {
     @Volatile var lastResult: String = ""
 
     fun enabled(ctx: Context): Boolean =
-        ctx.applicationContext.getSharedPreferences("castv", Context.MODE_PRIVATE).getBoolean("epg_on", false)
+        ctx.applicationContext.getSharedPreferences("castv", Context.MODE_PRIVATE).getBoolean("epg_on", true)
 
     fun clear() { guide = null }
 

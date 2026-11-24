@@ -1506,11 +1506,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun gOn(key: String): Boolean = prefs().getBoolean(key, true)
     private fun gState(key: String): String = if (gOn(key)) "Activado" else "Desactivado"
 
-    // [EPG-1] la guía viene apagada hasta que Ariel la active
-    private fun epgState(): String = if (prefs().getBoolean("epg_on", false)) "Activado" else "Desactivado"
+    // [EPG-1] [EPG-DEFECTO-1] la guía viene encendida por defecto; si Ariel ya eligió, se respeta su valor
+    private fun epgState(): String = if (prefs().getBoolean("epg_on", true)) "Activado" else "Desactivado"
 
     private fun toggleEpg() {
-        val now = !prefs().getBoolean("epg_on", false)
+        val now = !prefs().getBoolean("epg_on", true)
         prefs().edit().putBoolean("epg_on", now).apply()
         if (!now) Epg.clear()
         toast(if (now) "✅ Guía de programación: activada" else "🚫 Guía de programación: desactivada")
