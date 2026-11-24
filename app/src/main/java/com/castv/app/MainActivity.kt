@@ -689,7 +689,7 @@ class MainActivity : AppCompatActivity() {
         }
         try { mediaSession?.isActive = false; mediaSession?.release() } catch (e: Exception) { }
         mediaSession = null
-        if (!handedOff) postDefaultNotification()
+        if (!handedOff) postDefaultNotification() else CastvWidget.reset(this)   // [WIDGET-1]
         super.onDestroy()
     }
 
@@ -2402,6 +2402,7 @@ class MainActivity : AppCompatActivity() {
 
         val title = prettyTitle(item)
         val where = if (localActive) "teléfono" else "TV"
+        CastvWidget.push(this, title, if (playing) "Sonando en el $where" else "En pausa · $where", playing)   // [WIDGET-1]
         try {
             val md = MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
@@ -2458,6 +2459,7 @@ class MainActivity : AppCompatActivity() {
         val key = "link|$title|$playing|$linkIsLive|$zapOn|$hasCh|$tvFavNow"
         if (key == lastNotifKey) return
         lastNotifKey = key
+        CastvWidget.push(this, title, if (playing) (if (linkIsLive) "En vivo en el TV" else "Sonando en el TV") else "En pausa · TV", playing)   // [WIDGET-1]
         try {
             val md = MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
@@ -2506,6 +2508,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Al cerrar la app, la notificación vuelve a ser la sencilla del servicio. */
     private fun postDefaultNotification() {
+        CastvWidget.reset(this)   // [WIDGET-1]
         try {
             val n = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("CASTV activo")
