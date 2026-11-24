@@ -133,6 +133,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var scale: ScaleGestureDetector
     private var gSeekStart = 0
     private var gSeekTo = 0
+    private var gZapDir = 0   // [ZAP-3] gMode 5: 0 aún nada, +1 siguiente canal, -1 anterior
     private var mpRef: MediaPlayer? = null
     private var enhancer: LoudnessEnhancer? = null   // [VOL-1] volumen extra (más de 100 %)
     private var abA = -1               // [AB-1] inicio de la repetición A-B (ms; -1 = sin marcar)
@@ -507,6 +508,10 @@ class VideoPlayerActivity : AppCompatActivity() {
                 setFast(false)
                 showHud("▶ 1x")
             }
+            5 -> {   // [ZAP-3] al levantar el dedo se cambia de canal
+                if (up && gZapDir != 0 && !locked) stepOrZap(gZapDir) else hud.visibility = View.GONE
+                gZapDir = 0
+            }
         }
         gMode = 0
     }
@@ -592,6 +597,9 @@ class VideoPlayerActivity : AppCompatActivity() {
                         gMode = 3
                         gSeekStart = try { video.currentPosition } catch (ex: Exception) { 0 }
                         gSeekTo = gSeekStart
+                    } else if (zapList.size > 1 && gOn("g_zap") && gDownX >= w / 3f && gDownX <= w * 2f / 3f) {
+                        gMode = 5   // [ZAP-3] franja central con canales: deslizar arriba = siguiente, abajo = anterior
+                        gZapDir = 0
                     } else if (gDownX >= w / 2f) {
                         if (!gOn("g_bright")) { gMode = -1; return true }   // [GESTOS-AJ-1]
                         gMode = 1
@@ -607,6 +615,12 @@ class VideoPlayerActivity : AppCompatActivity() {
                     gSeekTo = (gSeekStart + ((e2.x - gDownX) / w * 90000f).toInt()).coerceIn(0, maxOf(d - 500, 0))
                     val diff = (gSeekTo - gSeekStart) / 1000
                     showHud((if (diff >= 0) "⏩ +$diff s" else "⏪ −${-diff} s") + "\n" + fmt(gSeekTo))
+                    return true
+                }
+                if (gMode == 5) {   // [ZAP-3] hace falta recorrer 70 dp para que cuente
+                    val up = gDownY - e2.y
+                    gZapDir = if (up > dp(70)) 1 else if (up < -dp(70)) -1 else 0
+                    showHud(when (gZapDir) { 1 -> "⏭ Canal siguiente"; -1 -> "⏮ Canal anterior"; else -> "↕ Cambiar de canal" })
                     return true
                 }
                 val frac = dy / (h * 0.8f)   // dy > 0: el dedo sube

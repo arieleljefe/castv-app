@@ -252,6 +252,7 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Video", "Deslizar de lado: adelantar", gState("g_seek"), { toggleG("g_seek", "Deslizar de lado") }))
         l.add(Entry("Video", "Deslizar a la derecha: brillo", gState("g_bright"), { toggleG("g_bright", "Brillo") }))
         l.add(Entry("Video", "Deslizar a la izquierda: volumen", gState("g_vol"), { toggleG("g_vol", "Volumen") }))
+        l.add(Entry("Video", "Deslizar al centro: cambiar de canal", gState("g_zap") + " (arriba = siguiente, abajo = anterior; solo con canales de una lista)", { toggleG("g_zap", "Cambiar de canal") }))   // [ZAP-3]
         l.add(Entry("Video", "Doble toque", gState("g_dtap") + " (con el doble toque apagado, dos toques muestran u ocultan los controles)", { toggleG("g_dtap", "Doble toque") }))
         l.add(Entry("Video", "Mantener pulsado: acelerar", gState("g_hold"), { toggleG("g_hold", "Mantener pulsado") }))
         l.add(Entry("Video", "Velocidad al mantener pulsado", fastNames[fastIdx()], { pickFast() }))
