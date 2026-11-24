@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v384
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v385
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -124,3 +124,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CANAL-MINI-1 · 24 nov · barra en Canales con el canal que está en el TV y ⏮ ⏯ ⏭ ☆ ✕ · `M3uActivity.kt`, `MainActivity.kt`, `Zap.kt`
 - MAPA-1 · 24 nov · `MAPA.md` con la arquitectura del código
 - ICONOS-1 · 24 nov · en la barra del canal del TV (Canales) ⏮ ⏯ ⏭ usan iconos vectoriales en vez de emojis · `M3uActivity.kt`
+- ICONOS-2 · 24 nov · los botones de Canales (Favs, Lista, Quitar, ocultos, Guía, fallan, Revisar) usan iconos vectoriales dentro del texto · `M3uActivity.kt`, 7 drawables `ic_*`
