@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v338
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v339
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -82,3 +82,11 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - LOG-1 · 23 nov · el `/log` oculta claves: `redact()` en `DebugLog.kt` cambia por `[OCULTO]` el valor de `token`, `key`, `apikey`, `pass`, `password`, `secret`, `auth`, `sig`, `session`, `user`, `usuario`, `usuario:clave@` y `Bearer …`, también codificados dentro de otro enlace; no cubre claves en la ruta del enlace · `DebugLog.kt`.
 - ATOMIC-1 · 23 nov · guardado seguro en `Store.kt`: los métodos que leen y escriben son `@Synchronized` y, si un dato guardado (`links`, `m3u`, `chfav`, `chfavmeta`, `chrecent`, `chhidden`, `lists`, marcadores) no se puede leer, se guarda una copia del texto en `castv_bad` y una línea en el `/log` antes de que una escritura lo pise; sin cambio visible · `Store.kt`.
 - TESTS-1 · 23 nov · pruebas automáticas (JUnit) en GitHub Actions: 7 de `DebugLog.redact` y 7 de `M3uParser.parse`, paso «Pruebas automaticas (TESTS-1)» antes de compilar; confirmado en verde con el log del run 239 · `DebugLogRedactTest.kt`, `M3uParserTest.kt`, `app/build.gradle`, `build.yml`.
+- VISTA-1 a VISTA-4 · 24 nov · pantalla Canales: fondo claro tras cada logo, tarjetas de 96 dp, lista actual en su fila con 4 botones (☆ Favs, 👁 N, ＋ Lista, 🗑 Quitar), estrella de Favoritos con el color de acento y fila de ánimos difuminada · `M3uActivity.kt`
+- VISTA-5 · 24 nov · logos claros (blancos) con fondo oscuro `#2B3040` y los demás con `#F2F2F2`: `Logos.bgFor()` mide el brillo del logo (muestra ~24×24, umbral 185) y ajusta el fondo al llegar el logo · `Logos.kt`, `M3uActivity.kt`
+- FAV-REPRO-1 · 24 nov · ★/☆ en la barra del reproductor del teléfono para marcar el canal como favorito mientras se mira (usa `Store.toggleChFav` + `rememberChFav/forgetChFav`); al volver, Canales relee las ★ en `onResume` · `VideoPlayerActivity.kt`, `M3uActivity.kt`
+- BARRA-1 · 24 nov · barra del reproductor: título, ★, 🔄, ⋯ y 📺 TV; el menú ⋯ agrupa 🔒 Bloquear, 🖼 Tamaño, 😴 Temporizador (con el tiempo restante), 🛠 Herramientas y 💬 Subtítulos · `VideoPlayerActivity.kt`
+- VIVO-1 · 24 nov · en canales y enlaces en vivo (`id == 0L`, sin duración) se ocultan tiempo, barra y −10/+10 y queda «● EN VIVO»; con videos del teléfono vuelven · `VideoPlayerActivity.kt`
+- GIRO-1 · 24 nov · 🔄 con un toque alterna vertical ↔ horizontal; mantener pulsado vuelve al giro automático · `VideoPlayerActivity.kt`
+- VERSION-3 · 24 nov · `versionName` por defecto 3.8 en `app/build.gradle` (con etiqueta `v*` manda la etiqueta); la causa de «3.1» era instalar el APK de un push · `app/build.gradle`
+- TESTS-1b · 24 nov · `build.yml` sin `continue-on-error`: una prueba rota detiene el build antes del APK; build en verde con v3.8 · `.github/workflows/build.yml`
