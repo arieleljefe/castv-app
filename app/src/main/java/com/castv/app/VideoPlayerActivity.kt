@@ -71,6 +71,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var favChip: TextView   // [FAV-REPRO-1] ★ del canal que se está viendo
     // [UI-2b] barra de control propia (reemplaza al MediaController del sistema)
     private lateinit var bottomBar: LinearLayout
+    private var insetB = 0   // [INSETS-1] alto de la barra de navegación (aunque esté oculta)
     private lateinit var seek: SeekBar
     private lateinit var tvPos: TextView
     private lateinit var tvDur: TextView
@@ -335,8 +336,12 @@ class VideoPlayerActivity : AppCompatActivity() {
         setContentView(root)
         // [UI-2d] la barra de control nunca queda debajo de los botones de navegación ni del notch
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
-            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            // [INSETS-1] con las barras ocultas (pantalla completa) getInsets() da 0 y los controles quedaban
+            // debajo de ☰ ○ < al deslizar; se mide el tamaño real aunque estén ocultas
+            val b = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            insetB = b.bottom
             if (::bottomBar.isInitialized) bottomBar.setPadding(dp(16) + b.left, dp(24), dp(16) + b.right, dp(10) + b.bottom)
+            if (::topBar.isInitialized) topBar.setPadding(dp(16) + b.left, dp(10) + b.top, dp(12) + b.right, dp(10))
             insets
         }
 
@@ -346,6 +351,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         bars.hide(WindowInsetsCompat.Type.systemBars())
 
         buildControls(root)   // [UI-2b]
+        ViewCompat.requestApplyInsets(root)   // [INSETS-1] la barra se crea después del primer reparto de márgenes
         setupGestures(root)
 
         video.setOnPreparedListener { mp ->
@@ -718,7 +724,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** Sube los subtítulos mientras se ve la barra, para que no queden tapados. */
     private fun moveSubtitles(up: Boolean) {
         val lp = subText.layoutParams as FrameLayout.LayoutParams
-        lp.bottomMargin = if (up) dp(140) else dp(72)
+        lp.bottomMargin = (if (up) dp(140) else dp(72)) + insetB   // [INSETS-1]
         subText.layoutParams = lp
     }
 
