@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v387
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v389
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -125,3 +125,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - MAPA-1 · 24 nov · `MAPA.md` con la arquitectura del código
 - ICONOS-1 · 24 nov · en la barra del canal del TV (Canales) ⏮ ⏯ ⏭ usan iconos vectoriales en vez de emojis · `M3uActivity.kt`
 - ICONOS-2 · 24 nov · los botones de Canales (Favs, Lista, Quitar, ocultos, Guía, fallan, Revisar) usan iconos vectoriales dentro del texto · `M3uActivity.kt`, 7 drawables `ic_*`
+- ICONOS-3/4/5 · 24 nov · los menús del reproductor de video (⋯, Herramientas, Subtítulos y Estilo del subtítulo) usan iconos vectoriales dentro del texto, del color del texto del diálogo; `CastvIcons.item(ctx, res, texto)` y 23 drawables `ic_vp_*` (Material Icons, Apache 2.0); los índices `which` no cambian; avisos, HUD y títulos con emoji no se tocaron · `CastvUtils.kt`, `VideoPlayerActivity.kt`, `res/drawable/ic_vp_*.xml`
