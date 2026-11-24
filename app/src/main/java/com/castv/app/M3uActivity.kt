@@ -598,10 +598,12 @@ class M3uActivity : AppCompatActivity() {
         val labels = ArrayList<String>()
         for ((r, l) in groups) labels.add("$r (${l.size})")
         labels.add("📋 Ver todas (${saved.size})")
+        labels.add("🔎 Buscar en todas mis listas")   // [BUSCA-TODO-1]
         AlertDialog.Builder(this)
             .setTitle("Regiones y categorías")
             .setItems(labels.toTypedArray()) { _, which ->
-                if (which == groups.size) showListsOf(saved, "Todas mis listas", true)
+                if (which == groups.size + 1) loadAllCached(saved)   // [BUSCA-TODO-1]
+                else if (which == groups.size) showListsOf(saved, "Todas mis listas", true)
                 else showListsOf(groups[which].second, groups[which].first, true, groups[which].first)   // [REGIONES-1b]
             }
             .setNeutralButton("＋ Nueva") { _, _ -> addListDialog() }
@@ -733,6 +735,85 @@ class M3uActivity : AppCompatActivity() {
             }
         }
         pool.shutdown()   // deja terminar lo ya pedido y no acepta más
+    }
+
+    /**
+     * [BUSCA-TODO-1] Une, SIN descargar nada, las copias guardadas de todas mis listas (las que ya se abrieron alguna vez)
+     * para buscar en todas a la vez con el buscador de siempre. Sin repetidos por enlace; mismo tope que una región.
+     * La guía solo se lee de su copia (nunca se descarga sola); con «Actualizar ya» en 📅 se baja, como en una región.
+     */
+    private fun loadAllCached(lists: List<M3uList>) {
+        if (lists.isEmpty()) return
+        if (checking) stopCheck(null)   // [CHECK-1]
+        val name = "Todas mis listas"
+        current = null
+        regionName = name
+        regionLists = lists
+        Epg.clear()
+        groupFilter = null
+        moodFilter = -1
+        groupBtn.text = "Grupo: Todos ▾"
+        listBtn.text = "🔎 $name ▾"
+        channels = emptyList()
+        normNames = emptyList()
+        shown = emptyList()
+        fromCache = false
+        refreshMoods()
+        statusView.text = "Leyendo las copias guardadas…"
+        chAdapter.notifyDataSetChanged()
+        val gen = ++loadGen
+        thread {
+            val merged = LinkedHashMap<String, M3uChannel>()
+            val heads = ArrayList<List<String>>()
+            var withCopy = 0
+            var dupes = 0
+            var capped = false
+            for (l in lists) {
+                if (gen != loadGen) return@thread
+                val f = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
+                if (!f.exists()) continue
+                val body: String = try { f.readText() } catch (e: Exception) { continue }
+                val parsed = M3uParser.parse(body)
+                if (parsed.isEmpty()) continue
+                withCopy++
+                heads.add(M3uParser.epgUrls(body, 300))
+                for (c in parsed) {
+                    if (merged.containsKey(c.url)) { dupes++; continue }
+                    if (merged.size >= regionMax) { capped = true; break }
+                    merged[c.url] = c
+                }
+            }
+            val missing = lists.size - withCopy
+            val list = ArrayList(merged.values)
+            val names = list.map { norm(it.name) }
+            DebugLog.add("M3U todas: $withCopy listas con copia, ${list.size} canales, $dupes repetidos quitados" +
+                (if (missing > 0) ", $missing sin copia" else "") + (if (capped) ", tope de $regionMax" else ""))
+            runOnUiThread {
+                if (isFinishing || gen != loadGen) return@runOnUiThread
+                channels = list
+                normNames = names
+                fromCache = list.isNotEmpty()
+                cacheNote = " · de $withCopy listas" + (if (missing > 0) " ($missing sin copia)" else "") + (if (capped) " · tope de $regionMax" else "")
+                applyFilter()
+                if (list.isEmpty()) {
+                    statusView.text = "Ninguna lista tiene copia guardada todavía: abre una lista (o «Toda la región») una vez para poder buscar en ella."
+                } else {
+                    searchBox.requestFocus()
+                    try {
+                        (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+                            .showSoftInput(searchBox, 0)
+                    } catch (e: Exception) { }
+                }
+            }
+            if (list.isNotEmpty() && Epg.enabled(this)) {
+                // la guía solo de su copia guardada (allowNet = false): así se puede buscar también por programa
+                Epg.load(this, "region:" + name, Epg.regionSources(heads), list, false, false) { gen == loadGen && !isFinishing }
+                runOnUiThread {
+                    if (!isFinishing && gen == loadGen) applyFilter()
+                }
+            }
+            Store.backfillChFavs(list)   // [FAV-1]
+        }
     }
 
     private fun addListDialog() {
