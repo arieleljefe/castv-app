@@ -1096,7 +1096,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             "🛠 Herramientas",
             "💬 Subtítulos")
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
-        if (ch != null && Epg.nowNext(ch) != null) labels.add("📅 Guía: ahora y siguiente")
+        if (ch != null && Epg.nowNext(ch) != null) labels.add("📅 Guía: ahora y lo que sigue")
         AlertDialog.Builder(this)
             .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
@@ -1122,6 +1122,12 @@ class VideoPlayerActivity : AppCompatActivity() {
         nn.second?.let {
             if (sb.isNotEmpty()) sb.append("\n\n")
             sb.append("⏭ Después (").append(Epg.hhmm(it.start)).append("–").append(Epg.hhmm(it.stop)).append(")\n").append(it.title)
+        }
+        // [EPG-AGENDA-1] y lo que sigue después de esos dos (hasta 6 más, una línea cada uno)
+        val rest = Epg.upcoming(c, 8).filter { p -> p !== nn.first && p !== nn.second }
+        if (rest.isNotEmpty()) {
+            sb.append("\n\nMás tarde:")
+            for (p in rest) sb.append("\n").append(Epg.hhmm(p.start)).append("  ").append(p.title)
         }
         AlertDialog.Builder(this)
             .setTitle(c.name)

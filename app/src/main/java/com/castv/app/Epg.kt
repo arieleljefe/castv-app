@@ -375,6 +375,15 @@ object Epg {
         return if (cur == null && nxt == null) null else Pair(cur, nxt)
     }
 
+    /** [EPG-AGENDA-1] Los próximos programas de un canal (el de ahora y los que siguen), hasta [max]; vacío si no hay guía. */
+    fun upcoming(c: M3uChannel, max: Int): List<Prog> {
+        val g = guide ?: return emptyList()
+        val tid = c.tvgId.lowercase()
+        val id = (if (tid.isNotEmpty() && g.progs.containsKey(tid)) tid else g.names[key(c.name)]) ?: return emptyList()
+        val now = System.currentTimeMillis()
+        return (g.progs[id] ?: emptyList()).filter { it.stop > now }.take(max)
+    }
+
     /** «▶ Programa · hasta 21:30» para la lista de canales; null si no hay programa en curso. */
     fun nowLine(c: M3uChannel): String? {
         val cur = nowNext(c)?.first ?: return null
