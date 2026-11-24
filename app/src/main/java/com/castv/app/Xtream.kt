@@ -36,6 +36,7 @@ object Xtream {
         val id = if (reuse != null && isXtream(reuse)) reuse.removePrefix(PREFIX) else java.util.UUID.randomUUID().toString().take(8)
         val o = JSONObject().put("s", cleanServer(server)).put("u", user.trim()).put("p", pass)
         sp(ctx).edit().putString(id, o.toString()).apply()
+        rehydrate(ctx)   // [XTFAV-1] si venían entradas «portátiles» de un respaldo, se completan con este acceso
         return PREFIX + id
     }
 
@@ -99,5 +100,111 @@ object Xtream {
             } catch (e: Exception) { }
         }
         return false
+    }
+
+    // ------------------------------------------------- [XTFAV-1] Enlaces de canales «portátiles» (sin usuario ni clave)
+    // En un respaldo, un enlace de canal Xtream `http://srv/live/usuario/clave/123.m3u8` se guarda como
+    // `xtream://<id>/live/123.m3u8` (o `xtream://<id>@http://otro-host/live/123.m3u8` si el host no es el del acceso).
+    // Al restaurar, si ese acceso existe en el teléfono, vuelve a ser el enlace real; si no, queda así hasta que se
+    // vuelva a poner el acceso de esa lista (🔑 Xtream con el mismo id), momento en que [rehydrate] lo completa.
+
+    /** Claves de castv_lib con enlaces de canales que se vuelven portátiles. («chhealth» no: se descarta.) */
+    internal val PORTABLE_KEYS = setOf("chfav", "chfavmeta", "chhidden", "links", "chrecent")
+
+    internal class Login(val id: String, val s: String, val u: String, val p: String)
+
+    private val CH_URL = Regex("""^(.*?)/(live|movie|series|timeshift)/([^/\s]+)/([^/\s]+)/(\S+)$""", RegexOption.IGNORE_CASE)
+    private val CH_BACK = Regex("""^(.*?)/(live|movie|series|timeshift)/(\S+)$""", RegexOption.IGNORE_CASE)
+
+    internal fun logins(ctx: Context): List<Login> {
+        val out = ArrayList<Login>()
+        for ((id, v) in sp(ctx).all) {
+            val raw = v as? String ?: continue
+            try {
+                val o = JSONObject(raw)
+                val u = o.getString("u")
+                val p = o.getString("p")
+                if (u.isNotEmpty() && p.isNotEmpty()) out.add(Login(id, o.getString("s"), u, p))
+            } catch (e: Exception) { }
+        }
+        return out
+    }
+
+    private fun dec(s: String): String = try { java.net.URLDecoder.decode(s, "UTF-8") } catch (e: Exception) { s }
+
+    /** Enlace real de un canal con usuario y clave → forma portátil; null si no es de un acceso guardado aquí. */
+    internal fun toPortable(url: String, ls: List<Login>): String? {
+        val m = CH_URL.find(url) ?: return null
+        val base = m.groupValues[1]
+        val kind = m.groupValues[2]
+        val user = m.groupValues[3]
+        val pass = m.groupValues[4]
+        val rest = m.groupValues[5]
+        val lg = ls.firstOrNull { (it.u == user && it.p == pass) || (it.u == dec(user) && it.p == dec(pass)) } ?: return null
+        val same = base.equals(lg.s, ignoreCase = true)
+        return PREFIX + lg.id + (if (same) "" else "@$base") + "/" + kind + "/" + rest
+    }
+
+    /** Forma portátil → enlace real; null si no es portátil o no hay acceso con ese id. */
+    internal fun fromPortable(p: String, ls: List<Login>): String? {
+        if (!p.startsWith(PREFIX)) return null
+        val body = p.removePrefix(PREFIX)
+        val cut = body.indexOfFirst { it == '@' || it == '/' }
+        if (cut <= 0) return null
+        val id = body.substring(0, cut)
+        val lg = ls.firstOrNull { it.id == id } ?: return null
+        val tail = body.substring(cut)
+        val base: String
+        val kind: String
+        val rest: String
+        if (tail.startsWith("@")) {
+            val m = CH_BACK.find(tail.substring(1)) ?: return null
+            base = m.groupValues[1]; kind = m.groupValues[2]; rest = m.groupValues[3]
+        } else {
+            val m = CH_BACK.find(tail) ?: return null
+            if (m.groupValues[1].isNotEmpty()) return null
+            base = lg.s; kind = m.groupValues[2]; rest = m.groupValues[3]
+        }
+        return "$base/$kind/${lg.u}/${lg.p}/$rest"
+    }
+
+    /** Aplica [f] al enlace de cada elemento (texto suelto o campo "u" de un objeto) del JSON [v] de la clave [k]. Si algo falla devuelve [v] igual. */
+    internal fun mapUrls(k: String, v: String, f: (String) -> String): String {
+        if (k !in PORTABLE_KEYS) return v
+        return try {
+            val a = org.json.JSONArray(v)
+            val out = org.json.JSONArray()
+            for (i in 0 until a.length()) {
+                val e = a.get(i)
+                if (e is JSONObject) {
+                    val c = JSONObject(e.toString())
+                    c.put("u", f(e.getString("u")))
+                    out.put(c)
+                } else out.put(f(e.toString()))
+            }
+            out.toString()
+        } catch (ex: Exception) { v }
+    }
+
+    /** Para el respaldo: los enlaces con usuario y clave de un acceso conocido pasan a forma portátil. */
+    internal fun portabilize(k: String, v: String, ls: List<Login>): String =
+        if (ls.isEmpty()) v else mapUrls(k, v) { toPortable(it, ls) ?: it }
+
+    /** Completa las entradas portátiles de castv_lib cuyo acceso ya existe (se llama al guardar un acceso). */
+    fun rehydrate(ctx: Context) {
+        try {
+            val ls = logins(ctx)
+            if (ls.isEmpty()) return
+            val lib = ctx.applicationContext.getSharedPreferences("castv_lib", Context.MODE_PRIVATE)
+            val ed = lib.edit()
+            var changed = false
+            for (k in PORTABLE_KEYS) {
+                val cur = lib.getString(k, null) ?: continue
+                if (!cur.contains(PREFIX)) continue
+                val nv = mapUrls(k, cur) { fromPortable(it, ls) ?: it }
+                if (nv != cur) { ed.putString(k, nv); changed = true }
+            }
+            if (changed) ed.commit()
+        } catch (e: Exception) { }
     }
 }

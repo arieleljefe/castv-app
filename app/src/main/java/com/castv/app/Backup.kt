@@ -12,6 +12,9 @@ import java.io.InputStream
  * reanudación ni las estadísticas de uso (salvo las marcas de «visto»; el modo incógnito y los
  * presets propios del ecualizador ya viajaban en las preferencias).
  *
+ * [XTFAV-1] Los canales Xtream (favoritos, ocultos, Continuar, historial) viajan sin usuario ni clave (`xtream://<id>/…`); al restaurar se
+ * conserva lo de Xtream que ya había y se une con lo del respaldo.
+ *
  * Importar REEMPLAZA los datos actuales. Antes de tocar nada, todo el archivo se lee y se valida.
  *
  * [AUTORESPALDO-1] Los archivos PARCIALES (v = 2, con la marca "part") traen solo el historial o solo los
@@ -66,6 +69,7 @@ object Backup {
     /** Arma el JSON con las preferencias de la app. */
     fun build(ctx: Context): String {
         val leaks = Xtream.leakFilter(ctx)   // [XTREAM-1]
+        val xt = Xtream.logins(ctx)          // [XTFAV-1] los canales Xtream viajan en forma portátil (sin usuario ni clave)
         val root = JSONObject()
         root.put("app", APP)
         root.put("v", VERSION)
@@ -78,7 +82,7 @@ object Backup {
                 if (!keep(name, k)) continue@loop
                 val e = JSONObject()
                 when (v) {
-                    is String -> e.put("t", "s").put("v", if (name == "castv_lib") scrub(k, v, leaks) else v)   // [XTREAM-1]
+                    is String -> e.put("t", "s").put("v", if (name == "castv_lib") scrub(k, Xtream.portabilize(k, v, xt), leaks) else v)   // [XTREAM-1] [XTFAV-1]
                     is Int -> e.put("t", "i").put("v", v)
                     is Long -> e.put("t", "l").put("v", v)
                     is Float -> e.put("t", "f").put("v", v.toDouble())
@@ -155,8 +159,9 @@ object Backup {
         if (staged.isEmpty()) return "El respaldo está vacío."
 
         // 2) Aplicar: reemplaza lo actual (salvo lo que no se respalda)
-        for ((name, m) in staged) {
+        for ((name, m0) in staged) {
             val sp = ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
+            val m = if (name == "castv_lib") withXtream(ctx, sp, m0) else m0   // [XTFAV-1]
             val ed = sp.edit()
             for (k in sp.all.keys) {
                 if (!keep(name, k)) continue
@@ -175,6 +180,38 @@ object Backup {
             ed.commit()
         }
         return null
+    }
+
+    // ------------------------------------------------- [XTFAV-1] Canales Xtream al restaurar
+
+    /**
+     * Antes de reemplazar castv_lib: (1) los enlaces portátiles del respaldo vuelven a ser reales si su acceso existe aquí;
+     * (2) lo de Xtream que ya hay en el teléfono (reales o portátiles) se conserva y se une con lo del respaldo.
+     * Si algo falla con una clave, esa clave queda como venía en el respaldo.
+     */
+    private fun withXtream(ctx: Context, sp: android.content.SharedPreferences, m: Map<String, Any>): Map<String, Any> {
+        val ls = Xtream.logins(ctx)
+        val leaks = Xtream.leakFilter(ctx)
+        val out = LinkedHashMap<String, Any>(m)
+        for (k in Xtream.PORTABLE_KEYS) {
+            val inc = out[k] as? String
+            val dec = if (inc != null) Xtream.mapUrls(k, inc) { Xtream.fromPortable(it, ls) ?: it } else null
+            if (dec != null) out[k] = dec
+            try {
+                val cur = sp.getString(k, null) ?: continue
+                val mine = JSONArray(scrub(k, cur) { u -> !(leaks(u) || Xtream.isXtream(u)) })   // solo lo de Xtream
+                if (mine.length() == 0) continue
+                out[k] = mergeKey(k, JSONArray(dec ?: "[]"), mine).toString()
+            } catch (e: Exception) { }
+        }
+        return out
+    }
+
+    private fun mergeKey(k: String, a: JSONArray, b: JSONArray): JSONArray = when (k) {
+        "links" -> mergeLinks(a, b).first
+        "chfav" -> mergeStrings(a, b).first
+        "chrecent" -> mergeObjects(a, b, MAX_RECENT_CH).first
+        else -> mergeObjects(a, b, Int.MAX_VALUE).first   // chfavmeta, chhidden
     }
 
     // ------------------------------------------------- [AUTORESPALDO-1] Archivos parciales para compartir
