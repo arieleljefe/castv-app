@@ -1643,18 +1643,20 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun showToolsMenu() {
         val nMarks = items.getOrNull(index)?.let { if (it.id != 0L) Store.marks(it).size else 0 } ?: 0   // [MARCAS-1]
-        val baseLabels = arrayOf(
-            "⏱ Saltar a un tiempo…",
-            "🔁 Marcar A (inicio) aquí",
-            "🔁 Marcar B (fin) aquí",
-            "❌ Quitar repetición A-B",
-            "🔊 Volumen extra: " + boostPct() + " %",
-            "ℹ️ Información del video",
-            "🪟 Ventana flotante (PiP)",
-            "🔖 Marcadores (" + nMarks + ")…",   // [MARCAS-1]
-            "⏩ Velocidad: " + speedText())   // [SPEED-1]
-        val labels = if (chapters.isNotEmpty()) baseLabels + ("📑 Capítulos (" + chapters.size + ")…") else baseLabels   // [CAPITULOS-1]
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-4]
+        val ic = b.context
+        val baseLabels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_time, "Saltar a un tiempo…"),
+            CastvIcons.item(ic, R.drawable.ic_vp_repeat, "Marcar A (inicio) aquí"),
+            CastvIcons.item(ic, R.drawable.ic_vp_repeat, "Marcar B (fin) aquí"),
+            CastvIcons.item(ic, R.drawable.ic_vp_close, "Quitar repetición A-B"),
+            CastvIcons.item(ic, R.drawable.ic_vp_volume, "Volumen extra: " + boostPct() + " %"),
+            CastvIcons.item(ic, R.drawable.ic_vp_info, "Información del video"),
+            CastvIcons.item(ic, R.drawable.ic_vp_pip, "Ventana flotante (PiP)"),
+            CastvIcons.item(ic, R.drawable.ic_vp_bookmark, "Marcadores (" + nMarks + ")…"),   // [MARCAS-1]
+            CastvIcons.item(ic, R.drawable.ic_vp_speed, "Velocidad: " + speedText()))   // [SPEED-1]
+        val labels = if (chapters.isNotEmpty()) baseLabels + CastvIcons.item(ic, R.drawable.ic_vp_list, "Capítulos (" + chapters.size + ")…") else baseLabels   // [CAPITULOS-1]
+        b
             .setTitle("Herramientas · " + abText())
             .setItems(labels) { _, which ->
                 when (which) {
