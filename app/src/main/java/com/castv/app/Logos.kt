@@ -2,6 +2,7 @@ package com.castv.app
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
@@ -23,6 +24,9 @@ object Logos {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
     private val failed = HashSet<String>()
+    private val lightMap = HashMap<String, Boolean>()   // [VISTA-5] url -> el logo es claro
+    private const val BG_LIGHT = 0xFFF2F2F2.toInt()
+    private const val BG_DARK = 0xFF2B3040.toInt()
     private val pool = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
 
@@ -49,10 +53,45 @@ object Logos {
                     }
                 } else {
                     cache.put(url, bmp)
-                    if (iv.tag == url) iv.setImageBitmap(bmp)
+                    if (iv.tag == url) {
+                        iv.setImageBitmap(bmp)
+                        val bg = iv.background   // [VISTA-5] el fondo ya puesto se ajusta al llegar el logo
+                        if (bg is GradientDrawable) bg.setColor(if (isLight(url, bmp)) BG_DARK else BG_LIGHT)
+                    }
                 }
             }
         }
+    }
+
+    /** [VISTA-5] Color de fondo para el logo: oscuro si el logo es claro (p. ej. blanco), claro en los demás casos o si aún no llegó. */
+    fun bgFor(url: String): Int {
+        val b = cache.get(url) ?: return BG_LIGHT
+        return if (isLight(url, b)) BG_DARK else BG_LIGHT
+    }
+
+    /** [VISTA-5] Promedia el brillo de los píxeles visibles (muestra de ~24x24); más de 185 de 255 = logo claro. */
+    private fun isLight(url: String, b: Bitmap): Boolean {
+        synchronized(lightMap) { lightMap[url]?.let { return it } }
+        var sum = 0L
+        var n = 0
+        val sx = maxOf(1, b.width / 24)
+        val sy = maxOf(1, b.height / 24)
+        var y = 0
+        while (y < b.height) {
+            var x = 0
+            while (x < b.width) {
+                val p = b.getPixel(x, y)
+                if ((p ushr 24) > 128) {
+                    sum += (299 * ((p shr 16) and 255) + 587 * ((p shr 8) and 255) + 114 * (p and 255)) / 1000
+                    n++
+                }
+                x += sx
+            }
+            y += sy
+        }
+        val r = n > 0 && sum / n > 185
+        synchronized(lightMap) { lightMap[url] = r }
+        return r
     }
 
     private fun fetch(url: String): Bitmap? {

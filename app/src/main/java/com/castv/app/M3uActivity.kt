@@ -82,10 +82,10 @@ class M3uActivity : AppCompatActivity() {
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
     /** [VISTA-1] Fondo claro redondeado detrás del logo: así los logos oscuros se ven con el tema oscuro. Sin logo (icono gris de TV) no lleva fondo. */
-    private fun styleLogo(logo: ImageView, hasLogo: Boolean) {
-        if (hasLogo) {
+    private fun styleLogo(logo: ImageView, url: String) {   // [VISTA-5] el fondo depende del brillo del logo
+        if (url.isNotEmpty()) {
             logo.background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F2F2F2"))
+                setColor(Logos.bgFor(url))
                 cornerRadius = dp(6).toFloat()
             }
             logo.setPadding(dp(3), dp(2), dp(3), dp(2))
@@ -699,7 +699,7 @@ class M3uActivity : AppCompatActivity() {
         } else {
             logo.clearColorFilter()
         }
-        styleLogo(logo, c.logo.isNotEmpty())   // [VISTA-1]
+        styleLogo(logo, c.logo)   // [VISTA-1] [VISTA-5]
         box.addView(logo, LinearLayout.LayoutParams(dp(64), dp(36)))   // [VISTA-2]
         val name = TextView(this)
         name.text = splitName(c.name).first
@@ -1146,7 +1146,7 @@ class M3uActivity : AppCompatActivity() {
             } else {
                 logo.clearColorFilter()
             }
-            styleLogo(logo, c.logo.isNotEmpty())   // [VISTA-1]
+            styleLogo(logo, c.logo)   // [VISTA-1] [VISTA-5]
             // [PULIDO-3b/3c] nombre limpio; categorías en español y etiquetas en la línea gris
             val (shownName, badges) = splitName(c.name)
             val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
