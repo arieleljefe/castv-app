@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v377
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v379
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -114,3 +114,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - EPG-BUSCAR-1 · 24 nov · con la guía activada, el buscador de Canales también encuentra por el programa que dan ahora (solo mira el programa si el nombre no coincidió); probado: Free-TV › Italia, «noti» → Mediaset Italia («Dentro La Notizia») · `M3uActivity.kt` (`applyFilter`)
 - TESTS-2 · 24 nov · 11 pruebas automáticas del respaldo (`BackupTest`: claves respaldadas, `scrub` sin enlaces con usuario y clave, unión de parciales, `describe`, `readLimited`); `keep/scrub/merge*` pasan a `internal` y `build.gradle` suma `org.json:json:20231013` para pruebas; build en verde · `Backup.kt`, `app/build.gradle`, `BackupTest.kt`
 - EPG-AGENDA-1 · 24 nov · en el reproductor, ⋯ › «📅 Guía: ahora y lo que sigue» muestra también «Más tarde:» con hasta 6 programas más («HH:MM  título») de las próximas ~24 h · `Epg.kt` (`upcoming`), `VideoPlayerActivity.kt` (`showGuideNow`)
+- INSETS-1 · 24 nov · los controles del reproductor (barra de abajo, de arriba y subtítulos) ya no quedan bajo ☰ ○ < en pantalla completa: se mide el tamaño real de las barras con `getInsetsIgnoringVisibility` y se repiten los márgenes al crear la barra · `VideoPlayerActivity.kt`
+- CANALES-1 · 24 nov · Canales más compacto: la lista actual va junto a la flecha ← (sin la fila del título), los chips de ánimo van dentro de la lista y se van al bajar, y los botones dicen «📅 Guía» y «⚠ N fallan» · `M3uActivity.kt`
+- AVANZADO-1 · 24 nov · Ajustes › Avanzado junta las tres pruebas de IA (audio, Whisper, transcripción) en una fila «Pruebas de IA…» con menú · `SettingsActivity.kt`
