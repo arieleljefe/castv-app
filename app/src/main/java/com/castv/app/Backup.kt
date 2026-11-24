@@ -18,6 +18,7 @@ import java.io.InputStream
  * canales favoritos para compartirlos con otra persona: al importarlos se AÑADEN a lo que ya hay y no se borra nada.
  */
 object Backup {
+    // [TESTS-2] keep, scrub y merge* son internal (no private) solo para poder probarlos; no cambia nada más
     private const val APP = "castv"
     private const val VERSION = 1         // los respaldos completos siguen siendo v1 (cualquier CASTV los lee)
     private const val MAX_READABLE = 2    // [AUTORESPALDO-1] v2 = parcial; una versión vieja de CASTV lo rechaza
@@ -25,7 +26,7 @@ object Backup {
     private val SKIP = setOf("tvIp", "pin_hash")   // [BACKUP-1] propios de cada teléfono/red: no se respaldan ni se tocan al importar
 
     /** [BACKUP-2] Qué claves de cada archivo se respaldan: en castv_stats solo las marcas "visto" (v|...). */
-    private fun keep(name: String, k: String): Boolean = when (name) {
+    internal fun keep(name: String, k: String): Boolean = when (name) {
         "castv" -> k !in SKIP
         "castv_stats" -> k.startsWith("v|")
         else -> true
@@ -35,7 +36,7 @@ object Backup {
     private val URL_KEYS = setOf("chfav", "chfavmeta", "chhidden", "links", "chrecent", "chhealth")
 
     /** Quita de [v] (texto JSON de la clave [k]) los enlaces con usuario y clave de Xtream. */
-    private fun scrub(k: String, v: String, leaks: (String) -> Boolean): String {
+    internal fun scrub(k: String, v: String, leaks: (String) -> Boolean): String {
         if (k !in URL_KEYS) return v
         return try {
             if (k == "chhealth") {
@@ -273,7 +274,7 @@ object Backup {
     }
 
     /** Enlaces: lo que ya hay se queda; se añaden los que no estén (por URL); mismo tope que Store. Devuelve (lista, nuevos). */
-    private fun mergeLinks(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
+    internal fun mergeLinks(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
         val have = HashSet<String>()
         val all = ArrayList<JSONObject>()
         for (i in 0 until cur.length()) {
@@ -298,7 +299,7 @@ object Backup {
     }
 
     /** Lista de textos (enlaces de canales favoritos): unión sin repetir. */
-    private fun mergeStrings(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
+    internal fun mergeStrings(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
         val have = LinkedHashSet<String>()
         for (i in 0 until cur.length()) have.add(cur.getString(i))
         var added = 0
@@ -309,7 +310,7 @@ object Backup {
     }
 
     /** Lista de objetos con "u": lo que ya hay va primero y se añaden los que no estén; con tope de tamaño. */
-    private fun mergeObjects(cur: JSONArray, inc: JSONArray, max: Int): Pair<JSONArray, Int> {
+    internal fun mergeObjects(cur: JSONArray, inc: JSONArray, max: Int): Pair<JSONArray, Int> {
         val have = HashSet<String>()
         val all = ArrayList<JSONObject>()
         for (i in 0 until cur.length()) {
