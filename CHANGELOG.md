@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v339
+# CASTV: CHANGELOG (cerebro) · v340
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -116,13 +116,19 @@ rm -f ~/storage/downloads/*_actual.*
   - **Causa:** la ★ de FAV-REPRO-1 solo salía con canales abiertos desde una lista que pasa por `Zap` (`zapList`); un canal abierto desde otro lado (tarjetas de Continuar o Favoritos, Historial, enlaces) quedaba sin ★.
   - **Qué cambia:** `currentChannel()` ahora también arma el canal (título + enlace; con logo y grupo si ya estaba en «Continuar», vía `Store.recentChannels()`) cuando el reproductor se abrió con un enlace (`id == 0L`) sin lista. Con videos del teléfono sigue sin ★. Un enlace mp4 suelto también puede marcarse ★ (queda en Favoritos de canales con su título).
   - **Cómo probar:** 1) abrir un canal que NO sea favorito desde Canales, desde las tarjetas de Continuar y desde Historial/enlaces; 2) tocar la pantalla: debe salir ☆; 3) tocarla: pasa a ★, sale el aviso y el canal aparece en Favoritos al volver a Canales; 4) videos del teléfono: sin ★.
-  - **Riesgo:** sin compilador de Kotlin (R4). Si Ariel se refería a la pantalla «Reproduciendo» del modo TV (no al reproductor del teléfono), esto no lo cubre: avisar.
+  - **Riesgo:** sin compilador de Kotlin (R4). El caso del TV (pantalla «Reproduciendo») lo cubre FAV-REPRO-3.
   - **Siguiente paso:** «ya funciona» → ✅ y a `HISTORIAL`. Sin etiqueta (R12).
+- **Ahora en 🧪 también: FAV-REPRO-3 (24 nov; Ariel: «crea ambos, haz lo que tengas que hacer para que cubra todo lo que pueda»).** Archivos: `MainActivity.kt`, `M3uActivity.kt`, `Zap.kt` (`FAV-REPRO-3.patch`; se aplica después de FAV-REPRO-2).
+  - **Qué hace:** cuando un canal suena en el TV, la ★ del mini reproductor (`btnNowFav`) y la de la pantalla «Reproduciendo» marcan ese canal como favorito (antes solo servían para canciones y videos). También hay una ★ en la notificación del canal (cuarto botón «Favorito» / «Quitar de favoritos»; se ve al expandirla). Todo usa `Store.toggleChFav` + `rememberChFav/forgetChFav`, igual que la lista y el reproductor del teléfono.
+  - **Cómo funciona:** el aviso `ACT_CHANNEL_ON_TV` ahora lleva también el enlace (`url`), desde `M3uActivity.sendToTv` y desde `Zap.send` (⏮ ⏭ en el TV); `MainActivity` lo guarda en `linkUrlNow` (también al mandar un enlace desde el campo de enlaces, `playLink`). `tvChannelNow()` arma el canal (con logo y grupo si ya estaba en «Continuar»). `tvFavNow` guarda el estado para no leer el disco en cada refresco de la notificación. Nueva acción `ACT_FAV`, registrada en el `IntentFilter` (R1); solo funciona con la app viva, como ⏮ ⏯ ⏭.
+  - **Cómo probar:** 1) mandar al TV un canal que NO sea favorito: la ☆ del mini reproductor aparece; tocarla la pone ★ y el canal sale en Favoritos; 2) abrir la pantalla «Reproduciendo»: su ☆/★ coincide y también marca; 3) ⏮ ⏭ al cambiar de canal: la estrella sigue al canal nuevo; 4) expandir la notificación: botón ★ que marca/quita y cambia de icono; 5) música o video del teléfono: la ★ sigue marcando la canción/video como siempre.
+  - **Riesgos:** (a) sin compilador de Kotlin (R4); (b) en la notificación compacta solo se ven 3 botones, la ★ queda al expandir; (c) un enlace pegado a mano (mp4) enviado al TV también puede marcarse como favorito de canales.
+  - **Siguiente paso:** «ya funciona» de Ariel → FAV-REPRO-2 y FAV-REPRO-3 a ✅ y a `HISTORIAL`. Sin etiqueta (R12).
 - **Propuesta aún sin etiquetar:** `v3.8` (pedida por Ariel, 24 nov): falta confirmar que la etiqueta y su Release (`CASTV-v3.8.apk`) están subidos; si no, `git tag v3.8 && git push origin v3.8` con el build de `main` en verde. ZAP-3 (deslizar para cambiar de canal) no se hizo: puede chocar con los gestos de brillo y volumen.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. **FAV-REPRO-2** (🧪, pendiente de aplicar y probar). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
+1. **FAV-REPRO-2** y **FAV-REPRO-3** (🧪, pendientes de aplicar y probar; en ese orden). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
 
 ### Pendientes sueltos
 - ⬜ **ZAP-3** deslizar arriba/abajo en el reproductor para cambiar de canal (propuesto 24 nov; puede chocar con los gestos de brillo y volumen; Ariel no lo eligió). BARRA-1, VIVO-1 y GIRO-1 ya están en 🧪.
