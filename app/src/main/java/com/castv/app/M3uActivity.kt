@@ -1,9 +1,15 @@
 package com.castv.app
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.InputType
 import android.text.TextUtils
@@ -41,6 +47,12 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var channelList: ListView
     private lateinit var chAdapter: ChannelAdapter
+    // [CANAL-MINI-1] barra de abajo con el canal que está en el TV (⏮ ⏯ ⏭ ★ ✕)
+    private lateinit var nowBar: LinearLayout
+    private lateinit var nowTitle: TextView
+    private lateinit var nowFav: TextView
+    private var nowDismissed: String? = null
+    private var nowRecv: BroadcastReceiver? = null
     private lateinit var sections: LinearLayout   // [ESTILO-2] cabecera del ListView: Continuar y Favoritos
 
     private var txtColor = Color.BLACK
@@ -278,7 +290,49 @@ class M3uActivity : AppCompatActivity() {
         root.addView(
             channelList,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // [CANAL-MINI-1] los botones mandan las mismas órdenes que la notificación; las atiende la pantalla principal
+        nowBar = LinearLayout(this)
+        nowBar.gravity = Gravity.CENTER_VERTICAL
+        nowBar.setPadding(dp(12), dp(10), dp(4), dp(8))
+        nowBar.background = ContextCompat.getDrawable(this, R.drawable.bg_mini_player)
+        nowBar.visibility = View.GONE
+        nowTitle = TextView(this)
+        nowTitle.setTextColor(txtColor)
+        nowTitle.textSize = 14f
+        nowTitle.setTypeface(null, android.graphics.Typeface.BOLD)
+        nowTitle.maxLines = 1
+        nowTitle.ellipsize = TextUtils.TruncateAt.END
+        nowBar.addView(nowTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val tvCmd = { act: String -> sendBroadcast(Intent(act).setPackage(packageName)) }
+        nowFav = chip("☆") {
+            tvCmd(MainActivity.ACT_FAV)
+            Handler(Looper.getMainLooper()).postDelayed({ favs = Store.chFavs(); updateNowBar(); chAdapter.notifyDataSetChanged() }, 400)
+        }
+        val nowBtns = listOf(
+            chip("⏮") { tvCmd(MainActivity.ACT_PREV) },
+            chip("⏯") { tvCmd(MainActivity.ACT_TOGGLE) },
+            chip("⏭") { tvCmd(MainActivity.ACT_NEXT) },
+            nowFav,
+            chip("✕") { nowDismissed = Zap.nowTitle; updateNowBar() })
+        for (b in nowBtns) {
+            b.textSize = 16f
+            b.setPadding(dp(10), dp(6), dp(10), dp(6))
+            nowBar.addView(b)
+        }
+        root.addView(nowBar)
         setContentView(root)
+        nowRecv = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) {
+                nowDismissed = null
+                Zap.nowTitle = i?.getStringExtra("title")
+                Zap.nowUrl = i?.getStringExtra("url")
+                updateNowBar()
+            }
+        }
+        val nowFilter = IntentFilter(MainActivity.ACT_CHANNEL_ON_TV)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(nowRecv, nowFilter, Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(nowRecv, nowFilter)
+        updateNowBar()
 
         val added = Store.installCatalog(Catalog.VERSION, Catalog.items)   // [CATALOGO-1] listas de fábrica, una sola vez
         if (added > 0) toast("📡 Se añadieron $added listas de canales")
@@ -1012,6 +1066,17 @@ class M3uActivity : AppCompatActivity() {
         if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else { chAdapter.notifyDataSetChanged(); updateFailBtn() } }
         refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
         if (::guideBtn.isInitialized) guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE   // [EPG-1] pudo cambiar en Ajustes
+        updateNowBar()   // [CANAL-MINI-1]
+    }
+
+    /** [CANAL-MINI-1] Muestra u oculta la barra del canal que está en el TV. */
+    private fun updateNowBar() {
+        if (!::nowBar.isInitialized) return
+        val t = Zap.nowTitle
+        if (t == null || t == nowDismissed) { nowBar.visibility = View.GONE; return }
+        nowTitle.text = "📺 $t"
+        nowFav.text = if (Zap.nowUrl?.let { favs.contains(it) } == true) "★" else "☆"
+        nowBar.visibility = View.VISIBLE
     }
 
     /** Arma las dos filas de tarjetas de arriba. Se esconden al buscar, filtrar por grupo o con ★ Favs; una fila vacía no se muestra. */
@@ -1395,6 +1460,7 @@ class M3uActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         checkGen++   // [CHECK-1] si se sale de la pantalla, la revisión se detiene
+        try { nowRecv?.let { unregisterReceiver(it) } } catch (e: Exception) { }   // [CANAL-MINI-1]
         QrAdd.close("pantalla cerrada")   // [QR-1]
         QrSend.close("pantalla cerrada")   // [QR-2a]
         checkPool?.shutdownNow()

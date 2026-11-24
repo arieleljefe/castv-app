@@ -185,6 +185,7 @@ class MainActivity : AppCompatActivity() {
                     linkOnTv = true; linkDurSec = 0; linkGen++
                     linkTitleNow = t
                     linkUrlNow = intent?.getStringExtra("url")   // [FAV-REPRO-3]
+                    Zap.nowTitle = t; Zap.nowUrl = linkUrlNow   // [CANAL-MINI-1]
                     linkIsLive = intent?.getBooleanExtra("live", false) ?: false
                     resetProgress()
                     tvNowPlaying.text = t
@@ -509,7 +510,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 thread { TvController.stop() }
                 resetProgress()
-                linkOnTv = false; linkDurSec = 0   // [PAUSA-1] tras Detener ya no hay enlace que pausar
+                Zap.nowTitle = null; linkOnTv = false; linkDurSec = 0   // [PAUSA-1] tras Detener ya no hay enlace que pausar
             }
             adapter.notifyDataSetChanged()
         }
@@ -763,7 +764,7 @@ class MainActivity : AppCompatActivity() {
         sleepAtMs = s.sleepAt
         val item = s.current
         playingItem = item
-        linkOnTv = false; linkDurSec = 0
+        Zap.nowTitle = null; linkOnTv = false; linkDurSec = 0
         manualStop = false
         wasPlaying = true
         tvNowPlaying.text = prettyTitle(item)
@@ -1916,7 +1917,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         Store.addLink(url, title)   // historial de enlaces
-        linkOnTv = false   // [PAUSA-1] se vuelve a marcar solo si el TV acepta este enlace
+        Zap.nowTitle = null; linkOnTv = false   // [PAUSA-1] se vuelve a marcar solo si el TV acepta este enlace
         linkDurSec = 0; val gen = ++linkGen   // [PROG-1d] enlace nuevo: duración en cero
         if (playingItem != null) stopCurrentPlayback()   // detiene lo que suene antes de cambiar de destino
         stopLocal()
@@ -2090,7 +2091,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         playingItem = item
-        linkOnTv = false; linkDurSec = 0   // [PAUSA-1] lo nuevo reemplaza al enlace
+        Zap.nowTitle = null; linkOnTv = false; linkDurSec = 0   // [PAUSA-1] lo nuevo reemplaza al enlace
         Store.registerPlay(item)
         pendingResume = resumeAt
         resumeTries = 0
@@ -3270,7 +3271,7 @@ class MainActivity : AppCompatActivity() {
         manualStop = true
         if (localActive) stopLocal() else thread { TvController.stop() }
         playingItem = null
-        linkOnTv = false; linkDurSec = 0   // [PAUSA-1]
+        Zap.nowTitle = null; linkOnTv = false; linkDurSec = 0   // [PAUSA-1]
         resetProgress()
         lastNotifKey = ""
         postDefaultNotification()

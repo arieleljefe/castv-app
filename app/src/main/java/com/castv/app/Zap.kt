@@ -14,6 +14,10 @@ object Zap {
     @Volatile private var pending: Ctx? = null   // la lista del último canal enviado, a la espera de que el TV lo acepte
     @Volatile private var busy = false
 
+    // [CANAL-MINI-1] el canal que está en el TV ahora (lo lee Canales para su barra de abajo). null = ninguno.
+    @Volatile var nowTitle: String? = null
+    @Volatile var nowUrl: String? = null
+
     // ------------------------------------------------- [ZAP-2] ⏮ ⏭ cuando el canal suena en el teléfono
     // La lista va por memoria (no por Intent: una lista grande pasaría el límite de ~1 MB) y se entrega una sola vez.
 
