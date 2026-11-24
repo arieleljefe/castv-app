@@ -350,6 +350,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         video.setOnPreparedListener { mp ->
             mpRef = mp   // [GESTO-2]
+            items.getOrNull(index)?.let { if (it.id == 0L) Store.markChOk(it.uriString) }   // [FUENTES-1] el canal abrió bien
             applyBoost(mp)   // [VOL-1]
             fastOn = false
             video.setVideoDims(mp.videoWidth, mp.videoHeight)   // [UI-2c]
@@ -375,6 +376,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             if (zapList.size < 2 && index + 1 < items.size) playAt(index + 1, saveCurrent = false) else finish()   // [ZAP-2] con canales no se pasa solo al siguiente
         }
         video.setOnErrorListener { _, _, _ ->
+            items.getOrNull(index)?.let { if (it.id == 0L) Store.markChFail(it.uriString) }   // [FUENTES-1] el canal falló
             if (zapList.size > 1) {   // [ZAP-2] se queda en el canal roto para elegir otro con ⏮ ⏭
                 toast("No se pudo reproducir: ${items[index].name}. Prueba otro canal con ⏮ ⏭")
                 return@setOnErrorListener true

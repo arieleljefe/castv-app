@@ -89,13 +89,14 @@ object Zap {
         val live = hls && phoneIp != null
         if (live) {
             val why = MediaServer.probeLive(c.url)
-            if (why != null) return why
+            if (why != null) { Store.markChFail(c.url); return why }   // [FUENTES-1]
         }
         ctx.sendBroadcast(Intent(MainActivity.ACT_STOP_LOCAL).setPackage(ctx.packageName))   // [LOCAL-1]
         val mime = if (live) "video/mp2t" else if (hls) "application/vnd.apple.mpegurl" else "video/mp4"
         val sendUrl = if (phoneIp == null) c.url else if (live) TvSend.liveUrl(phoneIp, c.url) else TvSend.relayUrl(phoneIp, c.url, hls)
         DebugLog.add("ZAP: ${c.url} -> $sendUrl")
         if (!TvController.setUriAndPlay(sendUrl, c.name, mime, false)) return "El TV no aceptó el canal"
+        Store.markChOk(c.url)   // [FUENTES-1]
         ctx.sendBroadcast(Intent(MainActivity.ACT_CHANNEL_ON_TV).setPackage(ctx.packageName)
             .putExtra("title", c.name).putExtra("live", live).putExtra("url", c.url))   // [NOW-1] [FAV-REPRO-3]
         return null

@@ -545,6 +545,68 @@ object Store {
 
     // ------------------------------------------------- Listas de reproducción
 
+    // ------------------------------------------------- Salud de canales [FUENTES-1]
+    // Clave "chhealth" (JSON {enlace: [fallos seguidos, ms del último fallo]}). Un acierto borra la entrada.
+    // No oculta nada: solo sirve para marcar con ⚠ los canales que fallan seguido. Tope de 600 enlaces.
+
+    private fun readHealth(): MutableMap<String, LongArray> {
+        val out = LinkedHashMap<String, LongArray>()
+        val raw = prefs.getString("chhealth", null) ?: return out
+        try {
+            val o = JSONObject(raw)
+            val ks = o.keys()
+            while (ks.hasNext()) {
+                val k = ks.next()
+                val a = o.getJSONArray(k)
+                out[k] = longArrayOf(a.getLong(0), a.getLong(1))
+            }
+        } catch (e: Exception) { rescue("chhealth", raw, e) }
+        return out
+    }
+
+    private fun writeHealth(m: Map<String, LongArray>) {
+        try {
+            val src = if (m.size > 600) m.entries.sortedByDescending { it.value[1] }.take(600).associate { it.key to it.value } else m
+            val o = JSONObject()
+            for ((k, v) in src) o.put(k, JSONArray().put(v[0]).put(v[1]))
+            prefs.edit().putString("chhealth", o.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Anota de una vez qué enlaces fallaron (+1 seguido) y cuáles respondieron bien (se borra su historial). No anota en incógnito. */
+    @Synchronized
+    fun recordHealth(fails: Collection<String>, oks: Collection<String>) {
+        if (incognito || (fails.isEmpty() && oks.isEmpty())) return
+        val m = readHealth()
+        var changed = false
+        for (u in oks) if (m.remove(u) != null) changed = true
+        val now = System.currentTimeMillis()
+        for (u in fails) {
+            val a = m[u]
+            m[u] = longArrayOf((a?.get(0) ?: 0L) + 1L, now)
+            changed = true
+        }
+        if (changed) writeHealth(m)
+    }
+
+    fun markChFail(url: String) = recordHealth(listOf(url), emptyList())
+
+    fun markChOk(url: String) = recordHealth(emptyList(), listOf(url))
+
+    /** Canales con al menos [min] fallos seguidos: enlace → número de fallos. */
+    @Synchronized
+    fun failedChannels(min: Int = 2): Map<String, Int> {
+        val out = HashMap<String, Int>()
+        for ((k, v) in readHealth()) if (v[0] >= min) out[k] = v[0].toInt()
+        return out
+    }
+
+    /** Borra todos los avisos ⚠ (los canales no se tocan). */
+    @Synchronized
+    fun clearHealth() {
+        prefs.edit().remove("chhealth").apply()
+    }
+
     private fun loadLists() {
         lists = LinkedHashMap()
         val raw = prefs.getString("lists", null) ?: return

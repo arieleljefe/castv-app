@@ -66,6 +66,8 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var favBtn: TextView
     private lateinit var hiddenBtn: TextView   // [OCULTAR-1] "👁 N": canales ocultos (solo se ve si hay alguno)
     @Volatile private var hidden: Set<String> = emptySet()   // [OCULTAR-1] enlaces de los canales ocultos
+    private lateinit var failBtn: TextView   // [FUENTES-1] "⚠ N": canales que fallan seguido (solo se ve si hay alguno)
+    @Volatile private var failed: Map<String, Int> = emptyMap()   // [FUENTES-1] enlace → fallos seguidos (2 o más)
     private val reqPlayer = 4715
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
     // [CHECK-1] revisar qué canales responden
@@ -133,6 +135,7 @@ class M3uActivity : AppCompatActivity() {
         Store.init(this)
         favs = Store.chFavs()
         hidden = Store.hiddenUrls()   // [OCULTAR-1]
+        failed = Store.failedChannels()   // [FUENTES-1]
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
         mutedColor = ContextCompat.getColor(this, R.color.vlc_muted)
 
@@ -237,6 +240,12 @@ class M3uActivity : AppCompatActivity() {
         checkBtn = chip("🔎 Revisar") { onCheckClick() }
         checkBtn.textSize = 13f
         checkBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        failBtn = chip("⚠") { showFailedDialog() }   // [FUENTES-1]
+        failBtn.contentDescription = "Canales que fallan"
+        failBtn.textSize = 13f
+        failBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        failBtn.visibility = View.GONE
+        statusRow.addView(failBtn)
         statusRow.addView(checkBtn)
         statusRow.setPadding(0, dp(6), 0, dp(2))   // [VISTA-4] "Revisar" con más aire respecto a los chips de ánimo
         root.addView(statusRow)
@@ -571,6 +580,7 @@ class M3uActivity : AppCompatActivity() {
         }
         refreshSections()   // [ESTILO-2]
         refreshMoods()   // [ESTILO-3]
+        updateFailBtn()   // [FUENTES-1]
     }
 
     // ------------------------------------------------------------ [ESTILO-3] Ánimos
@@ -645,7 +655,8 @@ class M3uActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         favs = Store.chFavs()   // [FAV-REPRO-1] la ★ pudo cambiar en el reproductor
-        if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else chAdapter.notifyDataSetChanged() }
+        failed = Store.failedChannels()   // [FUENTES-1] el reproductor pudo anotar fallos o aciertos
+        if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else { chAdapter.notifyDataSetChanged(); updateFailBtn() } }
         refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
     }
 
@@ -702,7 +713,7 @@ class M3uActivity : AppCompatActivity() {
         styleLogo(logo, c.logo)   // [VISTA-1] [VISTA-5]
         box.addView(logo, LinearLayout.LayoutParams(dp(64), dp(36)))   // [VISTA-2]
         val name = TextView(this)
-        name.text = splitName(c.name).first
+        name.text = (if (failed.containsKey(c.url)) "⚠ " else "") + splitName(c.name).first   // [FUENTES-1]
         name.setTextColor(txtColor)
         name.textSize = 11f   // [VISTA-2] tarjeta más ancha y letra algo menor: caben más nombres completos
         name.gravity = Gravity.CENTER_HORIZONTAL
@@ -830,6 +841,52 @@ class M3uActivity : AppCompatActivity() {
         toast("👁 Canales restaurados: ${urls.size}")
     }
 
+    // ------------------------------------------------------------ Salud de canales [FUENTES-1]
+
+    /** Canales de lo que se ve ahora (lista actual, o favoritos si ★ Favs está activo) que no están ocultos y fallaron 2 veces o más seguidas. */
+    private fun failedNow(): List<M3uChannel> {
+        val f = failed
+        if (f.isEmpty()) return emptyList()
+        val base = if (favOnly) favChannels else channels
+        return visible(base).filter { f.containsKey(it.url) }.sortedByDescending { f[it.url] ?: 0 }
+    }
+
+    private fun updateFailBtn() {
+        if (!::failBtn.isInitialized) return
+        val n = failedNow().size
+        failBtn.text = "⚠ $n"
+        failBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
+    }
+
+    /** Lista de los canales que fallan seguido, con todos desmarcados: se marcan a mano los que se quieran ocultar. */
+    private fun showFailedDialog() {
+        val fl = failedNow()
+        if (fl.isEmpty()) {
+            toast("No hay canales con fallos")
+            return
+        }
+        val labels = Array(fl.size) { i -> "${fl[i].name} · falló ${failed[fl[i].url] ?: 2} veces seguidas" }
+        val checked = BooleanArray(fl.size)
+        AlertDialog.Builder(this)
+            .setTitle("⚠ Fallan seguido (${fl.size}) · marca los que quieras ocultar")
+            .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
+            .setPositiveButton("Ocultar marcados") { _, _ ->
+                val sel = ArrayList<M3uChannel>()
+                for (i in fl.indices) if (checked[i]) sel.add(fl[i])
+                if (sel.isEmpty()) toast("No marcaste ningún canal") else hideFailed(sel)
+            }
+            .setNeutralButton("Olvidar avisos") { _, _ ->
+                Store.clearHealth()
+                failed = emptyMap()
+                chAdapter.notifyDataSetChanged()
+                refreshSections()
+                updateFailBtn()
+                toast("Avisos ⚠ borrados (los canales siguen igual)")
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
     // ------------------------------------------------------------ Revisar canales [CHECK-1]
 
     private class CheckFail(val ch: M3uChannel, val why: String)
@@ -862,6 +919,7 @@ class M3uActivity : AppCompatActivity() {
         val total = list.size
         val done = java.util.concurrent.atomic.AtomicInteger(0)
         val fails = java.util.concurrent.ConcurrentLinkedQueue<CheckFail>()
+        val oks = java.util.concurrent.ConcurrentLinkedQueue<String>()   // [FUENTES-1]
         val pool = Executors.newFixedThreadPool(8)
         checkPool = pool
         checkBtn.text = "⏹ 0/$total"
@@ -872,9 +930,10 @@ class M3uActivity : AppCompatActivity() {
                 if (gen != checkGen) return@execute
                 val why = MediaServer.checkChannel(c.url)
                 if (gen != checkGen) return@execute
-                if (why != null) fails.add(CheckFail(c, why))
+                if (why != null) fails.add(CheckFail(c, why)) else oks.add(c.url)
                 val n = done.incrementAndGet()
                 if (n == total) {
+                    Store.recordHealth(fails.map { it.ch.url }, oks.toList())   // [FUENTES-1] una sola escritura al terminar
                     runOnUiThread { if (!isFinishing && gen == checkGen) finishCheck(total, fails.toList(), listName) }
                 } else if (n % 5 == 0) {
                     runOnUiThread {
@@ -907,6 +966,7 @@ class M3uActivity : AppCompatActivity() {
         checking = false
         checkBtn.text = "🔎 Revisar"
         DebugLog.add("CHECK-1: $listName: $total revisados, ${fails.size} sin respuesta")
+        failed = Store.failedChannels()   // [FUENTES-1]
         applyFilter()
         if (fails.isEmpty()) {
             AlertDialog.Builder(this)
@@ -1066,6 +1126,7 @@ class M3uActivity : AppCompatActivity() {
             if (live && !skipCheck) {
                 val why = MediaServer.probeLive(url)
                 if (why != null) {
+                    Store.markChFail(url)   // [FUENTES-1]
                     DebugLog.add("AVISO-HLS: $title: $why")
                     runOnUiThread { if (!isFinishing) warnChannel(url, title, why) }
                     return@thread
@@ -1076,6 +1137,7 @@ class M3uActivity : AppCompatActivity() {
             val sendUrl = if (phoneIp == null) url else if (live) TvSend.liveUrl(phoneIp, url) else TvSend.relayUrl(phoneIp, url, hls)
             DebugLog.add("ENLACE (M3U): $url -> $sendUrl")
             val ok = TvController.setUriAndPlay(sendUrl, title, mime, false)
+            if (ok) Store.markChOk(url)   // [FUENTES-1]
             if (ok) sendBroadcast(Intent(MainActivity.ACT_CHANNEL_ON_TV).setPackage(packageName).putExtra("title", title).putExtra("live", live).putExtra("url", url))   // [NOW-1] [FAV-REPRO-3] la barra y la notificación muestran el canal (y su ★)
             runOnUiThread {
                 toast(if (ok) "✅ Canal en el TV" else "❌ El TV no aceptó el canal")
@@ -1150,7 +1212,7 @@ class M3uActivity : AppCompatActivity() {
             // [PULIDO-3b/3c] nombre limpio; categorías en español y etiquetas en la línea gris
             val (shownName, badges) = splitName(c.name)
             val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
-            (box.getChildAt(0) as TextView).text = shownName
+            (box.getChildAt(0) as TextView).text = (if (failed.containsKey(c.url)) "⚠ " else "") + shownName   // [FUENTES-1]
             (box.getChildAt(1) as TextView).text =
                 listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
             return v
