@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v382
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v383
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -118,3 +118,9 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CANALES-1 · 24 nov · Canales más compacto: la lista actual va junto a la flecha ← (sin la fila del título), los chips de ánimo van dentro de la lista y se van al bajar, y los botones dicen «📅 Guía» y «⚠ N fallan» · `M3uActivity.kt`
 - AVANZADO-1 · 24 nov · Ajustes › Avanzado junta las tres pruebas de IA (audio, Whisper, transcripción) en una fila «Pruebas de IA…» con menú · `SettingsActivity.kt`
 - FAB-1 · 24 nov · el botón 🔀 se corre 60 dp del borde derecho para no tapar el ⋮ de las filas de Pistas y Videos con la lista quieta · `activity_main.xml`
+- VACIO-1 · 24 nov · pantallas vacías con ayuda: «Nada por continuar» explica y ofrece «📡 Abrir Canales»; Favoritos vacío ofrece «Ver todos» · `MainActivity.kt`, `activity_main.xml`
+- BUSCA-1 · 24 nov · al escribir en el buscador sale «Buscar «texto» en Canales ›» y Canales abre con ese texto (respeta el PIN) · `MainActivity.kt`, `M3uActivity.kt`, `activity_main.xml`
+- DESHACER-1 · 24 nov · quitar un canal ya no pregunta: aviso con DESHACER (devuelve también la ★) · `M3uActivity.kt`
+- CANAL-MINI-1 · 24 nov · barra en Canales con el canal que está en el TV y ⏮ ⏯ ⏭ ☆ ✕ · `M3uActivity.kt`, `MainActivity.kt`, `Zap.kt`
+- MAPA-1 · 24 nov · `MAPA.md` con la arquitectura del código
+
