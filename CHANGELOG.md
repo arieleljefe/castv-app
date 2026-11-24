@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v409
+# CASTV: CHANGELOG (cerebro) · v410
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -93,13 +93,13 @@ rm -f ~/storage/downloads/*_actual.*
 ## 4. ESTADO VIVO
 
 ### ▶ RETOMAR AQUÍ (24 nov 2026)
-- **LOTE v3.12 (24 nov, noche; Ariel: «me gustan todas» y «anota todo y sigamos más ahorita»): plan propuesto, ⬜ SIN «Dale» todavía (R2).** Un parche por ítem, un commit cada uno, en este orden; la etiqueta `v3.12` se propone al cerrar el lote (R12). La etiqueta `v3.11` (lote anterior) está propuesta y Ariel aún no dijo si la subió.
-  1. **SRT-1 · ⬜** Subtítulos `.srt` sueltos: Herramientas del video › «Cargar subtítulos» (elegir archivo). Antes revisar en `VideoPlayerActivity.kt` y `SubtitleGen.kt` si ya existe algo parecido y no duplicar. Riesgo bajo.
-  2. **BUSCA-TODO-1 · ⬜** Una búsqueda por nombre de canal y por programa de la guía sobre todas las listas guardadas. Archivos: `M3uActivity.kt`, `Catalog.kt`, `Epg.kt`. Riesgo medio.
+- **LOTE v3.12 (24 nov; Ariel: «me gustan todas», luego «Dale» a BUSCA-TODO-1).** Un parche por ítem, un commit cada uno; la etiqueta `v3.12` se propone al cerrar el lote (R12). La etiqueta `v3.11` (lote anterior) está propuesta y Ariel aún no dijo si la subió.
+  1. **SRT-1 · ⛔ ya existe (24 nov):** `VideoPlayerActivity.showSubtitleMenu()` ya trae «Elegir archivo (.srt / .vtt)…» (`ACTION_OPEN_DOCUMENT`), más retraso y estilo. Sin parche.
+  2. **BUSCA-TODO-1 · 🧪 entregado, pendiente de probar** · `BUSCA-TODO-1.patch` (solo `M3uActivity.kt`). Regiones y categorías › «🔎 Buscar en todas mis listas»: une SIN descargar las copias guardadas (`cacheDir/m3u_<hash>.txt`, solo listas ya abiertas alguna vez), sin repetidos y con el tope de región (40000); el buscador de siempre filtra por nombre. El pie dice «de N listas (M sin copia)». La guía se lee solo de su copia (`region:Todas mis listas`, sin descargar sola): para buscar también por programa, pulsar 📅 › «Actualizar ya» una vez en esta vista. Sin copias → aviso para abrir una lista antes. **Cómo probar:** abrir Canales › nombre de la lista › «🔎 Buscar en todas mis listas»; escribir «noti» y ver canales de varias listas; comprobar que tarda poco y no descarga (modo avión sirve). **Riesgo:** leer y parsear hasta ~45 copias en hilo aparte; sin compilador aquí (R4): si GitHub Actions falla, pasar el mensaje.
   3. **M3U-EXPORT-1 · ⬜** Exportar ★ Favoritos como `.m3u` (guardar o compartir); los canales Xtream se omiten (llevan usuario y clave). Archivos: `M3uActivity.kt`, `ShareProvider.kt`. Riesgo bajo.
-  4. **TESTS-4 · ⬜** Pruebas de `Backup.restore` y de la unión de Xtream (`withXtream`) con un `Context` simulado; toca solo la parte de pruebas de `app/build.gradle`, sin cambiar código de la app. Riesgo bajo para la app (el build puede fallar si algo no cuadra).
+  4. **TESTS-4 · ⬜** Pruebas de `Backup.restore` y de la unión de Xtream (`withXtream`) con un `Context` simulado; toca solo la parte de pruebas de `app/build.gradle`. Riesgo bajo para la app (el build puede fallar si algo no cuadra).
   5. **LIMPIA-1 · ⬜** Al cerrar el lote, plantilla E (`rm -f ~/storage/downloads/*_actual.*`).
-  - **Al retomar:** Ariel pasa solo este changelog; la IA pide UNA vez los archivos (plantilla A, ya propuesta): `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen` (`.kt`), `app/build.gradle` (como `build_actual.gradle`) y `res/values/strings.xml` (como `strings_actual.xml`). Con ellos subidos y su «Dale», empezar por SRT-1. Nada de esto está confirmado ni tocado en el código.
+  - **Archivos ya recibidos (24 nov, 13:49):** `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen`, `build.gradle`, `strings.xml`. Si Ariel retoma en otro chat, hay que volver a pedirlos (plantilla A).
 - **DECISIÓN DE ARIEL (24 nov, noche): «todo, vamos por todos menos COMPAT-TV-1»** (y «Dale» al plan). Orden: BORRAR-1 ✅ › WIDGET-1 ✅ › etiqueta `v3.10` ✅ al final (con el build de `main` en verde; incluirá ICONOS-1 a 10, BORRAR-1 y WIDGET-1) › Android Auto/TV solo evaluar, sin código hasta que Ariel diga. COMPAT-TV-1 sigue ⏳.
 - **LOTE v3.11 (24 nov, Ariel: «todo lo otro vamos a darle»), en este orden, un parche por ítem (R2: «todo de golpe» = parches encadenados, un commit por parche); la etiqueta `v3.11` se propone al cerrar el lote (R12):**
   - EPG-DEFECTO-1 ✅, SINPANTALLA-1 ✅, **XTFAV-1 ✅** y **TESTS-3 ✅** (24 nov, ver `HISTORIAL`; Ariel: «Funciona»). **Lote v3.11 cerrado:** se propone la etiqueta `v3.11` (R12) con el build de `main` en verde; incluye EPG-DEFECTO-1, SINPANTALLA-1, XTFAV-1 y TESTS-3.
