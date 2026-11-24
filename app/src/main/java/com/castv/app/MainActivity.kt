@@ -797,6 +797,7 @@ class MainActivity : AppCompatActivity() {
         adoptHeadless()   // [SERVICIO-1b] si la música seguía sin pantalla, se recoge aquí
         monitoring = true
         applyPendingShortcut()   // [ATAJOS-1]
+        thread { autoBackupNow() }   // [AUTORESPALDO-1]
         thread { monitorLoop() }
         window.decorView.postDelayed({ warnIfPortBusy() }, 2000)
         window.decorView.postDelayed({ showWhatsNewOnce() }, 2600)   // [NOVEDADES-1]
@@ -1372,24 +1373,28 @@ class MainActivity : AppCompatActivity() {
     private fun showBackupMenu() {
         AlertDialog.Builder(this)
             .setTitle("Respaldo")
-            .setItems(arrayOf("📤 Exportar respaldo", "📥 Importar respaldo")) { _, which ->
-                try {
-                    if (which == 0) {
-                        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                            .format(java.util.Date())
-                        val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                            .addCategory(Intent.CATEGORY_OPENABLE)
-                            .setType("application/json")
-                            .putExtra(Intent.EXTRA_TITLE, "castv_respaldo_$day.json")
-                        startActivityForResult(i, reqBackupOut)
-                    } else {
-                        val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                            .addCategory(Intent.CATEGORY_OPENABLE)
-                            .setType("*/*")
-                        startActivityForResult(i, reqBackupIn)
+            .setItems(arrayOf("📤 Exportar respaldo", "📥 Importar respaldo", "📨 Compartir…", "🔁 Restaurar copia automática…")) { _, which ->
+                when (which) {
+                    2 -> showShareMenu()        // [AUTORESPALDO-1]
+                    3 -> showAutoRestore()      // [AUTORESPALDO-1]
+                    else -> try {
+                        if (which == 0) {
+                            val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                                .format(java.util.Date())
+                            val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("application/json")
+                                .putExtra(Intent.EXTRA_TITLE, "castv_respaldo_$day.json")
+                            startActivityForResult(i, reqBackupOut)
+                        } else {
+                            val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                            startActivityForResult(i, reqBackupIn)
+                        }
+                    } catch (e: Exception) {
+                        toast("No se pudo abrir el selector de archivos")
                     }
-                } catch (e: Exception) {
-                    toast("No se pudo abrir el selector de archivos")
                 }
             }
             .setNegativeButton("Cerrar", null)
@@ -1409,33 +1414,174 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Lee el archivo elegido (en un hilo) y pregunta antes de importarlo. */
     private fun confirmImport(uri: Uri) {
-        AlertDialog.Builder(this)
-            .setTitle("¿Importar respaldo?")
-            .setMessage("Esto REEMPLAZA tus favoritos, listas, historial de enlaces, listas M3U y ajustes actuales por los del archivo. Los puntos de reanudación, las estadísticas y el TV elegido no cambian. Si suena algo en el teléfono, se detendrá.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Importar") { _, _ -> doImport(uri) }
-            .show()
+        thread {
+            val text = try {
+                contentResolver.openInputStream(uri)?.use { Backup.readLimited(it) }
+            } catch (e: Exception) {
+                DebugLog.add("RESPALDO: error al leer: ${e.javaClass.simpleName}: ${e.message}")
+                null
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (text == null) toast("❌ No se pudo leer el archivo (o es demasiado grande).")
+                else confirmImportText(text)
+            }
+        }
     }
 
-    private fun doImport(uri: Uri) {
+    /** [AUTORESPALDO-1] El aviso dice si el archivo REEMPLAZA (respaldo completo) o AÑADE (parcial). */
+    private fun confirmImportText(text: String) {
+        val kind = Backup.describe(text)
+        if (kind == null) {
+            toast("❌ Este archivo no es un respaldo de CASTV.")
+            return
+        }
+        val b = AlertDialog.Builder(this)
+        if (kind == "full") {
+            b.setTitle("¿Importar respaldo?")
+                .setMessage("Esto REEMPLAZA tus favoritos, listas, historial de enlaces, listas M3U y ajustes actuales por los del archivo. Los puntos de reanudación, las estadísticas y el TV elegido no cambian. Si suena algo en el teléfono, se detendrá.")
+                .setPositiveButton("Importar") { _, _ -> doImport(text) }
+        } else {
+            val what = when (kind) {
+                "history" -> "el historial de enlaces y los canales vistos recientemente"
+                "favs" -> "canales favoritos"
+                else -> "datos parciales"
+            }
+            b.setTitle("¿Añadir lo recibido?")
+                .setMessage("Este archivo trae solo $what. Se AÑADE a lo que ya tienes: no se borra nada y no se repite lo que ya esté. Tus listas, ajustes y demás datos no cambian.")
+                .setPositiveButton("Añadir") { _, _ -> doImport(text) }
+        }
+        b.setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun doImport(text: String) {
         thread {
             var err: String? = null
             try {
-                val text = contentResolver.openInputStream(uri)?.use { Backup.readLimited(it) }
-                err = if (text == null) "No se pudo leer el archivo (o es demasiado grande)." else Backup.restore(this, text)
+                err = Backup.restore(this, text)
             } catch (e: Exception) {
                 DebugLog.add("RESPALDO: error al importar: ${e.javaClass.simpleName}: ${e.message}")
                 err = "No se pudo leer el archivo."
             }
             val msg = err
+            val partial = Backup.describe(text).let { it != null && it != "full" }   // [AUTORESPALDO-1]
+            val note = Backup.lastNote
             runOnUiThread {
                 if (msg != null) {
                     toast("❌ $msg")
+                } else if (partial) {
+                    Store.reload()
+                    if (!isFinishing && !isDestroyed) {
+                        AlertDialog.Builder(this)
+                            .setTitle("✅ Listo")
+                            .setMessage(note)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
                 } else {
                     Store.reload()
                     toast("✅ Respaldo importado")
                     recreate()   // aplica tema, color, orden y demás ajustes
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------- [AUTORESPALDO-1] Copia automática y compartir
+
+    private fun autoBackupNow() {
+        try {
+            AutoBackup.runIfNeeded(applicationContext)?.let { DebugLog.add(it) }
+        } catch (e: Exception) {
+            DebugLog.add("RESPALDO-AUTO: error: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    private fun showAutoRestore() {
+        val copies = AutoBackup.list(this)
+        if (copies.isEmpty()) {
+            toast("Todavía no hay copias automáticas. Se crea una al abrir la app, una vez al día.")
+            return
+        }
+        val labels = copies.map { "${it.day} · ${it.kb} KB" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("🔁 Copias automáticas")
+            .setItems(labels) { _, i -> loadAutoCopy(copies[i]) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun loadAutoCopy(c: AutoBackup.Copy) {
+        thread {
+            val text = try { c.file.readText(Charsets.UTF_8) } catch (e: Exception) { null }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (text == null) toast("❌ No se pudo leer la copia") else confirmImportText(text)
+            }
+        }
+    }
+
+    private fun showShareMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("📨 Compartir")
+            .setItems(arrayOf("📦 Respaldo completo", "🕘 Solo historial", "⭐ Solo canales favoritos")) { _, which ->
+                confirmShare(when (which) { 0 -> "full"; 1 -> "history"; else -> "favs" })
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun confirmShare(kind: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Antes de compartir")
+            .setMessage("El archivo puede traer enlaces con usuario o clave: compártelo solo con gente de confianza.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Compartir") { _, _ -> shareBackup(kind) }
+            .show()
+    }
+
+    /** Arma el .json en la carpeta temporal y lo manda por la hoja de compartir de Android. */
+    private fun shareBackup(kind: String) {
+        thread {
+            var uri: Uri? = null
+            try {
+                val json = if (kind == "full") Backup.build(this) else Backup.buildPart(this, kind)
+                if (json != null) {
+                    val dir = java.io.File(cacheDir, "share")
+                    dir.mkdirs()
+                    dir.listFiles()?.forEach { it.delete() }
+                    val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                    val name = when (kind) {
+                        "full" -> "castv_respaldo_$day.json"
+                        "history" -> "castv_historial_$day.json"
+                        else -> "castv_favoritos_$day.json"
+                    }
+                    val f = java.io.File(dir, name)
+                    f.writeText(json, Charsets.UTF_8)
+                    uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.shareprovider", f)
+                }
+            } catch (e: Exception) {
+                DebugLog.add("RESPALDO: error al compartir: ${e.javaClass.simpleName}: ${e.message}")
+                uri = null
+            }
+            val u = uri
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (u == null) {
+                    toast("No hay nada para compartir")
+                } else {
+                    try {
+                        val send = Intent(Intent.ACTION_SEND)
+                            .setType("application/json")
+                            .putExtra(Intent.EXTRA_STREAM, u)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        send.clipData = android.content.ClipData.newRawUri("", u)
+                        startActivity(Intent.createChooser(send, "Compartir respaldo"))
+                    } catch (e: Exception) {
+                        toast("No se pudo abrir la hoja de compartir")
+                    }
                 }
             }
         }

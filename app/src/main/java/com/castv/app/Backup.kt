@@ -13,10 +13,14 @@ import java.io.InputStream
  * presets propios del ecualizador ya viajaban en las preferencias).
  *
  * Importar REEMPLAZA los datos actuales. Antes de tocar nada, todo el archivo se lee y se valida.
+ *
+ * [AUTORESPALDO-1] Los archivos PARCIALES (v = 2, con la marca "part") traen solo el historial o solo los
+ * canales favoritos para compartirlos con otra persona: al importarlos se AÑADEN a lo que ya hay y no se borra nada.
  */
 object Backup {
     private const val APP = "castv"
-    private const val VERSION = 1
+    private const val VERSION = 1         // los respaldos completos siguen siendo v1 (cualquier CASTV los lee)
+    private const val MAX_READABLE = 2    // [AUTORESPALDO-1] v2 = parcial; una versión vieja de CASTV lo rechaza
     private val FILES = listOf("castv_lib", "castv", "castv_stats")   // [BACKUP-2] castv_stats: solo las marcas "visto"
     private val SKIP = setOf("tvIp", "pin_hash")   // [BACKUP-1] propios de cada teléfono/red: no se respaldan ni se tocan al importar
 
@@ -78,6 +82,8 @@ object Backup {
         if (root.optString("app") != APP) return "Este archivo no es un respaldo de CASTV."
         val ver = root.optInt("v", 0)
         if (ver < 1) return "El respaldo no tiene una versión válida."
+        if (ver > MAX_READABLE) return "El respaldo es de una versión más nueva de CASTV. Actualiza la app."
+        if (root.has("part")) return restorePart(ctx, root)   // [AUTORESPALDO-1] parcial: se añade, no reemplaza
         if (ver > VERSION) return "El respaldo es de una versión más nueva de CASTV. Actualiza la app."
         val prefs = root.optJSONObject("prefs") ?: return "El respaldo está vacío."
 
@@ -136,5 +142,157 @@ object Backup {
             ed.commit()
         }
         return null
+    }
+
+    // ------------------------------------------------- [AUTORESPALDO-1] Archivos parciales para compartir
+
+    /** Qué claves de castv_lib viajan en cada parte. */
+    private val PARTS = mapOf(
+        "history" to listOf("links", "chrecent"),   // historial de enlaces y canales vistos recientemente
+        "favs" to listOf("chfav", "chfavmeta")      // canales favoritos
+    )
+    private const val MAX_LINKS_RECENT = 20   // igual que Store (los favoritos no cuentan)
+    private const val MAX_RECENT_CH = 12      // igual que Store
+
+    /** Resumen del último parcial añadido (para el aviso al importar). */
+    @Volatile var lastNote: String = ""
+        private set
+
+    /**
+     * Qué es este texto: "full" (respaldo completo), "history" o "favs" (parciales), "part" (parcial de un tipo
+     * que esta versión no conoce) o null si no es un respaldo de CASTV.
+     */
+    fun describe(text: String): String? {
+        val root = try { JSONObject(text) } catch (e: Exception) { return null }
+        if (root.optString("app") != APP) return null
+        if (!root.has("part")) return "full"
+        val p = root.optString("part")
+        return if (PARTS.containsKey(p)) p else "part"
+    }
+
+    /** Arma un parcial ("history" o "favs"); devuelve null si no hay nada que compartir. */
+    fun buildPart(ctx: Context, part: String): String? {
+        val keys = PARTS[part] ?: return null
+        val sp = ctx.getSharedPreferences("castv_lib", Context.MODE_PRIVATE)
+        val o = JSONObject()
+        for (k in keys) {
+            val v = sp.getString(k, null) ?: continue
+            val n = try { JSONArray(v).length() } catch (e: Exception) { 0 }
+            if (n == 0) continue
+            o.put(k, JSONObject().put("t", "s").put("v", v))
+        }
+        if (o.length() == 0) return null
+        val root = JSONObject()
+        root.put("app", APP)
+        root.put("v", 2)
+        root.put("part", part)
+        root.put("time", System.currentTimeMillis())
+        root.put("prefs", JSONObject().put("castv_lib", o))
+        return root.toString(2)
+    }
+
+    /** Añade (sin borrar nada) lo que trae un parcial. Devuelve null si salió bien, o el mensaje de error. */
+    private fun restorePart(ctx: Context, root: JSONObject): String? {
+        val keys = PARTS[root.optString("part")]
+            ?: return "El respaldo es de una versión más nueva de CASTV. Actualiza la app."
+        val lib = root.optJSONObject("prefs")?.optJSONObject("castv_lib") ?: return "El respaldo está vacío."
+        val sp = ctx.getSharedPreferences("castv_lib", Context.MODE_PRIVATE)
+
+        // 1) Leer y validar todo en memoria (si algo falla no se toca nada)
+        val out = LinkedHashMap<String, String>()
+        val counts = LinkedHashMap<String, Int>()
+        var found = false
+        try {
+            for (k in keys) {
+                val e = lib.optJSONObject(k) ?: continue
+                if (e.getString("t") != "s") throw IllegalArgumentException("tipo")
+                val inc = JSONArray(e.getString("v"))
+                found = true
+                val cur = try { JSONArray(sp.getString(k, null) ?: "[]") } catch (ex: Exception) { JSONArray() }
+                val res = when (k) {
+                    "links" -> mergeLinks(cur, inc)
+                    "chfav" -> mergeStrings(cur, inc)
+                    "chfavmeta" -> mergeObjects(cur, inc, Int.MAX_VALUE)
+                    else -> mergeObjects(cur, inc, MAX_RECENT_CH)   // chrecent
+                }
+                out[k] = res.first.toString()
+                counts[k] = res.second
+            }
+        } catch (e: Exception) {
+            return "El respaldo está dañado."
+        }
+        if (!found) return "El respaldo está vacío."
+
+        // 2) Aplicar: solo claves de este parcial, una sola escritura
+        val ed = sp.edit()
+        for ((k, v) in out) ed.putString(k, v)
+        ed.commit()
+
+        val bits = ArrayList<String>()
+        val l = counts["links"] ?: 0
+        val r = counts["chrecent"] ?: 0
+        val f = counts["chfav"] ?: 0
+        if (l > 0) bits.add(if (l == 1) "1 enlace" else "$l enlaces")
+        if (r > 0) bits.add(if (r == 1) "1 canal visto" else "$r canales vistos")
+        if (f > 0) bits.add(if (f == 1) "1 canal favorito" else "$f canales favoritos")
+        lastNote = if (bits.isEmpty()) "No había nada nuevo: ya lo tenías todo."
+                   else "Se añadió: " + bits.joinToString(", ") + ". No se borró nada."
+        return null
+    }
+
+    /** Enlaces: lo que ya hay se queda; se añaden los que no estén (por URL); mismo tope que Store. Devuelve (lista, nuevos). */
+    private fun mergeLinks(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
+        val have = HashSet<String>()
+        val all = ArrayList<JSONObject>()
+        for (i in 0 until cur.length()) {
+            val o = cur.getJSONObject(i)
+            if (have.add(o.getString("u"))) all.add(o)
+        }
+        val fresh = HashSet<String>()
+        for (i in 0 until inc.length()) {
+            val o = inc.getJSONObject(i)
+            val u = o.getString("u")
+            if (have.add(u)) {
+                fresh.add(u)
+                all.add(JSONObject().put("u", u).put("n", o.optString("n", "")).put("f", o.optBoolean("f", false)).put("t", o.optLong("t", 0L)))
+            }
+        }
+        val starred = all.filter { it.optBoolean("f", false) }
+        val recent = all.filter { !it.optBoolean("f", false) }.sortedByDescending { it.optLong("t", 0L) }.take(MAX_LINKS_RECENT)
+        val arr = JSONArray()
+        var added = 0
+        for (o in starred + recent) { arr.put(o); if (fresh.contains(o.getString("u"))) added++ }
+        return Pair(arr, added)
+    }
+
+    /** Lista de textos (enlaces de canales favoritos): unión sin repetir. */
+    private fun mergeStrings(cur: JSONArray, inc: JSONArray): Pair<JSONArray, Int> {
+        val have = LinkedHashSet<String>()
+        for (i in 0 until cur.length()) have.add(cur.getString(i))
+        var added = 0
+        for (i in 0 until inc.length()) if (have.add(inc.getString(i))) added++
+        val arr = JSONArray()
+        for (x in have) arr.put(x)
+        return Pair(arr, added)
+    }
+
+    /** Lista de objetos con "u": lo que ya hay va primero y se añaden los que no estén; con tope de tamaño. */
+    private fun mergeObjects(cur: JSONArray, inc: JSONArray, max: Int): Pair<JSONArray, Int> {
+        val have = HashSet<String>()
+        val all = ArrayList<JSONObject>()
+        for (i in 0 until cur.length()) {
+            val o = cur.getJSONObject(i)
+            if (have.add(o.getString("u"))) all.add(o)
+        }
+        val fresh = HashSet<String>()
+        for (i in 0 until inc.length()) {
+            val o = inc.getJSONObject(i)
+            val u = o.getString("u")
+            if (have.add(u)) { fresh.add(u); all.add(o) }
+        }
+        val arr = JSONArray()
+        var added = 0
+        for (o in all.take(max)) { arr.put(o); if (fresh.contains(o.getString("u"))) added++ }
+        return Pair(arr, added)
     }
 }
