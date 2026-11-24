@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v412
+# CASTV: CHANGELOG (cerebro) · v413
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -96,10 +96,10 @@ rm -f ~/storage/downloads/*_actual.*
 - **LOTE v3.12 (24 nov; Ariel: «me gustan todas», «Dale» a BUSCA-TODO-1 ✅).** Un parche por ítem, un commit cada uno; la etiqueta `v3.12` se propone al cerrar el lote (R12). La etiqueta `v3.11` (lote anterior) está propuesta y Ariel aún no dijo si la subió.
   1. **SRT-1 · ⛔ ya existe (24 nov):** `VideoPlayerActivity.showSubtitleMenu()` ya trae «Elegir archivo (.srt / .vtt)…» (`ACTION_OPEN_DOCUMENT`), más retraso y estilo. Sin parche.
   2. **BUSCA-TODO-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
-  3. **M3U-EXPORT-1 · 🧪 (entregado 24 nov, `m3uexport1.patch`, falta probar y el «ya funciona»)** Con ★ Favs activo aparece el chip «📤» (junto a ★ Favs): diálogo «Exportar favoritos» con Compartir (archivo `cache/share/castv-favoritos.m3u` por `ShareProvider`, autoridad `.shareprovider`; manifest y `share_paths.xml` sin cambios) y Guardar… (selector de archivos del sistema, `ACTION_CREATE_DOCUMENT`). Se omiten los favoritos con usuario y clave (`Xtream.leakFilter`) y los que no son http(s); el diálogo dice cuántos. Solo `M3uActivity.kt`. Cómo probar: ★ Favs › 📤 › Compartir (a ti mismo) o Guardar…, y abrir ese .m3u con ＋ Lista; con un favorito Xtream, ver que el aviso lo cuente y que el archivo no lleve usuario ni clave. Riesgo bajo (aquí no hay compilador: si GitHub Actions falla, pasar el mensaje).
-  4. **TESTS-4 · ⬜** Pruebas de `Backup.restore` y de la unión de Xtream (`withXtream`) con un `Context` simulado; toca solo la parte de pruebas de `app/build.gradle`. Riesgo bajo para la app (el build puede fallar si algo no cuadra).
+  3. **M3U-EXPORT-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
+  4. **TESTS-4 · ⬜ (siguiente; plan entregado 24 nov, falta el «Dale»; hay que pedir `build.gradle` y la lista de pruebas existentes en `app/src/test`)** Pruebas de `Backup.restore` y de la unión de Xtream (`withXtream`) con un `Context` simulado; toca solo la parte de pruebas de `app/build.gradle`. Riesgo bajo para la app (el build puede fallar si algo no cuadra).
   5. **LIMPIA-1 · ⬜** Al cerrar el lote, plantilla E (`rm -f ~/storage/downloads/*_actual.*`).
-  - **Archivos ya recibidos (24 nov, 13:49):** `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen`, `build.gradle`, `strings.xml`; más `Xtream` y `Backup` (para M3U-EXPORT-1). Si Ariel retoma en otro chat, hay que volver a pedirlos (plantilla A).
+  - **Archivos ya recibidos (24 nov, 13:49):** `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen`, `build.gradle`, `strings.xml`; más `Xtream` y `Backup`. Si Ariel retoma en otro chat, hay que volver a pedirlos (plantilla A).
 - **DECISIÓN DE ARIEL (24 nov, noche): «todo, vamos por todos menos COMPAT-TV-1»** (y «Dale» al plan). Orden: BORRAR-1 ✅ › WIDGET-1 ✅ › etiqueta `v3.10` ✅ al final (con el build de `main` en verde; incluirá ICONOS-1 a 10, BORRAR-1 y WIDGET-1) › Android Auto/TV solo evaluar, sin código hasta que Ariel diga. COMPAT-TV-1 sigue ⏳.
 - **LOTE v3.11 (24 nov, Ariel: «todo lo otro vamos a darle»), en este orden, un parche por ítem (R2: «todo de golpe» = parches encadenados, un commit por parche); la etiqueta `v3.11` se propone al cerrar el lote (R12):**
   - EPG-DEFECTO-1 ✅, SINPANTALLA-1 ✅, **XTFAV-1 ✅** y **TESTS-3 ✅** (24 nov, ver `HISTORIAL`; Ariel: «Funciona»). **Lote v3.11 cerrado:** se propone la etiqueta `v3.11` (R12) con el build de `main` en verde; incluye EPG-DEFECTO-1, SINPANTALLA-1, XTFAV-1 y TESTS-3.
