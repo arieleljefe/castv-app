@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v369
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v371
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -108,3 +108,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VOCAB-3 · 24 nov · «móvil» → «teléfono» en lo visible (enviar lista/respaldo por QR, páginas que abre el otro dispositivo, mensajes de Xtream) y «Borrado» → «Eliminado» en Ajustes › Almacenamiento; «Datos móviles» se queda · `M3uActivity.kt`, `SettingsActivity.kt`, `Qr.kt`
 - ARTISTA-1 · 24 nov · un artista o álbum que solo trae «?» cuenta como «sin dato» y ya no sale en «Filtrar por artista» · `MediaScanner.kt` (`cleanArtist`)
 - ALMAC-1 · 24 nov · revisado en el código: `toggleTrash()` guarda, avisa y repinta; el desajuste del video era por dos toques seguidos, no un fallo · sin cambios
+- EPG-REGION-1 · 24 nov · la guía funciona con «🌐 Toda la región»: se juntan las guías de las cabeceras (`url-tvg`) de todas sus listas (más de 3 se eligen por país como EPG-1b), copia propia de 12 h (`region:<nombre>`); el 📅 abre «Guía de la región» con «Actualizar ya» (la URL propia sigue siendo por lista) · `M3uActivity.kt`, `Epg.kt`, `M3uParser.kt` (`mergeGuides`), `EpgPickTest.kt`
+- VOCAB-4 · 24 nov · el aviso de la papelera en Más dice «Lo eliminado…» igual que Ajustes; «Borrar» como botón de acción no se cambió · `MainActivity.kt`
+- VOCABULARIO-3 · 24 nov · `VOCABULARIO.md` creado en la raíz del repo con los términos decididos · `VOCABULARIO.md`
