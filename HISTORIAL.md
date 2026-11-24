@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v364
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v366
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -103,3 +103,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TAG-3.9 · 24 nov · etiqueta `v3.9` publicada e instalada desde Ajustes › Actualizaciones (EPG-1, XTREAM-1, QR-1, EPG-1b, QR-2a, QR-2b); Release `CASTV-v3.9.apk` · `build.yml`
 - TV-INFO-1 · 24 nov · datos de la TV tomados de su pantalla «Acerca de»: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711`; sirve para COMPAT-TV-1 · `CHANGELOG.md`
 - IP-1 · 24 nov · comprobado: la app detecta sola la IP del teléfono y la del TV (Ajustes › Emisión al TV); la IP del teléfono cambia (DHCP, MAC aleatoria), por eso el changelog ya no la fija · `CHANGELOG.md`
+- DUP-1 · 24 nov · «Duplicados» detecta también copias con sufijo `_1`…`_99` o ` (1)`…` (99)` en el nombre (misma duración ±2 s; conserva la más antigua; no borra nada) · `MainActivity.kt` (`dupKey`, `dupSuffixRe`, `computeDups`)
