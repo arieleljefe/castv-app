@@ -97,7 +97,7 @@ object Zap {
         DebugLog.add("ZAP: ${c.url} -> $sendUrl")
         if (!TvController.setUriAndPlay(sendUrl, c.name, mime, false)) return "El TV no aceptó el canal"
         ctx.sendBroadcast(Intent(MainActivity.ACT_CHANNEL_ON_TV).setPackage(ctx.packageName)
-            .putExtra("title", c.name).putExtra("live", live))   // [NOW-1]
+            .putExtra("title", c.name).putExtra("live", live).putExtra("url", c.url))   // [NOW-1] [FAV-REPRO-3]
         return null
     }
 }

@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity() {
         const val ACT_NEXT = "com.castv.app.ACT_NEXT"
         const val ACT_STOP_LOCAL = "com.castv.app.ACT_STOP_LOCAL"   // [LOCAL-1]
         const val ACT_CHANNEL_ON_TV = "com.castv.app.ACT_CHANNEL_ON_TV"   // [NOW-1]
+        const val ACT_FAV = "com.castv.app.ACT_FAV"   // [FAV-REPRO-3] ★ desde la notificación del canal
         const val SC_RESUME = "com.castv.app.SC_RESUME"       // [ATAJOS-1] atajos del icono
         const val SC_MUSIC = "com.castv.app.SC_MUSIC"
         const val SC_CHANNELS = "com.castv.app.SC_CHANNELS"
@@ -169,6 +170,7 @@ class MainActivity : AppCompatActivity() {
                 ACT_NEXT -> step(+1)
                 ACT_TOGGLE -> togglePlayPause()
                 ACT_STOP_LOCAL -> if (localActive) stopCurrentPlayback()   // [LOCAL-1]
+                ACT_FAV -> tvChannelNow()?.let { ch -> toggleTvChannelFav(ch) }   // [FAV-REPRO-3]
                 ACT_CHANNEL_ON_TV -> {   // [NOW-1] un canal de Listas M3U acaba de empezar en el TV
                     if (playingItem != null) {   // había algo propio en el TV: el canal lo reemplaza (sin TvController.stop())
                         playingItem = null
@@ -180,11 +182,13 @@ class MainActivity : AppCompatActivity() {
                     Zap.confirm(t)   // [ZAP-1]
                     linkOnTv = true; linkDurSec = 0; linkGen++
                     linkTitleNow = t
+                    linkUrlNow = intent?.getStringExtra("url")   // [FAV-REPRO-3]
                     linkIsLive = intent?.getBooleanExtra("live", false) ?: false
                     resetProgress()
                     tvNowPlaying.text = t
                     nowBigArt.tag = null; nowBigArt.visibility = View.GONE   // [UI-3a] un canal no tiene carátula
                     lastNotifKey = ""
+                    updateNowFav(); updateMiniCompact()   // [FAV-REPRO-3] la ★ del mini reproductor sigue al canal
                     refreshNotification()
                 }
             }
@@ -212,6 +216,8 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var linkGen = 0        // [PROG-1d] número del enlace actual, para descartar lecturas viejas
     @Volatile private var linkTitleNow: String? = null   // [NOW-1] título del canal/enlace que está en el TV
     @Volatile private var linkIsLive = false             // [NOW-1] ese enlace es un canal en vivo (HLS)
+    @Volatile private var linkUrlNow: String? = null     // [FAV-REPRO-3] enlace original del canal que está en el TV (para la ★)
+    @Volatile private var tvFavNow = false               // [FAV-REPRO-3] ese canal es favorito (guardado aquí para no leer el disco en cada tic)
     private var showingMusic = false
     private var repeatMode = Repeat.OFF
     private var selectedArtist: String? = null
@@ -330,7 +336,7 @@ class MainActivity : AppCompatActivity() {
         }
         Store.init(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT); addAction(ACT_STOP_LOCAL); addAction(ACT_CHANNEL_ON_TV) }   // [NOW-1b]
+        val nf = IntentFilter().apply { addAction(ACT_PREV); addAction(ACT_TOGGLE); addAction(ACT_NEXT); addAction(ACT_STOP_LOCAL); addAction(ACT_CHANNEL_ON_TV); addAction(ACT_FAV) }   // [NOW-1b] [FAV-REPRO-3]
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(notifReceiver, nf)
         notifReceiverRegistered = true
@@ -481,7 +487,10 @@ class MainActivity : AppCompatActivity() {
         }
         btnClearSearch.setOnClickListener { etSearch.setText("") }
 
-        btnNowFav.setOnClickListener { playingItem?.let { toggleFav(it) } }
+        btnNowFav.setOnClickListener {   // [FAV-REPRO-3] con un canal en el TV, la ★ marca el canal
+            val cur = playingItem
+            if (cur != null) toggleFav(cur) else tvChannelNow()?.let { ch -> toggleTvChannelFav(ch) }
+        }
         btnPlay.setOnClickListener {
             if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause()
         }
@@ -1908,6 +1917,7 @@ class MainActivity : AppCompatActivity() {
                     tvNowPlaying.text = title   // [PROG-1] título del enlace en el reproductor
                     nowBigArt.tag = null; nowBigArt.visibility = View.GONE   // [UI-3a]
                     linkTitleNow = title; linkIsLive = live; lastNotifKey = ""   // [NOW-1] la notificación también lo muestra
+                    linkUrlNow = url; updateNowFav(); updateMiniCompact()   // [FAV-REPRO-3]
                 }
                 setStatus(
                     if (ok) "✅ Enlace en el TV"
@@ -2392,7 +2402,8 @@ class MainActivity : AppCompatActivity() {
         updateSessionState(playing)
         val title = linkTitleNow ?: "Enlace en el TV"
         val zapOn = Zap.matches(linkTitleNow)   // [ZAP-1] ⏮ ⏭ en la notificación del canal
-        val key = "link|$title|$playing|$linkIsLive|$zapOn"
+        val hasCh = linkOnTv && linkUrlNow != null   // [FAV-REPRO-3]
+        val key = "link|$title|$playing|$linkIsLive|$zapOn|$hasCh|$tvFavNow"
         if (key == lastNotifKey) return
         lastNotifKey = key
         try {
@@ -2426,6 +2437,10 @@ class MainActivity : AppCompatActivity() {
         )
         if (zapOn) nb.addAction(android.R.drawable.ic_media_next, "Siguiente",
             PendingIntent.getBroadcast(this, 3, Intent(ACT_NEXT).setPackage(packageName), flags))
+        if (hasCh) nb.addAction(   // [FAV-REPRO-3] ★ en la notificación (cuarto botón; se ve al expandirla)
+            if (tvFavNow) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off,
+            if (tvFavNow) "Quitar de favoritos" else "Favorito",
+            PendingIntent.getBroadcast(this, 4, Intent(ACT_FAV).setPackage(packageName), flags))
         val n = nb.setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
@@ -2887,9 +2902,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateNowFav() {
-        val fav = playingItem?.let { Store.isFav(it) } ?: false
+        val item = playingItem
+        val chUrl = if (item == null && linkOnTv) linkUrlNow else null   // [FAV-REPRO-3] canal en el TV
+        val fav = if (item != null) Store.isFav(item) else if (chUrl != null) Store.chFavs().contains(chUrl) else false
+        tvFavNow = chUrl != null && fav
         btnNowFav.text = if (fav) "★" else "☆"
         btnNowFav.setTextColor(if (fav) 0xFFFFC107.toInt() else col(R.color.vlc_muted))
+    }
+
+    /** [FAV-REPRO-3] El canal que está en el TV (null si no hay, o si suena algo propio). Con logo y grupo si ya estaba en «Continuar». */
+    private fun tvChannelNow(): M3uChannel? {
+        if (!linkOnTv || playingItem != null) return null
+        val u = linkUrlNow ?: return null
+        return Store.recentChannels().firstOrNull { it.url == u } ?: M3uChannel(linkTitleNow ?: "Canal", u, "")
+    }
+
+    /** [FAV-REPRO-3] Marca o quita la ★ del canal del TV (mini reproductor, pantalla «Reproduciendo» y notificación). */
+    private fun toggleTvChannelFav(c: M3uChannel) {
+        val on = Store.toggleChFav(c.url)
+        if (on) Store.rememberChFav(c) else Store.forgetChFav(c.url)
+        updateNowFav()
+        lastNotifKey = ""
+        refreshNotification()
+        toast(if (on) "★ En Favoritos: " + c.name else "☆ Quitado de Favoritos")
     }
 
     private fun toggleFav(item: MediaItem) {
