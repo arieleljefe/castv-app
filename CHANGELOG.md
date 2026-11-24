@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v337
+# CASTV: CHANGELOG (cerebro) · v338
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -92,7 +92,7 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (23 nov 2026, 21:20)
+### ▶ RETOMAR AQUÍ (24 nov 2026)
 - **Hecho y ✅:** **RECUP-1** (23 nov), REMOTO-1, ATAJOS-1, CAPÍTULOS-1, VOCABULARIO-1/2, FIRMA-1, UPDATE-1, VERSION-2, **ESTILO-1**, **ESTILO-2**, **UPDATE-2**, **TV-2**, **ESTILO-3**, **ZAP-1**, **LISTA-VAL-1**, **SPEED-1**, **TAG-3.5**, **SERVICIO-1a** y **SERVICIO-1b**, **AUTORESPALDO-1**, **ZAP-2**, **LOG-1**, **ATOMIC-1** y **TESTS-1** (ver `HISTORIAL`). WIDGET-1 en pausa.
 - **Decisión de Ariel (23 nov, 12:30):** quiere sobre todo **Actualización dentro de la app** y **Estilos y organización de pantallas**; carta blanca y repo público. Cola: ESTILO-1/2/3 › LISTA-VAL-1 › RECUP-1 (UPDATE-1 ya ✅).
 - **FIRMA-1 ✅ (13:25):** build verde, huella del APK = huella de la clave (`4dd1f018003d62cbee40d558f5af56873eca1be31e2773d39974910121dc558e`), Ariel desinstaló, instaló el APK firmado, restauró el respaldo y "funciona todo bien". Desde ahora las versiones se instalan encima sin desinstalar. Los 4 secretos están en GitHub (se subieron con `gh` desde Termux; sesión `arieleljefe` iniciada). **Sin copia del `.jks` fuera del teléfono (decisión de Ariel):** copias en `~/castv-release.jks` (Termux) y en `~/storage/downloads/castv-release.jks`; si se pierden ambas, hay que crear otra clave y reinstalar desde cero. Recomendación dada: conservar el `.jks` de Download (sobrevive si se borra Termux) y borrar solo `castv-ks-b64.txt`, la carpeta `castv-firmado` y los `*_actual.*`.
@@ -128,14 +128,25 @@ rm -f ~/storage/downloads/*_actual.*
   - **Riesgos:** (a) sin compilador de Kotlin (R4): si falla el build, pasar el mensaje; (b) la barra queda con 8 botones y el título aún más corto: se resuelve con BARRA-1 (abajo), propuesta aparte; (c) si abres un canal con una lista que no pasa por `Zap` (lista vacía), no sale la ★.
   - **Siguiente paso:** «ya funciona» de Ariel → ✅ y a `HISTORIAL`. Sin etiqueta (R12).
 - **VISTA-1 a VISTA-4:** ya instalados (captura de Ariel, 24 nov: logos con fondo claro y 4 botones en Canales); falta su «ya funciona» explícito.
-- **Propuesta aún sin etiquetar:** nada (v3.7 ya subida por Ariel).
+- **Ahora en 🧪 también (24 nov, Ariel: «Vamos por todos y arregla la versión para que suba a v3.8»; 5 parches encadenados, un commit cada uno, una sola línea):**
+  - **FAV-REPRO-1:** ya instalado; su captura (24 nov) muestra la ★ y el aviso «★ En Favoritos: Telemicro HD». Falta su «ya funciona» explícito.
+  - **VISTA-5 · logos blancos visibles** (`Logos.kt`, `M3uActivity.kt`): `Logos` promedia el brillo de los píxeles visibles del logo (muestra de ~24×24, umbral 185); si es claro, el fondo es oscuro `#2B3040`; si no, el gris claro `#F2F2F2` de VISTA-1. Arregla Cinecanal, Cartoon Network, A&E y 00s Replay, que salían como cajas grises vacías. `styleLogo(logo, url)` ahora recibe la URL; el fondo se ajusta también cuando el logo llega tarde. Riesgo: un logo con fondo blanco opaco ahora se ve con marco oscuro (es solo estético).
+  - **BARRA-1 · barra del reproductor** (`VideoPlayerActivity.kt`): queda `título · ★ · 🔄 · ⋯ · 📺 TV`. El botón ⋯ abre un menú con 🔒 Bloquear · 🖼 Tamaño · 😴 Temporizador (muestra el tiempo que queda) · 🛠 Herramientas · 💬 Subtítulos. `sleepChip` sigue existiendo (sin estar en la barra) solo para guardar el texto del temporizador.
+  - **VIVO-1 · en vivo limpio** (`VideoPlayerActivity.kt`): en canales y enlaces (`id == 0L`) sin duración, se esconden el tiempo, la barra y −10/+10 y queda «● EN VIVO»; con videos del teléfono todo vuelve. `setLiveUi()` se llama en cada `updateProgress`. Riesgo: un enlace mp4 que tarda en dar su duración muestra «● EN VIVO» unos segundos.
+  - **GIRO-1 · girar con un toque** (`VideoPlayerActivity.kt`): 🔄 pasa de vertical a horizontal y al revés (antes daba 3 vueltas: automático → horizontal → vertical); mantener pulsado 🔄 vuelve al giro automático.
+  - **VERSION-3 · versión** (`app/build.gradle`): el valor por defecto de `versionName` pasa de `3.1` a `3.8`, para que un APK compilado de un push (sin etiqueta) ya no diga «3.1». Con etiqueta `v*`, el número sale de la etiqueta (UPDATE-1). La causa de «CASTV 3.1» en Acerca de: Ariel instaló el APK de un push, no el de un Release. El `build.yml` no se toca (ya sin `continue-on-error`).
+  - **Cómo probar (después de subir la etiqueta `v3.8` e instalar desde Ajustes › Actualizaciones):** 1) Acerca de dice «CASTV 3.8»; 2) Canales: los logos blancos (Cinecanal, A&E, Cartoon Network, 00s Replay) se ven sobre fondo oscuro y los de color siguen igual; 3) reproductor: se ve el título completo y solo hay ★ 🔄 ⋯ 📺; 4) ⋯ abre el menú y cada opción funciona (bloquear, tamaño, temporizador, herramientas, subtítulos); 5) canal en vivo: solo «● EN VIVO», sin barra ni −10/+10; un video del teléfono: todo aparece; 6) 🔄 un toque alterna vertical/horizontal; mantener pulsado = automático.
+  - **Riesgos generales:** sin compilador de Kotlin (R4): si el build sale rojo, pasar el mensaje de Actions. Si algo falla a la mitad al aplicar, no se sube nada (el `push` va al final): `git reset --hard origin/main`.
+  - **Etiqueta v3.8 (pedida por Ariel, 24 nov; excepción a R12):** solo con el build de `main` en verde: `git tag v3.8 && git push origin v3.8`. Después instalar desde Ajustes › Actualizaciones (no el artefacto de un push).
+  - **Siguiente paso:** build verde → etiqueta v3.8 → Ariel prueba y dice «ya funciona» → cada ítem pasa a ✅ y a `HISTORIAL`.
+- **Propuesta aún sin etiquetar:** `v3.8` (pedida por Ariel; ver arriba). ZAP-3 (deslizar para cambiar de canal) no se hizo: puede chocar con los gestos de brillo y volumen.
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. **TESTS-1b** (🧪, pendiente de aplicar). 2. **VISTA-1 a VISTA-4** (🧪, pendientes de probar). 3. **FAV-REPRO-1** (🧪, pendiente de aplicar). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
+1. **VISTA-1 a VISTA-4** y **FAV-REPRO-1** (🧪, instalados; falta el «ya funciona»). 2. **VISTA-5, BARRA-1, VIVO-1, GIRO-1, VERSION-3** (🧪, entregados 24 nov; pendientes de aplicar y probar). TESTS-1b: `build.yml` ya está sin `continue-on-error` (visto 24 nov); falta su «ya funciona». Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
 
 ### Pendientes sueltos
-- ⬜ Mejoras del reproductor propuestas (24 nov; Ariel pidió opinión, aún no eligió): **BARRA-1** barra superior con ★, 📺 TV y un «⋯» que agrupe 🔄 🔒 🖼 😴 🛠 💬 para que el título se lea completo · **VIVO-1** en canales en vivo ocultar el tiempo, la barra muerta y −10/+10 (dejar «● EN VIVO»; verificar antes si −10/+10 sirven con el buffer) · **GIRO-1** botón/gesto para pasar a horizontal con un toque · **ZAP-3** deslizar arriba/abajo para cambiar de canal.
+- ⬜ **ZAP-3** deslizar arriba/abajo en el reproductor para cambiar de canal (propuesto 24 nov; puede chocar con los gestos de brillo y volumen; Ariel no lo eligió). BARRA-1, VIVO-1 y GIRO-1 ya están en 🧪.
 - ⬜ Ideas de referencia NO elegidas (23 nov; con su contra; ATOMIC-1 y TESTS-1 ya se eligieron, ver 🧪): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅; el `/log` ya oculta claves con LOG-1 ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
