@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v363
+# CASTV: CHANGELOG (cerebro) · v364
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -120,7 +120,7 @@ rm -f ~/storage/downloads/*_actual.*
 - **QR-2a ✅ (24 nov):** Ariel: «Ya funciona». ＋ Lista › «📤 Enviar esta lista a otro móvil» (solo con una lista abierta): QR con `http://<IP>:<puerto>/send/<clave>`; el otro móvil pulsa «Recibir lista» y ve nombre y enlace con «Copiar enlace»; clave de un solo uso, 5 min, solo red local, sin la clave en el `/log`; no se envían listas Xtream ni enlaces con usuario y clave. Línea en `HISTORIAL`. Sin etiqueta (R12).
 - **QR-2b ✅ (24 nov):** Ariel: «Ya funciona». Ajustes › Respaldo › «Enviar respaldo a otro móvil»: confirmación, QR con `http://<IP>:<puerto>/send/<clave>`, el otro móvil baja `castv-respaldo.json` con «Descargar respaldo» (avisa que importarlo reemplaza sus datos); mismas reglas que QR-2a (un solo uso, 5 min, red local, sin clave en el `/log`); el respaldo no lleva claves Xtream, IP del TV ni PIN. Línea en `HISTORIAL`. Sin etiqueta (R12).
 - **TAG-3.9 ✅ (24 nov):** Ariel: «Ya estamos en la última versión» (Release `CASTV-v3.9.apk` instalado desde la app). Incluye EPG-1, XTREAM-1, QR-1, EPG-1b, QR-2a y QR-2b (lo anterior ya estaba en `v3.8`). Línea en `HISTORIAL`. Nada más a medias; sigue pendiente solo COMPAT-TV-1 (espera la TV del amigo).
-- **Ahora no hay nada en 🧪.** La cola elegida está vacía.
+- **DUP-1 · 🧪 (24 nov):** «Duplicados» decía «ninguno» con dos pistas iguales porque el nombre de una termina en `_1` (`…Español(MP3_160K)_1.mp3`) y el detector solo quitaba la extensión y «(MP3_160K)». Ahora también ignora un sufijo de copia al final: `_1`…`_99` o ` (1)`…` (99)`; sigue exigiendo la misma duración (±2 s) y conserva la más antigua. **Archivos:** `MainActivity.kt` (`dupKey`, `dupSuffixRe`, `computeDups`). **Probar:** Más › Biblioteca › Duplicados debe mostrar «Ocultar duplicados (N)» y la pista «4BOUT First And Last» debe salir una sola vez al ocultarlos; no borra nada. **Riesgo:** bajo (una función; «Canción 2» sin guion bajo ni paréntesis no se toca). **Siguiente paso:** el «ya funciona» de Ariel para pasarlo a ✅.
 - **Etiquetas:** última `v3.9` ✅ (publicada e instalada). Siguiente: `v3.10`, solo cuando Ariel la pida (R12): `git tag v3.10 && git push origin v3.10` con el build de `main` en verde.
 - **TV-INFO-1 ✅ (24 nov):** Ariel pasó la pantalla «Acerca de» de la TV: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711` (extendida `J.N0711`), IP `192.168.100.14`. Línea en `HISTORIAL`. No se guardan MAC ni números de serie/ESN.
 
