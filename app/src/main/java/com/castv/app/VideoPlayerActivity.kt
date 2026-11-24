@@ -292,7 +292,14 @@ class VideoPlayerActivity : AppCompatActivity() {
         favChip = chip("☆") { toggleChannelFav() }   // [FAV-REPRO-1]
         favChip.visibility = View.GONE
         topBar.addView(favChip)
-        topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
+        topBar.addView(chip("🔄") { rotate() }.apply {   // [UI-2a] [GIRO-1] un toque cambia entre horizontal y vertical; mantener pulsado = giro automático
+            setOnLongClickListener {
+                rotMode = 0
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                toast("🔄 Giro automático")
+                true
+            }
+        })
         sleepChip = chip("😴") { showSleepMenu() }   // [GESTO-2] ya no va en la barra: solo guarda el texto del temporizador para el menú ⋯
         topBar.addView(chip("⋯") { showMoreMenu() })   // [BARRA-1] 🔒 🖼 😴 🛠 💬 agrupados
         topBar.addView(chip("📺 TV") { sendToTv() })
@@ -897,12 +904,17 @@ class VideoPlayerActivity : AppCompatActivity() {
         showControls()
     }
 
+    /** [GIRO-1] Un toque pasa a la otra orientación (horizontal ↔ vertical); mantener pulsado vuelve al giro automático. */
     private fun rotate() {
-        rotMode = (rotMode + 1) % 3
-        when (rotMode) {
-            1 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE; toast("↔ Horizontal") }
-            2 -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT; toast("↕ Vertical") }
-            else -> { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR; toast("🔄 Giro automático") }
+        val land = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        if (land) {
+            rotMode = 2
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            toast("↕ Vertical")
+        } else {
+            rotMode = 1
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            toast("↔ Horizontal")
         }
     }
 
