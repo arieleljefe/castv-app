@@ -1095,15 +1095,17 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** Agrupa los botones menos usados de la barra para que el título del canal se lea completo. */
     private fun showMoreMenu() {
         val sl = if (::sleepChip.isInitialized) sleepChip.text.toString().removePrefix("😴").trim() else ""
-        val labels = arrayListOf(
-            "🔒 Bloquear controles",
-            "🖼 Tamaño de imagen",
-            if (sl.isEmpty()) "😴 Temporizador de apagado" else "😴 Temporizador · $sl",
-            "🛠 Herramientas",
-            "💬 Subtítulos")
+        val b = AlertDialog.Builder(this)   // [ICONOS-3]
+        val ic = b.context
+        val labels = arrayListOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_lock, "Bloquear controles"),
+            CastvIcons.item(ic, R.drawable.ic_vp_aspect, "Tamaño de imagen"),
+            if (sl.isEmpty()) CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador de apagado") else CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador · $sl"),
+            CastvIcons.item(ic, R.drawable.ic_vp_build, "Herramientas"),
+            CastvIcons.item(ic, R.drawable.ic_vp_subs, "Subtítulos"))
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
-        if (ch != null && Epg.nowNext(ch) != null) labels.add("📅 Guía: ahora y lo que sigue")
-        AlertDialog.Builder(this)
+        if (ch != null && Epg.nowNext(ch) != null) labels.add(CastvIcons.item(ic, R.drawable.ic_event, "Guía: ahora y lo que sigue"))
+        b
             .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> lock()

@@ -1,5 +1,12 @@
 package com.castv.app
 
+import android.content.Context
+import android.graphics.Color
+import android.text.Spanned
+import android.text.SpannableString
+import android.text.style.ImageSpan
+import android.util.TypedValue
+import androidx.core.content.ContextCompat
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -70,5 +77,27 @@ object CastvNet {
             }
         } catch (e: Exception) { }
         return null
+    }
+}
+
+/** [ICONOS-3] Filas de menú con «icono vectorial + texto» (el icono va dentro del texto, así se alinea y toma el color del texto). */
+object CastvIcons {
+    /** [ctx] debe ser el contexto del diálogo (`builder.context`) para que el icono tome el color de sus textos. */
+    fun item(ctx: Context, res: Int, label: String): CharSequence {
+        val d = ContextCompat.getDrawable(ctx, res)?.mutate() ?: return label
+        val attrs = intArrayOf(android.R.attr.textColorAlertDialogListItem, android.R.attr.textColorPrimary)
+        var color = Color.GRAY
+        for (a in attrs) {
+            val ta = ctx.obtainStyledAttributes(intArrayOf(a))
+            val c = ta.getColorStateList(0)
+            ta.recycle()
+            if (c != null) { color = c.defaultColor; break }
+        }
+        d.setTint(color)
+        val px = (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 16f * 1.2f, ctx.resources.displayMetrics)).toInt()
+        d.setBounds(0, 0, px, px)
+        val sp = SpannableString("\u00A0 $label")
+        sp.setSpan(ImageSpan(d, ImageSpan.ALIGN_BASELINE), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return sp
     }
 }
