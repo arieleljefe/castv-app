@@ -74,8 +74,12 @@ object MediaScanner {
         return items
     }
 
-    private fun cleanArtist(a: String?): String =
-        if (a == null || a == "<unknown>") "" else a.trim()
+    private fun cleanArtist(a: String?): String {
+        if (a == null || a == "<unknown>") return ""
+        val t = a.trim()
+        // [ARTISTA-1] un nombre que solo trae "?" (alfabeto que no se pudo leer) cuenta como sin dato
+        return if (t.isNotEmpty() && t.all { it == '?' || it == '\uFFFD' || it.isWhitespace() }) "" else t
+    }
 
     /** Normaliza la ruta a algo como "Download/Series" (sin barras sobrantes ni nombre de archivo). */
     private fun folderOf(raw: String, relative: Boolean): String {
