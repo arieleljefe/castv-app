@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v379
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v382
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -117,3 +117,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - INSETS-1 · 24 nov · los controles del reproductor (barra de abajo, de arriba y subtítulos) ya no quedan bajo ☰ ○ < en pantalla completa: se mide el tamaño real de las barras con `getInsetsIgnoringVisibility` y se repiten los márgenes al crear la barra · `VideoPlayerActivity.kt`
 - CANALES-1 · 24 nov · Canales más compacto: la lista actual va junto a la flecha ← (sin la fila del título), los chips de ánimo van dentro de la lista y se van al bajar, y los botones dicen «📅 Guía» y «⚠ N fallan» · `M3uActivity.kt`
 - AVANZADO-1 · 24 nov · Ajustes › Avanzado junta las tres pruebas de IA (audio, Whisper, transcripción) en una fila «Pruebas de IA…» con menú · `SettingsActivity.kt`
+- FAB-1 · 24 nov · el botón 🔀 se corre 60 dp del borde derecho para no tapar el ⋮ de las filas de Pistas y Videos con la lista quieta · `activity_main.xml`
