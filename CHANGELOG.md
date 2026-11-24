@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v399
+# CASTV: CHANGELOG (cerebro) · v403
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -84,7 +84,7 @@ rm -f ~/storage/downloads/*_actual.*
 
 - **R11 Termux en el móvil:** comandos cortos; si una línea es muy larga el pegado se corta (queda un `>` esperando): partirla en 2 pasos (definir función, luego usarla) y recordar `CTRL`+`c` para salir. Las pruebas imprimen en pantalla (captura) o guardan en Download; Ariel NO borra Download hasta que la IA lo diga. Parche + changelog + historial = UNA sola línea (B+C), con `CHANGELOG_v<N>.md` y `HISTORIAL_v<N>.md` del mismo número.
 
-- **R12 Versiones:** no subir de versión ni proponer etiqueta con cambios pequeños; solo con cambios realmente grandes (decisión de Ariel, 23 nov). Al proponerla, dar la línea `git tag v<N> && git push origin v<N>`.
+- **R12 Versiones:** las etiquetas SÍ se proponen, pero agrupadas: no una por cada cambio pequeño, sino cuando se junta un lote de cambios (o al cerrar un objetivo) para instalarlos todos de una vez (aclaración de Ariel, 24 nov). La IA lo propone al terminar el lote, con la línea `git tag v<N> && git push origin v<N>`, solo con el build de `main` en verde; entre lotes, los parches van a `main` sin etiqueta.
 
 **Plantilla de entrada activa (sección 4):** `ID · estado · Qué · Archivos · Cómo probar · Siguiente paso`.
 
@@ -94,7 +94,12 @@ rm -f ~/storage/downloads/*_actual.*
 
 ### ▶ RETOMAR AQUÍ (24 nov 2026)
 - **DECISIÓN DE ARIEL (24 nov, noche): «todo, vamos por todos menos COMPAT-TV-1»** (y «Dale» al plan). Orden: BORRAR-1 ✅ › WIDGET-1 ✅ › etiqueta `v3.10` ✅ al final (con el build de `main` en verde; incluirá ICONOS-1 a 10, BORRAR-1 y WIDGET-1) › Android Auto/TV solo evaluar, sin código hasta que Ariel diga. COMPAT-TV-1 sigue ⏳.
-- **BORRAR-1 y TAG-3.10 ✅ (24 nov):** Ariel: «Ya funciona» (Release `CASTV-v3.10.apk` instalado; incluye ICONOS-1 a 10, BORRAR-1 y WIDGET-1). «Borrar» → «Eliminar» en historial, selección, diálogos de Ajustes y marcador; «Borrar datos» se deja. Líneas en `HISTORIAL`. Nada a medias; quedan COMPAT-TV-1 ⏳ (espera la TV del amigo) y la idea Android Auto/TV (solo evaluar, sin código hasta que Ariel diga).
+- **LOTE v3.11 (24 nov, Ariel: «todo lo otro vamos a darle»), en este orden, un parche por ítem (R2: «todo de golpe» = parches encadenados, un commit por parche); la etiqueta `v3.11` se propone al cerrar el lote (R12):**
+  - **EPG-DEFECTO-1 · 🧪** Qué: la guía de programación viene ENCENDIDA por defecto (`epg_on` ahora es `true` si no está guardada; si ya la guardaste en Ajustes › Video, se respeta tu valor). Archivos: `Epg.kt` (`enabled()`), `SettingsActivity.kt` (`epgState()` y `toggleEpg()`). Cómo probar: Ajustes › Video debe decir «Activado» (si nunca la tocaste) y en Canales se ve «▶ programa». Riesgo: más descargas de guías al abrir Canales (con datos móviles sigue solo a mano). Siguiente paso: tu «ya funciona» → pasa a `HISTORIAL`; luego SINPANTALLA-1.
+  - **SINPANTALLA-1 · ⬜** Qué: ecualizador y velocidad de la música también en el modo sin pantalla (`PlayerCore` los guarda y los reaplica sin `MainActivity`). Archivos: `PlayerCore.kt`, `MainActivity.kt`. Cómo probar: poner música con ecualizador/velocidad, forzar que Android cierre la pantalla principal y comprobar que siguen aplicados. Riesgo: medio (toca el reproductor); sin cambio visible.
+  - **XTFAV-1 · ⬜** Qué: favoritos, ocultos, Continuar e Historial de canales Xtream viajan en respaldos y restaurar ya no los borra; sin usuario ni clave en el respaldo (se identifican por `xtream://<id>`, así que solo valen en el mismo teléfono o si la lista Xtream se vuelve a crear con el mismo id). Archivos: `Backup.kt`, `Store.kt`, `Xtream.kt`, `M3uActivity.kt`. Cómo probar: respaldar, restaurar y ver que los favoritos Xtream siguen. Riesgo: medio-alto (datos); `TESTS-2` se amplía.
+  - Siguiente: probar EPG-DEFECTO-1; archivos de todo el lote ya pasados (`Epg`, `SettingsActivity`, `PlayerCore`, `MainActivity`, `Backup`, `Store`, `Xtream`, `M3uActivity`).
+- **BORRAR-1 y TAG-3.10 ✅ (24 nov):** Ariel: «Ya funciona» (Release `CASTV-v3.10.apk` instalado; incluye ICONOS-1 a 10, BORRAR-1 y WIDGET-1). «Borrar» → «Eliminar» en historial, selección, diálogos de Ajustes y marcador; «Borrar datos» se deja. Líneas en `HISTORIAL`. Nada a medias; quedan COMPAT-TV-1 ⏳ (espera la TV del amigo) y nada más (Android Auto/TV descartado por el momento, 24 nov).
 - **WIDGET-1 ✅ (24 nov):** Ariel: «ya instalé el widget1, funciona bien». Widget de inicio «CASTV» con título, estado y ⏮ ⏯ ⏭ (tocar el título abre la app); los botones usan `ACT_PREV/TOGGLE/NEXT` y solo responden con la app viva (con la app cerrada vuelve a «Abre la app para reproducir»). Línea en `HISTORIAL`. Sin etiqueta aún: entra en `v3.10`.
 - **ICONOS (24 nov):** zonas 1 a 10 ✅ (ICONOS-10 confirmado por Ariel: «Ya funciona»). Serie cerrada: se dejan con emoji, por decisión, los avisos/HUD, los botones de diálogo (los iconos no se tiñen igual que el texto en un botón), los selectores Artista/Álbum/Carpeta y los títulos; Ajustes no lleva emoji en sus menús. Si Ariel quiere más iconos, él lo pide.
 - **AHORA-TV · ⛔ ya existe (24 nov):** al revisar el código, «lo que dan ahora en mis favoritos» ya está: con la guía activada (Ajustes › Video) las tarjetas de ★ Favoritos muestran «▶ programa» y las filas «▶ programa · hasta HH:MM» (EPG-1). Lo único que falta es que la guía viene apagada; no se cambia.
@@ -133,7 +138,7 @@ rm -f ~/storage/downloads/*_actual.*
 - **EPG-BUSCAR-1 y TESTS-2 ✅ (24 nov):** Ariel: «Funciona» (en Free-TV › Italia, buscar «noti» encontró Mediaset Italia por su programa «Dentro La Notizia»; build con TESTS-2 en verde). Líneas en `HISTORIAL`. Sin etiqueta (R12). HILO-1 descartado: `mediaUrl` lo usa un solo hilo. **Dato:** con Free-TV la app eligió las guías IT1, RAKUTEN_IT1, PL1, RAKUTEN_PL1 y UK1; las dos RAKUTEN dan HTTP 404 (idea EPG-1c: saltarse las que den 404 y usar otras del mismo país; Ariel aún no respondió si la quiere).
 - **EPG-AGENDA-1 ✅ (24 nov):** Ariel: «Funciona» (Mediaset Italia: «Ahora», «Después» y «Más tarde:» con 5 programas). Línea en `HISTORIAL`. Sin etiqueta (R12). EPG-1c descartada (una guía con 404 ya se salta sola). Nada a medias; solo queda COMPAT-TV-1 (espera la TV del amigo).
 - **DUP-1 ✅ (24 nov):** Ariel: «Ya funciona». «Duplicados» ya detecta copias con sufijo `_1` o ` (1)` en el nombre. Línea en `HISTORIAL`. Sin etiqueta (R12).
-- **Etiquetas:** última `v3.10` ✅ (publicada e instalada). Siguiente: `v3.11`, solo cuando Ariel la pida y con cambios grandes (R12): `git tag v3.11 && git push origin v3.11` con el build de `main` en verde.
+- **Etiquetas:** última `v3.10` ✅ (publicada e instalada). Siguiente: `v3.11`, cuando haya un lote de cambios listo (R12; la IA la propone al cerrarlo): `git tag v3.11 && git push origin v3.11` con el build de `main` en verde.
 - **TV-INFO-1 ✅ (24 nov):** Ariel pasó la pantalla «Acerca de» de la TV: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711` (extendida `J.N0711`), IP `192.168.100.14`. Línea en `HISTORIAL`. No se guardan MAC ni números de serie/ESN.
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
@@ -152,11 +157,13 @@ Nada elegido por Ariel aparte de lo que está en 🧪. COMPAT-TV-1 ⏳ espera la
 - ✅ Modelo y versión de la TV: hecho (TV-INFO-1, ver `HISTORIAL`).
 - ✅ WIDGET-1 hecho (24 nov, ver `HISTORIAL`).
 - ✅ (hecho como SERVICIO-1) la reproducción de música del teléfono sobrevive a cerrar la app.
-- ⬜ Ideas: Android Auto / Android TV.
-- ⏳ Pistas de audio/subtítulos embebidos: solo con libvlc/ffmpeg. El tamaño del APK ya no es impedimento (decisión de Ariel, 17 nov); se evalúa caso por caso, y solo si Ariel lo pide.
+- ⛔ Android Auto / Android TV: descartado por el momento (Ariel, 24 nov); si algún día lo quiere, él avisa.
+- ⛔ Pistas de audio/subtítulos embebidos con libvlc/ffmpeg: descartado (Ariel, 24 nov: no quiere meter libvlc ni ffmpeg).
 - Verificado 23 nov: temporizador de apagado y velocidad ya existen en música (`MainActivity.kt`); el temporizador también en video (GESTO-2). Velocidad en video, verificado 23 nov: solo existe al mantener pulsado (1.5×/2×/3×), no hay selector (ver SPEED-1).
 
 ### Descartado (⛔)
+Widget con la app cerrada (mover la reproducción a un servicio) y libvlc/ffmpeg/pistas embebidas (24 nov, decisión de Ariel): no proponer. WIDGET-1 se queda como está (✅).
+Android Auto / Android TV (24 nov, decisión de Ariel: «por el momento»): no evaluar ni proponer; si lo quiere, él avisa.
 Subtítulos con IA (Whisper), idioma «Automático» y mejoras: **CERRADO por Ariel (23 nov)**; no tocar ni proponer. Si algún día quiere mejorarlo, él avisa (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 `Platzi-Download` y `Youtube_Downloader` (23 nov): no aportan a castv y descargan contenido de terceros; no se toman ideas de ellos.
 Catch-up (24 nov, sin cuenta Xtream), Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
