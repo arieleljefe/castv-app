@@ -97,6 +97,7 @@ class MainActivity : AppCompatActivity() {
     private val fullHandler = android.os.Handler(android.os.Looper.getMainLooper())   // [UI-3b]
     private lateinit var tvFilter: TextView
     private lateinit var tvEmpty: TextView
+    private lateinit var tvEmptyAction: TextView   // [VACIO-1]
     private lateinit var btnPlay: ImageButton
     private lateinit var fab: View
     private lateinit var footerView: View
@@ -401,6 +402,7 @@ class MainActivity : AppCompatActivity() {
         playerExpanded = findViewById(R.id.playerExpanded)
         tvFilter = findViewById(R.id.tvFilter)
         tvEmpty = findViewById(R.id.tvEmpty)
+        tvEmptyAction = findViewById(R.id.tvEmptyAction)   // [VACIO-1]
         btnPlay = findViewById(R.id.btnPlay)
         fab = findViewById(R.id.fabShuffle)
 
@@ -971,10 +973,25 @@ class MainActivity : AppCompatActivity() {
         return ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
     }
 
+    /** [VACIO-1] Muestra el botón bajo el mensaje de lista vacía. */
+    private fun setEmptyAction(label: String, onClick: () -> Unit) {
+        tvEmptyAction.text = label
+        tvEmptyAction.setOnClickListener { onClick() }
+        tvEmptyAction.visibility = View.VISIBLE
+    }
+
+    /** [BUSCA-1] Abre Canales con lo que se escribió en el buscador (respeta el PIN de Canales). */
+    private fun openChannelsSearch() {
+        val q = query
+        val open = { startActivityForResult(Intent(this, M3uActivity::class.java).putExtra("q", q), reqM3u) }
+        if (ParentalPin.guardsChannels(this)) ParentalPin.ask(this, "PIN para abrir Canales") { open() } else open()
+    }
+
     /** Mensaje en el centro de la lista cuando no hay nada que mostrar (ya no ensucia la línea de estado). */
     private fun updateEmptyState() {
         if (currentList.isNotEmpty()) {
             tvEmpty.visibility = View.GONE
+            tvEmptyAction.visibility = View.GONE   // [VACIO-1]
             if (!footerAttached) {
                 listFiles.addFooterView(footerView, null, false)
                 footerAttached = true
@@ -985,7 +1002,7 @@ class MainActivity : AppCompatActivity() {
             !hasMediaPermission() -> "Falta el permiso para leer tus archivos.\nActívalo en Ajustes › Apps › CASTV › Permisos."
             allItems.isEmpty() -> if (showingMusic) "No se encontró música en el teléfono." else "No se encontraron videos en el teléfono."
             viewMode == ViewMode.FAVS -> "Aún no hay favoritos.\nToca ⋮ en un archivo y elige ☆."
-            viewMode == ViewMode.RESUME -> "Nada por continuar todavía."
+            viewMode == ViewMode.RESUME -> "Nada por continuar todavía.\nLo que veas o escuches aparecerá aquí."   // [VACIO-1]
             onlyUnseen && !showingMusic -> "Ya viste todos los videos.\nToca el filtro de arriba para quitarlo."   // [NOVISTOS-1]
             query.isNotEmpty() -> "Sin resultados para «$query»."
             selectedPlaylist != null -> "Esta lista no tiene " + (if (showingMusic) "audios" else "videos") +
@@ -994,6 +1011,16 @@ class MainActivity : AppCompatActivity() {
         }
         tvEmpty.text = msg
         tvEmpty.visibility = View.VISIBLE
+        // [VACIO-1] un botón con la salida más útil de cada caso
+        if (hasMediaPermission() && allItems.isNotEmpty()) {
+            when {
+                viewMode == ViewMode.FAVS -> setEmptyAction("Ver todos") { viewMode = ViewMode.ALL; applyFilters() }
+                viewMode == ViewMode.RESUME -> setEmptyAction("📡 Abrir Canales") { runMenuAction(16) }
+                onlyUnseen && !showingMusic -> tvEmptyAction.visibility = View.GONE
+                query.isNotEmpty() -> setEmptyAction("📡 Buscar en Canales") { openChannelsSearch() }   // [BUSCA-1]
+                else -> tvEmptyAction.visibility = View.GONE
+            }
+        } else tvEmptyAction.visibility = View.GONE
         if (footerAttached) {
             listFiles.removeFooterView(footerView)
             footerAttached = false
