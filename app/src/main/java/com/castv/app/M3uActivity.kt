@@ -122,6 +122,20 @@ class M3uActivity : AppCompatActivity() {
         return tv.data
     }
 
+    /** [ICONOS-1] Botón con icono vectorial del mismo color del texto (alternativa a un emoji). */
+    private fun iconBtn(res: Int, desc: String, onClick: () -> Unit): ImageView = ImageView(this).apply {
+        setImageResource(res)
+        setColorFilter(txtColor)
+        contentDescription = desc
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        setPadding(dp(9), dp(9), dp(9), dp(9))
+        val ta = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
+        background = ta.getDrawable(0)
+        ta.recycle()
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+    }
+
     private fun chip(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
         text = label
         setTextColor(txtColor)
@@ -308,13 +322,11 @@ class M3uActivity : AppCompatActivity() {
             tvCmd(MainActivity.ACT_FAV)
             Handler(Looper.getMainLooper()).postDelayed({ favs = Store.chFavs(); updateNowBar(); chAdapter.notifyDataSetChanged() }, 400)
         }
-        val nowBtns = listOf(
-            chip("⏮") { tvCmd(MainActivity.ACT_PREV) },
-            chip("⏯") { tvCmd(MainActivity.ACT_TOGGLE) },
-            chip("⏭") { tvCmd(MainActivity.ACT_NEXT) },
-            nowFav,
-            chip("✕") { nowDismissed = Zap.nowTitle; updateNowBar() })
-        for (b in nowBtns) {
+        // [ICONOS-1] ⏮ ⏯ ⏭ con los mismos iconos de la pantalla principal (los emojis se ven distinto en cada teléfono)
+        nowBar.addView(iconBtn(R.drawable.ic_prev, "Canal anterior") { tvCmd(MainActivity.ACT_PREV) })
+        nowBar.addView(iconBtn(R.drawable.ic_pause, "Pausar o continuar") { tvCmd(MainActivity.ACT_TOGGLE) })
+        nowBar.addView(iconBtn(R.drawable.ic_next, "Canal siguiente") { tvCmd(MainActivity.ACT_NEXT) })
+        for (b in listOf(nowFav, chip("✕") { nowDismissed = Zap.nowTitle; updateNowBar() })) {
             b.textSize = 16f
             b.setPadding(dp(10), dp(6), dp(10), dp(6))
             nowBar.addView(b)
