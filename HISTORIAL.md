@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v410
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v412
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -136,3 +136,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - SINPANTALLA-1 · 24 nov · con la música sonando sin pantalla, `PlayerCore` pone el ecualizador (preset del sistema o propio) y los graves leídos de las preferencias `castv` (`eqPreset`, `bassOn`, `eq_user_on`, `eq_user`) y reaplica la velocidad en cada pista y al reanudar; al reabrir la app se recoge la velocidad (`Snapshot.speed`) · `PlayerCore.kt`, `MainActivity.kt`
 - XTFAV-1 · 24 nov · favoritos, ocultos, Continuar e Historial de canales Xtream viajan en respaldos completos en forma portátil `xtream://<id>/live/123.m3u8` (sin usuario ni clave); al restaurar vuelven a ser el enlace real si el acceso existe y se unen con lo que ya había (ya no se borra); en otro teléfono quedan inertes hasta volver a poner el acceso 🔑 (`rehydrate`) · `Backup.kt`, `Xtream.kt`
 - TESTS-3 · 24 nov · 11 pruebas automáticas de los enlaces portátiles de Xtream (`toPortable`, `fromPortable`, `mapUrls`/`portabilize`); build en verde · `XtreamPortableTest.kt`
+- BUSCA-TODO-1 · 24 nov · Canales › «🔎 Buscar en todas mis listas»: une SIN descargar las copias guardadas (`cacheDir/m3u_<hash>.txt`, solo listas ya abiertas), sin repetidos, tope 40000; el pie dice «de N listas (M sin copia)»; la guía se lee solo de su copia (`region:Todas mis listas`) y «Actualizar ya» en 📅 la baja · `M3uActivity.kt` (`loadAllCached`)
