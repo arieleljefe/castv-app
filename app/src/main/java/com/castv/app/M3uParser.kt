@@ -58,8 +58,8 @@ object M3uParser {
         return out
     }
 
-    /** [EPG-1] Enlaces de guía XMLTV de la cabecera (`#EXTM3U url-tvg="…"`, varios separados por coma); máximo 3. */
-    fun epgUrls(text: String): List<String> {
+    /** [EPG-1] Enlaces de guía XMLTV de la cabecera (`#EXTM3U url-tvg="…"`, varios separados por coma); por defecto máximo 3 ([EPG-1b]: [limit] sube el tope). */
+    fun epgUrls(text: String, limit: Int = 3): List<String> {
         var seen = 0
         for (raw in text.lineSequence()) {
             val line = raw.trim()
@@ -68,11 +68,65 @@ object M3uParser {
                 val v = tvgUrlRe.find(line)?.groupValues?.get(1).orEmpty()
                 return v.split(',').map { it.trim() }
                     .filter { it.startsWith("http://", true) || it.startsWith("https://", true) }
-                    .take(3)
+                    .take(limit)
             }
             if (++seen >= 5) break
         }
         return emptyList()
+    }
+
+    /** [EPG-1b] País de un `tvg-id` (`Rai1.it` → `it`, `Canal.es@SD` → `es`); "" si no trae. */
+    fun idCountry(tvgId: String): String {
+        val id = tvgId.trim().substringBefore('@')
+        val i = id.lastIndexOf('.')
+        if (i < 0 || i == id.length - 1) return ""
+        val cc = id.substring(i + 1).lowercase()
+        return if (cc.length in 2..3 && cc.all { it in 'a'..'z' }) cc else ""
+    }
+
+    /** [EPG-1b] Nombre corto de una guía (archivo sin parámetros, `.gz`, `.xml` ni `epg_ripper_`), para el /log. */
+    fun guideName(url: String): String {
+        var n = url.trim().substringBefore('?').substringBefore('#').trimEnd('/').substringAfterLast('/')
+        for (ext in listOf(".gz", ".xml")) {
+            if (n.lowercase().endsWith(ext)) n = n.substring(0, n.length - ext.length)
+        }
+        return n.removePrefix("epg_ripper_")
+    }
+
+    /** [EPG-1b] Códigos de país que lleva el nombre de una guía (`IT1` → it, `US_LOCALS1` → us). */
+    private fun guideCodes(url: String): Set<String> {
+        val out = HashSet<String>()
+        for (tok in guideName(url).split(Regex("[^A-Za-z0-9]+"))) {
+            val letters = tok.trimEnd { it.isDigit() }.lowercase()
+            if (letters.length in 2..3) out.add(letters)
+        }
+        return out
+    }
+
+    /**
+     * [EPG-1b] Con una cabecera de más de 3 guías (p. ej. Free-TV trae más de 100), elige las de los países
+     * que más pesan en los `tvg-id` de los canales: hasta 3 países (con al menos 3 canales), hasta 2 guías por
+     * país y [max] en total. Sin coincidencias (o con 3 guías o menos) se queda como antes: las 3 primeras.
+     */
+    fun pickGuides(urls: List<String>, channels: List<M3uChannel>, max: Int = 6): List<String> {
+        if (urls.size <= 3) return urls
+        val count = HashMap<String, Int>()
+        for (c in channels) {
+            val cc = idCountry(c.tvgId)
+            if (cc.isNotEmpty()) count[cc] = (count[cc] ?: 0) + 1
+        }
+        val top = count.toList().filter { it.second >= 3 }
+            .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+            .take(3).map { it.first }
+        val out = ArrayList<String>()
+        for (cc in top) {
+            var n = 0
+            for (u in urls) {
+                if (out.size >= max || n >= 2) break
+                if (!out.contains(u) && guideCodes(u).contains(cc)) { out.add(u); n++ }
+            }
+        }
+        return if (out.isEmpty()) urls.take(3) else out
     }
 
     /** Descarga una lista (sigue hasta 5 redirecciones, incluso de http a https). Lanza excepción si falla. */

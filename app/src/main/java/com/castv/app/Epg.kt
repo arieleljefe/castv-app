@@ -36,7 +36,7 @@ object Epg {
     private const val HORIZON_MS = 24L * 3600_000L
     private const val MAX_PROGS = 150_000
     private const val MAX_BYTES = 250L * 1024 * 1024
-    private const val MAX_URLS = 3
+    private const val MAX_URLS = 6   // [EPG-1b] antes 3
 
     @Volatile private var guide: Guide? = null
 
@@ -82,7 +82,7 @@ object Epg {
             lastSource = "tu proveedor Xtream"
             return if (x == null) emptyList() else listOf(x)
         }
-        val h = if (m3uText != null) M3uParser.epgUrls(m3uText) else emptyList()
+        val h = if (m3uText != null) M3uParser.epgUrls(m3uText, 300) else emptyList()   // [EPG-1b] todas; se eligen al cargar
         lastSource = if (h.isEmpty()) "ninguna (la lista no trae guía)" else "la cabecera de la lista"
         return h
     }
@@ -130,7 +130,12 @@ object Epg {
         val progs = HashMap<String, ArrayList<Prog>>()
         val names = HashMap<String, String>()
         var err: String? = null
-        for (u in urls.take(MAX_URLS)) {
+        // [EPG-1b] con muchas guías en la cabecera, solo las de los países de los canales
+        val use = M3uParser.pickGuides(urls, channels, MAX_URLS).take(MAX_URLS)
+        if (use.size < urls.size) {
+            DebugLog.add("EPG: guías elegidas (${use.size} de ${urls.size}): " + use.joinToString { M3uParser.guideName(it) })
+        }
+        for (u in use) {
             try {
                 fetch(u, wantIds, wantNames, progs, names)
             } catch (e: Exception) {
