@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v415
+# CASTV: CHANGELOG (cerebro) · v417
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -92,12 +92,22 @@ rm -f ~/storage/downloads/*_actual.*
 
 ## 4. ESTADO VIVO
 
-### ▶ RETOMAR AQUÍ (24 nov 2026)
-- **LOTE v3.12 (24 nov; Ariel: «me gustan todas», «Dale» a BUSCA-TODO-1 ✅).** Un parche por ítem, un commit cada uno; la etiqueta `v3.12` se propone al cerrar el lote (R12): ya cerrado salvo LIMPIA-1, se propone con el build de `main` en verde. La etiqueta `v3.11` (lote anterior) está propuesta y Ariel aún no dijo si la subió.
+### ▶ RETOMAR AQUÍ (24 nov 2026, noche)
+- **LOTE v3.13 (24 nov; Ariel: «me gustan todas», «sigamos más tarde»).** Ideas aceptadas, aún SIN plan ni código: al retomar, la IA revisa primero el código de cada una (puede que ya exista, como SRT-1 ⛔), pide TODOS los archivos en UNA línea (plantilla A, R5), da el plan en 🧪 y espera el «Dale» (R2). Orden propuesto (esfuerzo y utilidad): ⬜ CAIDOS-1 › ⬜ TEMP-TV-1 › ⬜ CALIDAD-1 › ⬜ EPG-RECORDA-1 › ⬜ TOP-1. Etiqueta `v3.13` al cerrar el lote (R12).
+  1. **CAIDOS-1 · ⬜** Tras «revisar canales» (CHECK-1), botón para ocultar de una vez los que no respondieron (usa OCULTAR-1, restaurables).
+  2. **TEMP-TV-1 · ⬜** Temporizador de apagado para lo que suena en el TV (hoy solo en el teléfono).
+  3. **CALIDAD-1 · ⬜** Elegir resolución (baja/media/alta) en canales HLS con varias calidades.
+  4. **EPG-RECORDA-1 · ⬜** Notificación cuando empiece un programa marcado con ⏰ (usa la guía de EPG-AGENDA-1).
+  5. **TOP-1 · ⬜** Pantalla «Lo más visto» con canales y música, desde las estadísticas guardadas (`castv_stats`).
+  6. **LIMPIA-1 · ⬜** (pendiente de v3.12) plantilla E; ✅ con el «listo» de Ariel.
+- COMPAT-TV-1 ⏳ sigue esperando la visita a la TV del amigo.
+
+### Anterior (lote v3.12, cerrado)
+- **LOTE v3.12 (24 nov; Ariel: «me gustan todas», «Dale» a BUSCA-TODO-1 ✅).** Un parche por ítem, un commit cada uno; **TAG-3.12 ✅ (24 nov, Ariel: «Ya funciona»):** etiqueta publicada e instalada; línea en `HISTORIAL`. Lote cerrado salvo LIMPIA-1 (R12). La etiqueta `v3.11` (lote anterior) está propuesta y Ariel aún no dijo si la subió.
   1. **SRT-1 · ⛔ ya existe (24 nov):** `VideoPlayerActivity.showSubtitleMenu()` ya trae «Elegir archivo (.srt / .vtt)…» (`ACTION_OPEN_DOCUMENT`), más retraso y estilo. Sin parche.
   2. **BUSCA-TODO-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
   3. **M3U-EXPORT-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
-  4. **TESTS-4 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta aún (R12).
+  4. **TESTS-4 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Entró en `v3.12`.
   5. **LIMPIA-1 · ⬜ (en curso: plantilla E entregada; ✅ con el «listo» de Ariel)** Al cerrar el lote, plantilla E (`rm -f ~/storage/downloads/*_actual.*`).
   - **Archivos ya recibidos (24 nov, 13:49):** `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen`, `build.gradle`, `strings.xml`; más `Xtream` y `Backup`. Si Ariel retoma en otro chat, hay que volver a pedirlos (plantilla A).
 - **DECISIÓN DE ARIEL (24 nov, noche): «todo, vamos por todos menos COMPAT-TV-1»** (y «Dale» al plan). Orden: BORRAR-1 ✅ › WIDGET-1 ✅ › etiqueta `v3.10` ✅ al final (con el build de `main` en verde; incluirá ICONOS-1 a 10, BORRAR-1 y WIDGET-1) › Android Auto/TV solo evaluar, sin código hasta que Ariel diga. COMPAT-TV-1 sigue ⏳.
@@ -142,7 +152,7 @@ rm -f ~/storage/downloads/*_actual.*
 - **EPG-BUSCAR-1 y TESTS-2 ✅ (24 nov):** Ariel: «Funciona» (en Free-TV › Italia, buscar «noti» encontró Mediaset Italia por su programa «Dentro La Notizia»; build con TESTS-2 en verde). Líneas en `HISTORIAL`. Sin etiqueta (R12). HILO-1 descartado: `mediaUrl` lo usa un solo hilo. **Dato:** con Free-TV la app eligió las guías IT1, RAKUTEN_IT1, PL1, RAKUTEN_PL1 y UK1; las dos RAKUTEN dan HTTP 404 (idea EPG-1c: saltarse las que den 404 y usar otras del mismo país; Ariel aún no respondió si la quiere).
 - **EPG-AGENDA-1 ✅ (24 nov):** Ariel: «Funciona» (Mediaset Italia: «Ahora», «Después» y «Más tarde:» con 5 programas). Línea en `HISTORIAL`. Sin etiqueta (R12). EPG-1c descartada (una guía con 404 ya se salta sola). Nada a medias; solo queda COMPAT-TV-1 (espera la TV del amigo).
 - **DUP-1 ✅ (24 nov):** Ariel: «Ya funciona». «Duplicados» ya detecta copias con sufijo `_1` o ` (1)` en el nombre. Línea en `HISTORIAL`. Sin etiqueta (R12).
-- **Etiquetas:** última `v3.10` ✅ (publicada e instalada). Siguiente: `v3.11`, cuando haya un lote de cambios listo (R12; la IA la propone al cerrarlo): `git tag v3.11 && git push origin v3.11` con el build de `main` en verde.
+- **Etiquetas:** última `v3.12` ✅ (publicada e instalada). Siguiente: `v3.13`, cuando haya un lote de cambios listo (R12; la IA la propone al cerrarlo): `git tag v3.13 && git push origin v3.13` con el build de `main` en verde.
 - **TV-INFO-1 ✅ (24 nov):** Ariel pasó la pantalla «Acerca de» de la TV: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711` (extendida `J.N0711`), IP `192.168.100.14`. Línea en `HISTORIAL`. No se guardan MAC ni números de serie/ESN.
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
