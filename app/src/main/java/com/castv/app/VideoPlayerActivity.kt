@@ -1913,7 +1913,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         val ic = b.context
         b
             .setTitle("🔖 " + fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else ""))
-            .setItems(arrayOf<CharSequence>(CastvIcons.item(ic, R.drawable.ic_vp_play, "Saltar aquí"), CastvIcons.item(ic, R.drawable.ic_vp_delete, "Borrar marcador"))) { _, which ->
+            .setItems(arrayOf<CharSequence>(CastvIcons.item(ic, R.drawable.ic_vp_play, "Saltar aquí"), CastvIcons.item(ic, R.drawable.ic_vp_delete, "Eliminar marcador"))) { _, which ->
                 if (which == 0) {
                     video.seekTo(m.sec * 1000)
                     showHud("⏩ " + fmt(m.sec * 1000))

@@ -1834,7 +1834,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Historial de enlaces")
             .setItems(labels.toTypedArray()) { _, which -> showLinkActions(saved[which]) }
-            .setNeutralButton("Borrar historial") { _, _ ->
+            .setNeutralButton("Eliminar historial") { _, _ ->
                 Store.clearRecentLinks()
                 toast("Historial borrado (los favoritos se conservan)")
             }
@@ -3072,7 +3072,7 @@ class MainActivity : AppCompatActivity() {
         actionMode = startSupportActionMode(object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 menu.add(0, 1, 0, "Todo").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-                menu.add(0, 2, 1, "🗑 Borrar").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                menu.add(0, 2, 1, "🗑 Eliminar").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 // [SEL-1] acciones en bloque (van al menú ⋮ de la barra)
                 menu.add(0, 6, 2, "▶ Reproducir selección").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
                 menu.add(0, 3, 2, "➕ Añadir a la cola").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)

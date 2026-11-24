@@ -235,7 +235,7 @@ class SettingsActivity : AppCompatActivity() {
             { pickIaLang() }))   // [IA-4]
         l.add(Entry("Subtítulos", "Modelo de voz (IA)", iaModelStatus(),
             { pickIaModel() }))   // [IA-4]
-        l.add(Entry("Subtítulos", "Borrar modelo de voz (IA)", iaUsedStatus(),
+        l.add(Entry("Subtítulos", "Eliminar modelo de voz (IA)", iaUsedStatus(),
             { pickIaDelete() }))   // [IA-5]
         l.add(Entry("Subtítulos", "Restablecer estilo",
             "Tamaño mediano, texto blanco, fondo semitransparente", { resetSubStyle() }))
@@ -638,7 +638,7 @@ class SettingsActivity : AppCompatActivity() {
             it.fullLabel + " · " + mbText(WhisperModel.file(this, it).length())
         }.toTypedArray()
         AlertDialog.Builder(this)
-            .setTitle("Borrar modelo de voz (IA)")
+            .setTitle("Eliminar modelo de voz (IA)")
             .setItems(names) { d, which ->
                 d.dismiss()
                 confirmIaDelete(present[which])
@@ -650,9 +650,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun confirmIaDelete(sp: WhisperModel.Spec) {
         val size = WhisperModel.file(this, sp).length()
         AlertDialog.Builder(this)
-            .setTitle("¿Borrar el modelo ${sp.label}?")
+            .setTitle("¿Eliminar el modelo ${sp.label}?")
             .setMessage("Se liberan ${mbText(size)}. Si lo necesitas otra vez, habrá que bajarlo de nuevo (${sp.sizeText}).")
-            .setPositiveButton("Borrar") { _, _ ->
+            .setPositiveButton("Eliminar") { _, _ ->
                 if (SubtitleGen.running) {
                     toast("Se están generando subtítulos; espera a que terminen")
                 } else {
@@ -678,9 +678,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun confirmClearLinks(n: Int) {
         AlertDialog.Builder(this)
-            .setTitle("Borrar historial de enlaces")
+            .setTitle("Eliminar historial de enlaces")
             .setMessage("Se borrarán $n enlaces recientes. Los favoritos se conservan.")
-            .setPositiveButton("Borrar") { _, _ ->
+            .setPositiveButton("Eliminar") { _, _ ->
                 Store.clearRecentLinks()
                 toast("🕘 Historial de enlaces borrado")
                 render()
@@ -691,9 +691,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun confirmClearResume(n: Int) {
         AlertDialog.Builder(this)
-            .setTitle("Borrar puntos de reanudación")
+            .setTitle("Eliminar puntos de reanudación")
             .setMessage("Se olvidará dónde lo dejaste en $n videos y canciones; volverán a empezar desde el principio.")
-            .setPositiveButton("Borrar") { _, _ ->
+            .setPositiveButton("Eliminar") { _, _ ->
                 Store.clearAllResume()
                 toast("⏱ Puntos de reanudación borrados")
                 render()
