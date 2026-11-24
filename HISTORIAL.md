@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v414
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v415
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -138,3 +138,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TESTS-3 · 24 nov · 11 pruebas automáticas de los enlaces portátiles de Xtream (`toPortable`, `fromPortable`, `mapUrls`/`portabilize`); build en verde · `XtreamPortableTest.kt`
 - BUSCA-TODO-1 · 24 nov · Canales › «🔎 Buscar en todas mis listas»: une SIN descargar las copias guardadas (`cacheDir/m3u_<hash>.txt`, solo listas ya abiertas), sin repetidos, tope 40000; el pie dice «de N listas (M sin copia)»; la guía se lee solo de su copia (`region:Todas mis listas`) y «Actualizar ya» en 📅 la baja · `M3uActivity.kt` (`loadAllCached`)
 - M3U-EXPORT-1 · 24 nov · Canales › ★ Favs › «📤 Exportar favoritos»: arma un `.m3u` con los favoritos de todas las listas y lo comparte (`cache/share/castv-favoritos.m3u` por `ShareProvider`) o lo guarda con el selector del sistema; omite los canales con usuario y clave (Xtream) y avisa cuántos · `M3uActivity.kt`
+- TESTS-4 · 24 nov · 14 pruebas automáticas de respaldo con un `Context` de mentira en memoria (`TestCtx`/`TestPrefs`): validación de `Backup.restore`, reemplazo que respeta `tvIp`/`pin_hash`/estadísticas, ida y vuelta `build`→`restore`, unión con Xtream y parciales; build en verde (74 pruebas) · `BackupRestoreTest.kt`
