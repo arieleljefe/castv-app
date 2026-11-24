@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v342
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v343
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -92,3 +92,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TESTS-1b · 24 nov · `build.yml` sin `continue-on-error`: una prueba rota detiene el build antes del APK; build en verde con v3.8 · `.github/workflows/build.yml`
 - FAV-REPRO-2 · 24 nov · ★/☆ también en canales abiertos desde Continuar, Historial o enlaces (`currentChannel()` arma el canal con título + enlace, y logo/grupo si ya estaba en «Continuar»); videos del teléfono sin ★ · `VideoPlayerActivity.kt`
 - FAV-REPRO-3 · 24 nov · ★ del mini reproductor, de «Reproduciendo» y botón «Favorito» en la notificación marcan el canal que suena en el TV (`ACT_CHANNEL_ON_TV` lleva `url`, `tvChannelNow()`, `tvFavNow`, nueva `ACT_FAV` en el `IntentFilter`) · `MainActivity.kt`, `M3uActivity.kt`, `Zap.kt`
+- ZAP-3 · 24 nov · con canales de una lista, deslizar en la franja central (1/3 a 2/3 del ancho) arriba = canal siguiente y abajo = anterior (70 dp, cambia al soltar; reusa `stepOrZap`); interruptor Ajustes › Video «Deslizar al centro: cambiar de canal» (`g_zap`) · `VideoPlayerActivity.kt`, `SettingsActivity.kt`
