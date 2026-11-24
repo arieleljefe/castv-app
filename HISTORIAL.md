@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v361
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v363
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -102,3 +102,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - QR-2b · 24 nov · enviar el respaldo a otro móvil por QR: Ajustes › Respaldo › «Enviar respaldo a otro móvil» (confirmación previa), QR con `http://<IP>:<puerto>/send/<clave>`; el otro móvil baja `castv-respaldo.json` con «Descargar respaldo» (se arma al bajarlo con `Backup.build`: sin claves Xtream, IP del TV ni PIN); un solo uso, 5 min, solo red local, sin clave en `/log`; `QrSend` entrega listas o respaldos, cada puerta rechaza lo del otro tipo · `Qr.kt`, `MediaServer.kt`, `SettingsActivity.kt`, `QrSendTest.kt`
 - TAG-3.9 · 24 nov · etiqueta `v3.9` publicada e instalada desde Ajustes › Actualizaciones (EPG-1, XTREAM-1, QR-1, EPG-1b, QR-2a, QR-2b); Release `CASTV-v3.9.apk` · `build.yml`
 - TV-INFO-1 · 24 nov · datos de la TV tomados de su pantalla «Acerca de»: código de servicio `VA0250UD1`, software `V0100.06.13J.N0711`; sirve para COMPAT-TV-1 · `CHANGELOG.md`
+- IP-1 · 24 nov · comprobado: la app detecta sola la IP del teléfono y la del TV (Ajustes › Emisión al TV); la IP del teléfono cambia (DHCP, MAC aleatoria), por eso el changelog ya no la fija · `CHANGELOG.md`

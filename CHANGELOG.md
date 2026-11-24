@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v361
+# CASTV: CHANGELOG (cerebro) · v363
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -20,8 +20,8 @@ Estados: ✅ confirmado por Ariel · 🧪 entregado/pendiente de probar · ⏳ e
 | Manifest / Gradle | `app/src/main/AndroidManifest.xml`, `app/build.gradle` |
 | Workflow | `.github/workflows/build.yml` (compila `assembleRelease` firmado; etiqueta `v*` publica APK; paso de pruebas TESTS-1 antes de compilar) |
 | **Carpeta de intercambio (Download del móvil)** | `~/storage/downloads/` |
-| Teléfono | Android + Termux · IP `192.168.100.43` (DHCP; si falla, revisar Ajustes › Wi-Fi) |
-| App | puerto `8001` · log: `http://192.168.100.43:8001/log` (`?clear` para limpiar) |
+| Teléfono | Android + Termux · **la IP cambia** (DHCP + MAC aleatoria; el 24 nov era `192.168.100.20`, antes `.43`). La app la detecta sola; verla en Ajustes › Emisión al TV › «IP del teléfono». Nunca dar una IP fija por sentada |
+| App | puerto `8001` (rango 8000–8010) · log: `http://<IP del teléfono>:8001/log` (`?clear` para limpiar) |
 | TV | Hisense HL1 (JVC en pantalla, Vidaa) · IP `192.168.100.14` · código de servicio `VA0250UD1`, software `V0100.06.13J.N0711` (Ariel, 24 nov) · DLNA/UPnP puerto `38400` (solo MediaRenderer; XML en `/MediaServer/rendererdevicedesc.xml`). **Ignora `SetMute`: el silencio es `SetVolume 0`**; `GetVolume` da 0 hasta el primer `SetVolume` |
 | Punto seguro | etiqueta `v2.1-estable` / commit `d7010ac` |
 | Idioma | Español. Respuestas cortas (Ariel usa el móvil). |
@@ -130,7 +130,7 @@ rm -f ~/storage/downloads/*_actual.*
 ### Pendientes sueltos
 - ✅ QR-1, EPG-1 y XTREAM-1 hechos (ver `HISTORIAL`). ✅ QR-2a y QR-2b hechos (ver `HISTORIAL`).
 - ✅ EPG-1b hecho (24 nov; problema original: con Free-TV la cabecera trae más de 100 guías y la app lee solo las 3 primeras; idea: elegir las guías por el país de los `tvg-id` (`.it`, `.es`…), tope ~6 descargas).
-- ⬜ Idea de referencia aún no elegida: catch-up (EPG-1 ya existe; solo valdría con listas Xtream cuyo proveedor guarde archivo; comprobarlo antes). Ya hechas: QR-1, FUENTES-1, ATOMIC-1, TESTS-1. Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
+- ⛔ Catch-up descartado (24 nov): Ariel no tiene cuenta Xtream y en listas M3U no existe archivo; si algún día usa Xtream, él avisa. Ya hechas: QR-1, FUENTES-1, ATOMIC-1, TESTS-1. Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅; el `/log` ya oculta claves con LOG-1 ✅).
 - ✅ Modelo y versión de la TV: hecho (TV-INFO-1, ver `HISTORIAL`).
 - ⏳ WIDGET-1 (widget con ⏮ ⏯ ⏭): en pausa, Ariel no lo necesita ni lo usa en otras apps (22 nov). Plan guardado: `CastvWidget.kt` nuevo (`AppWidgetProvider`) + layout/xml/5 drawables propios + receiver en el manifest + 3 llamadas en `MainActivity` (`refreshNotification`, `refreshLinkNotification`, `postDefaultNotification`); los botones usan `ACT_PREV/TOGGLE/NEXT` igual que la notificación, así que solo funcionan con la app viva (límite: la reproducción vive en `MainActivity`, `CastvService` solo aloja el servidor).
@@ -142,7 +142,7 @@ rm -f ~/storage/downloads/*_actual.*
 ### Descartado (⛔)
 Subtítulos con IA (Whisper), idioma «Automático» y mejoras: **CERRADO por Ariel (23 nov)**; no tocar ni proponer. Si algún día quiere mejorarlo, él avisa (al retomar, pedir antes `jni_whisper.cpp` y `WhisperLib.kt`).
 `Platzi-Download` y `Youtube_Downloader` (23 nov): no aportan a castv y descargan contenido de terceros; no se toman ideas de ellos.
-Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
+Catch-up (24 nov, sin cuenta Xtream), Chromecast/AirPlay, DRM, subtítulos con IA en segundo plano con servicio, guardar el modelo de Whisper en Download, control por 36669 con certificado ajeno, flechas/OK/teclas por DLNA (la TV no expone ese servicio), `SetMute` como silencio (la TV lo ignora).
 LOG-1 ya no está descartado: se hizo y quedó ✅ el 23 nov (ver `HISTORIAL`).
 
 ---
