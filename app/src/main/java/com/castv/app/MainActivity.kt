@@ -3212,8 +3212,8 @@ class MainActivity : AppCompatActivity() {
     private fun toggleTrash() {
         val now = !useTrash()
         getSharedPreferences("castv", MODE_PRIVATE).edit().putBoolean("trash", now).apply()
-        toast(if (now) "🗑 Lo borrado irá a la papelera de Android"
-              else "⚠️ Lo borrado se eliminará para siempre")
+        toast(if (now) "🗑 Lo eliminado irá a la papelera de Android"
+              else "⚠️ Lo eliminado se perderá para siempre")   // [VOCAB-4] igual que en Ajustes
     }
 
     private fun confirmDelete(items: List<MediaItem>, pinOk: Boolean = false) {
