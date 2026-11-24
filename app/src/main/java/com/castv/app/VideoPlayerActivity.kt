@@ -1340,13 +1340,15 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun showSubtitleMenu() {
-        val labels = arrayOf(
-            "📂 Elegir archivo (.srt / .vtt)…",
-            "⏱ Retraso de subtítulos…",
-            "🚫 Quitar subtítulos",
-            "🎨 Estilo del subtítulo…",
-            "✨ Generar subtítulos con IA…")
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-5]
+        val ic = b.context
+        val labels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_folder, "Elegir archivo (.srt / .vtt)…"),
+            CastvIcons.item(ic, R.drawable.ic_vp_timer, "Retraso de subtítulos…"),
+            CastvIcons.item(ic, R.drawable.ic_vp_block, "Quitar subtítulos"),
+            CastvIcons.item(ic, R.drawable.ic_vp_palette, "Estilo del subtítulo…"),
+            CastvIcons.item(ic, R.drawable.ic_vp_ai, "Generar subtítulos con IA…"))
+        b
             .setTitle("Subtítulos")
             .setItems(labels) { _, which ->
                 when (which) {
@@ -1529,13 +1531,15 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun showStyleMenu() {
-        val labels = arrayOf(
-            "🔠 Tamaño: ${sizeNames[stSize()]}",
-            "🅱 Negrita: ${if (stBold()) "sí" else "no"}",
-            "🎨 Color del texto: ${colorNames[stColor()]}",
-            "◼ Fondo: ${bgNames[stBg()]}",
-            "↩ Restablecer estilo")
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-5]
+        val ic = b.context
+        val labels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_textsize, "Tamaño: ${sizeNames[stSize()]}"),
+            CastvIcons.item(ic, R.drawable.ic_vp_bold, "Negrita: ${if (stBold()) "sí" else "no"}"),
+            CastvIcons.item(ic, R.drawable.ic_vp_palette, "Color del texto: ${colorNames[stColor()]}"),
+            CastvIcons.item(ic, R.drawable.ic_vp_bg, "Fondo: ${bgNames[stBg()]}"),
+            CastvIcons.item(ic, R.drawable.ic_vp_undo, "Restablecer estilo"))
+        b
             .setTitle("Estilo del subtítulo")
             .setItems(labels) { _, which ->
                 when (which) {
