@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v336
+# CASTV: CHANGELOG (cerebro) · v337
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -122,13 +122,20 @@ rm -f ~/storage/downloads/*_actual.*
   - **Cómo probar (con el APK instalado, por etiqueta):** 1) entrar a Canales: logos oscuros (Cinecanal, A&E, Telemundo) legibles; 2) «Continuar» y «Favoritos» más bajitas y con nombres más completos; 3) arriba: nombre de la lista completo y los cuatro botones con texto, sin cortarse; 4) estrella de «Favoritos» del color de acento; 5) todo sigue funcionando igual: tocar un canal, mantener pulsado para quitar, ★ de la lista, 👁 ocultos, ＋ y 🗑.
   - **Riesgos:** (a) sin compilador de Kotlin (R4): si el build falla, pasar el mensaje; (b) los cuatro botones pueden apretarse en pantallas muy pequeñas; (c) el fondo claro de los logos es cuestión de gusto: se ajusta.
   - **Siguiente paso:** Ariel prueba y dice «ya funciona» (o qué ajustar) → cada uno pasa a ✅ y a `HISTORIAL`. Sin etiqueta propia (R12).
+- **Ahora en 🧪 también: FAV-REPRO-1 (★ en el reproductor; entregado 24 nov, Ariel pidió marcar favorito mientras mira un canal y dio el «Dale»).** Archivos: `VideoPlayerActivity.kt` y `M3uActivity.kt` (`FAV-REPRO-1.patch`).
+  - **Qué hace:** barra de arriba del reproductor con una ★/☆ nueva (primer botón tras el título), solo con canales de lista (no con videos ni enlaces sueltos); llena = favorito. Usa `Store.toggleChFav` + `rememberChFav/forgetChFav`, igual que la lista, y sigue al cambiar de canal con ⏮ ⏭. Al volver a Canales, `M3uActivity.onResume` relee `Store.chFavs()` para que las ★ de la lista y de «Favoritos» salgan al día.
+  - **Cómo probar:** 1) abrir un canal en el teléfono, tocar la pantalla: aparece ☆ en la barra; 2) tocarla: pasa a ★ y sale aviso; 3) ⏮ ⏭: la estrella cambia según el canal; 4) volver a Canales: ese canal tiene ★ y está en la fila Favoritos; 5) quitarla desde el reproductor y volver: desaparece; 6) un video del teléfono o un enlace suelto: no sale la ★.
+  - **Riesgos:** (a) sin compilador de Kotlin (R4): si falla el build, pasar el mensaje; (b) la barra queda con 8 botones y el título aún más corto: se resuelve con BARRA-1 (abajo), propuesta aparte; (c) si abres un canal con una lista que no pasa por `Zap` (lista vacía), no sale la ★.
+  - **Siguiente paso:** «ya funciona» de Ariel → ✅ y a `HISTORIAL`. Sin etiqueta (R12).
+- **VISTA-1 a VISTA-4:** ya instalados (captura de Ariel, 24 nov: logos con fondo claro y 4 botones en Canales); falta su «ya funciona» explícito.
 - **Propuesta aún sin etiquetar:** nada (v3.7 ya subida por Ariel).
 - **Pendiente suelto de TV:** modelo real y versión del sistema (Ajustes › Soporte › Info de la TV).
 
 ### Cola de pendientes (uno a la vez, en este orden; ideas tomadas de `reproductor-IPTV` (MIT) y `kino-light` (Apache): solo ideas, código propio en Kotlin, sin nombre ni logo de Kino)
-1. **TESTS-1b** (🧪, pendiente de aplicar). 2. **VISTA-1 a VISTA-4** (🧪, pendientes de probar). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
+1. **TESTS-1b** (🧪, pendiente de aplicar). 2. **VISTA-1 a VISTA-4** (🧪, pendientes de probar). 3. **FAV-REPRO-1** (🧪, pendiente de aplicar). Después: Ariel elige de «Pendientes sueltos» o pide algo nuevo. COMPAT-TV-1 espera la visita a la TV del amigo (Ariel aún no tiene fecha, 23 nov: no sugerirlo hasta que él lo diga; el `/log` ya sale sin claves, LOG-1 ✅).
 
 ### Pendientes sueltos
+- ⬜ Mejoras del reproductor propuestas (24 nov; Ariel pidió opinión, aún no eligió): **BARRA-1** barra superior con ★, 📺 TV y un «⋯» que agrupe 🔄 🔒 🖼 😴 🛠 💬 para que el título se lea completo · **VIVO-1** en canales en vivo ocultar el tiempo, la barra muerta y −10/+10 (dejar «● EN VIVO»; verificar antes si −10/+10 sirven con el buffer) · **GIRO-1** botón/gesto para pasar a horizontal con un toque · **ZAP-3** deslizar arriba/abajo para cambiar de canal.
 - ⬜ Ideas de referencia NO elegidas (23 nov; con su contra; ATOMIC-1 y TESTS-1 ya se eligieron, ver 🧪): EPG-1 guía XMLTV (pantalla grande, XML pesado, emparejado de nombres falla) · XTREAM-1 importar con usuario y clave (solo si usa ese proveedor; guarda claves) · QR-1 pasar listas por QR/red local (abre una puerta en la red) · FUENTES-1 salud y ranking de fuentes (Ariel prefiere ocultar a mano) · catch-up (exige EPG). Descartado: despliegue escalonado, espejos de descarga, telemetría, interfaz Compose/Android TV, paquetes webOS/Tizen/Roku.
 - ⏳ COMPAT-TV-1: arreglo para la TV del amigo, solo cuando Ariel pruebe allá y pase el `/log` (el diagnóstico ya está ✅; el `/log` ya oculta claves con LOG-1 ✅).
 - ⬜ Modelo real y versión del sistema de la TV (el XML solo dice "SmartTV / Renderer"; `vidaa_support=1`). Ver en Ajustes › Soporte › Info de la TV.
