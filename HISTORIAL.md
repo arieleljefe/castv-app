@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v396
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v398
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -129,3 +129,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ICONOS-6/7/8 · 24 nov · más menús con iconos vectoriales (`CastvIcons.item`): selector «Al TV / En el teléfono» al tocar un canal, acciones de un enlace del Historial (Al TV, En el teléfono, favorito, quitar) y lista de Marcadores con sus acciones (Saltar aquí, Borrar marcador); drawables `ic_vp_tv`, `ic_vp_phone`, `ic_vp_star`, `ic_vp_star_border`, `ic_vp_delete`, `ic_vp_play`, `ic_vp_add`; botones de diálogo, avisos y HUD siguen con emoji · `M3uActivity.kt`, `MainActivity.kt`, `VideoPlayerActivity.kt`
 - ICONOS-9 · 24 nov · los submenús de `MainActivity` pasan a iconos vectoriales (`CastvIcons.item`): Respaldo (Exportar, Importar, Compartir…, Restaurar copia), Compartir (completo, historial, favoritos), preset de ecualizador (Usar, Editar, Eliminar) y lista (Abrir, Quitar lista); 8 drawables `ic_mn_*` (Material Icons, Apache 2.0) · `MainActivity.kt`
 - ICONOS-10 · 24 nov · más menús de `MainActivity` con iconos vectoriales: menú ⋮ de una fila (a la cola, a continuación, favorito, a lista, quitar, eliminar, olvidar punto, visto), «Continuar desde… / Desde el inicio», «Mis listas», «Nueva lista…» y «Mis presets»; 7 drawables `ic_mn_*`; Ajustes no llevaba emoji en sus menús · `MainActivity.kt`
+- WIDGET-1 · 24 nov · widget de inicio «CASTV» (título, estado y ⏮ ⏯ ⏭; tocar el título abre la app); botones con `ACT_PREV/TOGGLE/NEXT` como la notificación, solo con la app viva; `MainActivity` lo actualiza en `refreshNotification`, `refreshLinkNotification`, `postDefaultNotification` y `onDestroy` · `CastvWidget.kt`, `widget_castv.xml`, `widget_castv_info.xml`, 5 drawables `wdg_*`, `AndroidManifest.xml`, `MainActivity.kt`
