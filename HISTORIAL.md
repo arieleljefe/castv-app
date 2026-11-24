@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v345
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v346
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -94,3 +94,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FAV-REPRO-3 · 24 nov · ★ del mini reproductor, de «Reproduciendo» y botón «Favorito» en la notificación marcan el canal que suena en el TV (`ACT_CHANNEL_ON_TV` lleva `url`, `tvChannelNow()`, `tvFavNow`, nueva `ACT_FAV` en el `IntentFilter`) · `MainActivity.kt`, `M3uActivity.kt`, `Zap.kt`
 - ZAP-3 · 24 nov · con canales de una lista, deslizar en la franja central (1/3 a 2/3 del ancho) arriba = canal siguiente y abajo = anterior (70 dp, cambia al soltar; reusa `stepOrZap`); interruptor Ajustes › Video «Deslizar al centro: cambiar de canal» (`g_zap`) · `VideoPlayerActivity.kt`, `SettingsActivity.kt`
 - FUENTES-1 · 24 nov · salud de canales: el teléfono anota fallos y aciertos (error del reproductor, `probeLive`, 🔎 Revisar, TV acepta); con 2 fallos seguidos sale «⚠» en tarjetas y lista; botón «⚠ N» junto a 🔎 Revisar para ocultar a mano los marcados u «Olvidar avisos»; clave `chhealth` (tope 600), sin anotar en incógnito · `Store.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `Zap.kt`
+- XTREAM-1 · 24 nov · listas Xtream con usuario y clave: botón «🔑 Xtream» en «＋ Lista», lista `xtream://<id>` con el acceso en `castv_xt` (fuera de respaldos, autocopia y archivos para compartir), `/log` tapa usuario, clave y tokens, y los respaldos quitan los enlaces con claves; favoritos, ocultos, Continuar e Historial de canales Xtream no viajan en respaldos · `Xtream.kt`, `M3uActivity.kt`, `Backup.kt`, `DebugLog.kt`
