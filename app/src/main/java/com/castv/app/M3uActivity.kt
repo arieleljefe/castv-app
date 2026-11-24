@@ -150,7 +150,7 @@ class M3uActivity : AppCompatActivity() {
         // [PULIDO-3e] Encabezado: ← Canales (igual que Ajustes)
         val header = LinearLayout(this)
         header.gravity = Gravity.CENTER_VERTICAL
-        header.setPadding(0, 0, 0, dp(8))
+        header.setPadding(0, 0, 0, 0)   // [CANALES-1]
         val back = TextView(this)
         back.text = "←"
         back.textSize = 26f
@@ -160,13 +160,7 @@ class M3uActivity : AppCompatActivity() {
         back.setPadding(dp(8), dp(4), dp(16), dp(4))
         back.setOnClickListener { finish() }
         header.addView(back)
-        val headerTitle = TextView(this)
-        headerTitle.text = "Canales"
-        headerTitle.textSize = 22f
-        headerTitle.setTypeface(null, android.graphics.Typeface.BOLD)
-        headerTitle.setTextColor(txtColor)
-        header.addView(headerTitle)
-        root.addView(header)
+        // [CANALES-1] el botón de la lista actual va en la misma fila que la flecha (antes: fila «Canales» + fila de lista)
 
         // Fila 1: lista actual, añadir, quitar
         // [VISTA-3] Fila 1a: la lista actual con su nombre completo, a lo ancho
@@ -174,10 +168,12 @@ class M3uActivity : AppCompatActivity() {
         listBtn.maxLines = 1
         listBtn.ellipsize = TextUtils.TruncateAt.END
         (listBtn.layoutParams as LinearLayout.LayoutParams).apply {
-            width = ViewGroup.LayoutParams.MATCH_PARENT
+            width = 0
+            weight = 1f
             leftMargin = 0
         }
-        root.addView(listBtn)
+        header.addView(listBtn)   // [CANALES-1]
+        root.addView(header)
         // [VISTA-3] Fila 1b: acciones con texto, repartidas a partes iguales
         val row1 = LinearLayout(this)
         row1.gravity = Gravity.CENTER_VERTICAL
@@ -230,7 +226,9 @@ class M3uActivity : AppCompatActivity() {
         moodScroll.isHorizontalFadingEdgeEnabled = true   // [VISTA-4] el borde se difumina: se ve que sigue hacia el lado
         moodScroll.setFadingEdgeLength(dp(24))
         moodScroll.addView(moodRow)
-        root.addView(moodScroll)
+        val moodHolder = LinearLayout(this)   // [CANALES-1] los ánimos van dentro de la lista: se van al bajar y dejan más sitio a los canales
+        moodHolder.orientation = LinearLayout.VERTICAL
+        moodHolder.addView(moodScroll)
 
         statusView = TextView(this)
         statusView.setTextColor(mutedColor)
@@ -248,7 +246,7 @@ class M3uActivity : AppCompatActivity() {
         failBtn.textSize = 13f
         failBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         failBtn.visibility = View.GONE
-        guideBtn = chip("📅") { guideDialog() }   // [EPG-1]
+        guideBtn = chip("📅 Guía") { guideDialog() }   // [CANALES-1] con texto   // [EPG-1]
         guideBtn.contentDescription = "Guía de programación"
         guideBtn.textSize = 13f
         guideBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
@@ -263,6 +261,7 @@ class M3uActivity : AppCompatActivity() {
         channelList = ListView(this)
         sections = LinearLayout(this)   // [ESTILO-2] se llena en refreshSections()
         sections.orientation = LinearLayout.VERTICAL
+        channelList.addHeaderView(moodHolder, null, false)   // [CANALES-1]
         channelList.addHeaderView(sections, null, false)   // antes del adapter; la cabecera desplaza los índices
         channelList.adapter = chAdapter
         channelList.divider = null
@@ -1218,7 +1217,7 @@ class M3uActivity : AppCompatActivity() {
     private fun updateFailBtn() {
         if (!::failBtn.isInitialized) return
         val n = failedNow().size
-        failBtn.text = "⚠ $n"
+        failBtn.text = if (n == 1) "⚠ 1 falla" else "⚠ $n fallan"   // [CANALES-1]
         failBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 

@@ -336,15 +336,10 @@ class SettingsActivity : AppCompatActivity() {
         // [AJUSTES-2c] Avanzado: registro de la app
         l.add(Entry("Avanzado", "Ver registro", "Eventos de la app y del servidor, para diagnosticar fallos", { showLog() }))
         l.add(Entry("Avanzado", "Limpiar registro", "Borra el registro actual", { confirmClearLog() }))
-        l.add(Entry("Avanzado", "Probar extracción de audio (IA)",
-            "Prueba para los subtítulos con IA: saca el audio de un video y mide cuánto tarda",
-            { pickIaVideo.launch(arrayOf("video/*")) }))   // [IA-1]
-        l.add(Entry("Avanzado", "Probar Whisper (IA)",
-            "Comprueba que el motor de subtítulos con IA carga en este teléfono (todavía no transcribe)",
-            { runWhisperTest() }))   // [IA-2a]
-        l.add(Entry("Avanzado", "Probar transcripción (IA)",
-            "Baja el modelo de voz elegido (una vez) y transcribe un video; mide la velocidad. Todavía no crea subtítulos",
-            { startIaTranscribe() }))   // [IA-2b]
+        // [AVANZADO-1] las tres pruebas de IA se juntan en una sola entrada (siguen existiendo: [IA-1] [IA-2a] [IA-2b])
+        l.add(Entry("Avanzado", "Pruebas de IA…",
+            "Extracción de audio, motor Whisper y transcripción (solo para diagnosticar)",
+            { showIaTests() }))
 
         // [UPDATE-1] Actualizaciones desde GitHub
         l.add(Entry("Actualizaciones", "Buscar actualización",
@@ -985,6 +980,22 @@ class SettingsActivity : AppCompatActivity() {
                     .show()
             }
         }.start()
+    }
+
+    /** [AVANZADO-1] Menú con las tres pruebas de IA que antes ocupaban tres filas de Avanzado. */
+    private fun showIaTests() {
+        val items = arrayOf("Probar extracción de audio", "Probar Whisper", "Probar transcripción")
+        AlertDialog.Builder(this)
+            .setTitle("Pruebas de IA")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> pickIaVideo.launch(arrayOf("video/*"))   // [IA-1]
+                    1 -> runWhisperTest()                          // [IA-2a]
+                    else -> startIaTranscribe()                    // [IA-2b]
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     // ------------------------------------------------- [IA-2a] Prueba de Whisper
