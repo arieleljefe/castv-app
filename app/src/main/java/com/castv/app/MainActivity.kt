@@ -1832,12 +1832,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLinkActions(l: SavedLink) {
-        val labels = arrayOf(
-            "📺 Al TV",
-            "📱 En el teléfono",
-            if (l.fav) "☆ Quitar de favoritos" else "★ Marcar favorito",
-            "🗑 Quitar del historial")
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-7]
+        val ic = b.context
+        val labels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_tv, "Al TV"),
+            CastvIcons.item(ic, R.drawable.ic_vp_phone, "En el teléfono"),
+            if (l.fav) CastvIcons.item(ic, R.drawable.ic_vp_star_border, "Quitar de favoritos") else CastvIcons.item(ic, R.drawable.ic_vp_star, "Marcar favorito"),
+            CastvIcons.item(ic, R.drawable.ic_vp_delete, "Quitar del historial"))
+        b
             .setTitle(l.title)
             .setItems(labels) { _, which ->
                 when (which) {
