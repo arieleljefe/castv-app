@@ -221,6 +221,8 @@ class M3uActivity : AppCompatActivity() {
         moodScroll.isHorizontalScrollBarEnabled = false
         moodScroll.setPadding(0, dp(8), 0, 0)
         moodScroll.visibility = View.GONE
+        moodScroll.isHorizontalFadingEdgeEnabled = true   // [VISTA-4] el borde se difumina: se ve que sigue hacia el lado
+        moodScroll.setFadingEdgeLength(dp(24))
         moodScroll.addView(moodRow)
         root.addView(moodScroll)
 
@@ -236,6 +238,7 @@ class M3uActivity : AppCompatActivity() {
         checkBtn.textSize = 13f
         checkBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         statusRow.addView(checkBtn)
+        statusRow.setPadding(0, dp(6), 0, dp(2))   // [VISTA-4] "Revisar" con más aire respecto a los chips de ánimo
         root.addView(statusRow)
 
         chAdapter = ChannelAdapter()
@@ -654,13 +657,17 @@ class M3uActivity : AppCompatActivity() {
         val recent = Store.recentChannels().filter { !h.contains(it.url) }
         val favList = Store.chFavChannels().filter { !h.contains(it.url) }.take(20)
         addSection("🕘 Continuar", recent)
-        addSection("⭐ Favoritos", favList)
+        addSection("★ Favoritos", favList)   // [VISTA-4] misma estrella (color de acento) que la lista
     }
 
     private fun addSection(title: String, list: List<M3uChannel>) {
         if (list.isEmpty()) return
         val t = TextView(this)
-        t.text = title
+        val sp = android.text.SpannableString(title)
+        if (title.startsWith("★")) {   // [VISTA-4]
+            sp.setSpan(android.text.style.ForegroundColorSpan(accent()), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        t.text = sp
         t.textSize = 14f
         t.setTypeface(null, android.graphics.Typeface.BOLD)
         t.setTextColor(txtColor)
