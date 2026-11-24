@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v323
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v326
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -77,3 +77,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TAG-3.5 · 23 nov · etiqueta `v3.5` publicada y firmada (RECUP-1, ZAP-1, LISTA-VAL-1, SPEED-1); el actualizador de la app vuelve a funcionar · `build.yml`.
 - SERVICIO-1a · 23 nov · `PlayerCore.kt` guarda el reproductor del teléfono, su estado y el foco de audio fuera de la pantalla; `MainActivity` los lee de ahí (sin cambio visible) · `PlayerCore.kt`, `MainActivity.kt`.
 - SERVICIO-1b · 23 nov · la música del teléfono sigue sonando si Android cierra la pantalla principal («modo sin pantalla» en `PlayerCore`: pasa de pista sola, cola, repetir, temporizador, notificación ⏮ ⏯ ⏭; al reabrir la app se recoge con `adoptHeadless()`) · `PlayerCore.kt`, `MainActivity.kt`.
+- AUTORESPALDO-1 · 23 nov · copia automática diaria al abrir la app (`filesDir/autobackup/castv_auto_AAAA-MM-DD.json`, 1 al día, últimas 3, no se guarda si pesa <30 % de la anterior) + Respaldo › «Restaurar copia automática…»; Respaldo › «Compartir…» (completo, solo historial o solo favoritos de canales) por la hoja de Android con aviso de claves; los parciales (v2, `part`) se AÑADEN al importar y no borran nada; el aviso del importador dice si reemplaza o añade · `Backup.kt`, `AutoBackup.kt`, `ShareProvider.kt`, `share_paths.xml`, `AndroidManifest.xml`, `MainActivity.kt`.
