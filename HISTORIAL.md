@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v329
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v330
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -79,3 +79,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - SERVICIO-1b · 23 nov · la música del teléfono sigue sonando si Android cierra la pantalla principal («modo sin pantalla» en `PlayerCore`: pasa de pista sola, cola, repetir, temporizador, notificación ⏮ ⏯ ⏭; al reabrir la app se recoge con `adoptHeadless()`) · `PlayerCore.kt`, `MainActivity.kt`.
 - AUTORESPALDO-1 · 23 nov · copia automática diaria al abrir la app (`filesDir/autobackup/castv_auto_AAAA-MM-DD.json`, 1 al día, últimas 3, no se guarda si pesa <30 % de la anterior) + Respaldo › «Restaurar copia automática…»; Respaldo › «Compartir…» (completo, solo historial o solo favoritos de canales) por la hoja de Android con aviso de claves; los parciales (v2, `part`) se AÑADEN al importar y no borran nada; el aviso del importador dice si reemplaza o añade · `Backup.kt`, `AutoBackup.kt`, `ShareProvider.kt`, `share_paths.xml`, `AndroidManifest.xml`, `MainActivity.kt`.
 - ZAP-2 · 23 nov · ⏮ ⏭ cambian de canal también cuando el canal suena en el teléfono (barra del reproductor y teclas de audífonos; dan la vuelta, respetan búsqueda/grupo/ánimo/ocultos; la lista va por memoria en `Zap`); en modo canales un canal roto avisa y se queda, y uno que termina cierra el reproductor; 📺 TV desde el reproductor deja el contexto para ⏮ ⏭ en el TV · `Zap.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`.
+- LOG-1 · 23 nov · el `/log` oculta claves: `redact()` en `DebugLog.kt` cambia por `[OCULTO]` el valor de `token`, `key`, `apikey`, `pass`, `password`, `secret`, `auth`, `sig`, `session`, `user`, `usuario`, `usuario:clave@` y `Bearer …`, también codificados dentro de otro enlace; no cubre claves en la ruta del enlace · `DebugLog.kt`.
