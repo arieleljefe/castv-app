@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v417
+# CASTV: CHANGELOG (cerebro) · v419
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -93,12 +93,12 @@ rm -f ~/storage/downloads/*_actual.*
 ## 4. ESTADO VIVO
 
 ### ▶ RETOMAR AQUÍ (24 nov 2026, noche)
-- **LOTE v3.13 (24 nov; Ariel: «me gustan todas», «sigamos más tarde»).** Ideas aceptadas, aún SIN plan ni código: al retomar, la IA revisa primero el código de cada una (puede que ya exista, como SRT-1 ⛔), pide TODOS los archivos en UNA línea (plantilla A, R5), da el plan en 🧪 y espera el «Dale» (R2). Orden propuesto (esfuerzo y utilidad): ⬜ CAIDOS-1 › ⬜ TEMP-TV-1 › ⬜ CALIDAD-1 › ⬜ EPG-RECORDA-1 › ⬜ TOP-1. Etiqueta `v3.13` al cerrar el lote (R12).
-  1. **CAIDOS-1 · ⬜** Tras «revisar canales» (CHECK-1), botón para ocultar de una vez los que no respondieron (usa OCULTAR-1, restaurables).
-  2. **TEMP-TV-1 · ⬜** Temporizador de apagado para lo que suena en el TV (hoy solo en el teléfono).
-  3. **CALIDAD-1 · ⬜** Elegir resolución (baja/media/alta) en canales HLS con varias calidades.
-  4. **EPG-RECORDA-1 · ⬜** Notificación cuando empiece un programa marcado con ⏰ (usa la guía de EPG-AGENDA-1).
-  5. **TOP-1 · ⬜** Pantalla «Lo más visto» con canales y música, desde las estadísticas guardadas (`castv_stats`).
+- **LOTE v3.13 (24 nov; Ariel: «me gustan todas»; archivos recibidos y código revisado, 24 nov noche).** «Dale» recibido («Sigamos», 24 nov): orden CALIDAD-1 › EPG-RECORDA-1 › TOP-1, un parche por ítem. Etiqueta `v3.13` al cerrar el lote (R12).
+  1. **CAIDOS-1 · ⛔ ya existe (24 nov):** tras 🔎 Revisar, `finishCheck()` ofrece «Ocultar» todos o «Ver cuáles»; además el botón ⚠ «N fallan» (`showFailedDialog()`). Sin parche.
+  2. **TEMP-TV-1 · ⛔ ya existe (24 nov):** `pauseAll()` manda Pause al TV cuando no hay reproducción local, y `checkSleep()` corre en el bucle del TV. Duda sin confirmar: en canales en vivo el TV podría ignorar Pause (habría que mandar Stop). Solo si Ariel lo ve fallar.
+  3. **CALIDAD-1 · 🧪 entregado (24 nov, parche `CALIDAD-1.patch`; Ariel dijo «Sigamos» = Dale al lote; falta build en verde y probar):** Ajustes › Emisión al TV › «Calidad en TV» (Baja por defecto / Media / Alta), clave `tv_quality` en `castv`; `MediaServer.liveQuality` se lee al abrir cada canal y `LiveHlsStream.pickByQuality` elige la variante (Baja = igual que antes). Archivos reales: `MediaServer.kt`, `SettingsActivity.kt` (sin tocar `Store.kt` ni `strings.xml`). Cómo probar: poner Media o Alta, mandar un canal HLS al TV y mirar en `/log` «LIVE variante elegida (calidad N) BANDWIDTH=…»; con Baja debe salir la de siempre. Aviso: `tv_quality` no entra en respaldos. Plan original: solo para el TV (el teléfono usa `VideoView`/`MediaPlayer`, sin selector de calidad). `MediaServer` elige siempre la variante de menor BANDWIDTH. Plan: ajuste «Calidad en TV» Baja (hoy, por defecto) / Media / Alta en Ajustes › Emisión al TV. Archivos: `MediaServer.kt`, `Store.kt`, `SettingsActivity.kt`, `strings.xml`. Riesgo: Alta puede atascar el Wi-Fi.
+  4. **EPG-RECORDA-1 · 🧪 siguiente (Dale dado con «Sigamos»; se entrega tras confirmar CALIDAD-1):** el ⏰ NO existe aún (hay que crearlo). Plan: en 📅 Guía, tocar un programa futuro › «⏰ Avisarme»; `AlarmManager` inexacto (sin permiso de alarmas exactas), receptor y canal de notificación nuevos; tocar el aviso abre el canal. `POST_NOTIFICATIONS` ya está en el manifest. Archivos: `Epg.kt`, `M3uActivity.kt`, `Store.kt`, `AndroidManifest.xml`, `strings.xml`, `ReminderReceiver.kt` (nuevo). Riesgos: los avisos pueden llegar con unos minutos de retraso; se pierden al reiniciar el teléfono.
+  5. **TOP-1 · 🧪 después de EPG-RECORDA-1 (Dale dado con «Sigamos»):** `castv_stats` guarda reproducciones, última vez y tiempo visto solo de archivos del teléfono (música y video); los canales no se cuentan. Plan: Más › «Lo más visto» con el top 10 de música y video; contar canales sería un contador nuevo que arranca de cero (se ofrece aparte). Archivos: `MainActivity.kt`, `Store.kt`, `strings.xml`.
   6. **LIMPIA-1 · ⬜** (pendiente de v3.12) plantilla E; ✅ con el «listo» de Ariel.
 - COMPAT-TV-1 ⏳ sigue esperando la visita a la TV del amigo.
 
