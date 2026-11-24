@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v413
+# CASTV: CHANGELOG (cerebro) · v414
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -97,7 +97,7 @@ rm -f ~/storage/downloads/*_actual.*
   1. **SRT-1 · ⛔ ya existe (24 nov):** `VideoPlayerActivity.showSubtitleMenu()` ya trae «Elegir archivo (.srt / .vtt)…» (`ACTION_OPEN_DOCUMENT`), más retraso y estilo. Sin parche.
   2. **BUSCA-TODO-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
   3. **M3U-EXPORT-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12).
-  4. **TESTS-4 · ⬜ (siguiente; plan entregado 24 nov, falta el «Dale»; hay que pedir `build.gradle` y la lista de pruebas existentes en `app/src/test`)** Pruebas de `Backup.restore` y de la unión de Xtream (`withXtream`) con un `Context` simulado; toca solo la parte de pruebas de `app/build.gradle`. Riesgo bajo para la app (el build puede fallar si algo no cuadra).
+  4. **TESTS-4 · 🧪 (24 nov; Ariel: «Dale»; entregado, falta build verde y su «ya funciona»)** Qué: `BackupRestoreTest.kt` (14 pruebas) con un `Context` de mentira en memoria (`TestCtx` + `TestPrefs`, sin Mockito ni Robolectric): validación de `Backup.restore` (no respaldo, versión, vacío, dañado sin cambiar nada), reemplazo que respeta `tvIp`/`pin_hash`/estadísticas, ida y vuelta `build`→`restore` de todos los tipos, `build` sin usuario ni clave de Xtream, unión de `withXtream` (portátil→real, objetos, sin acceso, `Xtream.save`+`rehydrate`) y parciales (`buildPart`, añadir sin borrar, `lastNote`). **Archivos:** solo `app/src/test/java/com/castv/app/BackupRestoreTest.kt` (nuevo); `app/build.gradle` NO cambia. **Cómo probar:** subir el parche y mirar el paso «Pruebas automaticas» de GitHub Actions en verde (ya no es 60 pruebas sino 74). **Riesgo:** no hay compilador de Kotlin aquí (R4): si el build falla, pasar el mensaje de GitHub Actions. La app no cambia. **Siguiente:** ✅ solo con tu «ya funciona» (R3), luego LIMPIA-1.
   5. **LIMPIA-1 · ⬜** Al cerrar el lote, plantilla E (`rm -f ~/storage/downloads/*_actual.*`).
   - **Archivos ya recibidos (24 nov, 13:49):** `M3uActivity`, `Store`, `Catalog`, `Epg`, `ShareProvider`, `CastvUtils`, `M3uParser`, `VideoPlayerActivity`, `SubtitleGen`, `build.gradle`, `strings.xml`; más `Xtream` y `Backup`. Si Ariel retoma en otro chat, hay que volver a pedirlos (plantilla A).
 - **DECISIÓN DE ARIEL (24 nov, noche): «todo, vamos por todos menos COMPAT-TV-1»** (y «Dale» al plan). Orden: BORRAR-1 ✅ › WIDGET-1 ✅ › etiqueta `v3.10` ✅ al final (con el build de `main` en verde; incluirá ICONOS-1 a 10, BORRAR-1 y WIDGET-1) › Android Auto/TV solo evaluar, sin código hasta que Ariel diga. COMPAT-TV-1 sigue ⏳.
