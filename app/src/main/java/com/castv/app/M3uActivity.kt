@@ -602,7 +602,7 @@ class M3uActivity : AppCompatActivity() {
         val curList = current
         if (curList != null) {   // [QR-2a] enviar la lista abierta a otro móvil
             val sendLink = TextView(this)
-            sendLink.text = "📤 Enviar esta lista a otro móvil"
+            sendLink.text = "📤 Enviar esta lista a otro teléfono"
             sendLink.textSize = 15f
             sendLink.setTextColor(accent())
             sendLink.setPadding(0, dp(8), 0, dp(8))
@@ -669,7 +669,7 @@ class M3uActivity : AppCompatActivity() {
             box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
         }
         val t = TextView(this)
-        t.text = "Con otro móvil u ordenador del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra solo al recibir la lista o en 5 minutos."
+        t.text = "Con otro teléfono u ordenador del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra solo al recibir la lista o en 5 minutos."
         t.textSize = 13f
         t.setTextColor(mutedColor)
         t.setPadding(0, dp(12), 0, 0)
@@ -722,7 +722,7 @@ class M3uActivity : AppCompatActivity() {
             box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
         }
         val t = TextView(this)
-        t.text = "Con el otro móvil del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra sola al entregar la lista o en 5 minutos."
+        t.text = "Con el otro teléfono del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra sola al entregar la lista o en 5 minutos."
         t.textSize = 13f
         t.setTextColor(mutedColor)
         t.setPadding(0, dp(12), 0, 0)

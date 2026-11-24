@@ -328,7 +328,7 @@ class SettingsActivity : AppCompatActivity() {
             if (hidden == 0) "Ninguno" else "$hidden ocultos (tocar para mostrarlos todos)", onHidden))
 
         if (Build.VERSION.SDK_INT >= 30) {
-            l.add(Entry("Almacenamiento", "Borrado",
+            l.add(Entry("Almacenamiento", "Eliminado",
                 if (useTrash()) "A la papelera de Android" else "Permanente (no se puede deshacer)",
                 { toggleTrash() }))
         }
@@ -355,7 +355,7 @@ class SettingsActivity : AppCompatActivity() {
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
-        l.add(Entry("Respaldo", "Enviar respaldo a otro móvil",   // [QR-2b]
+        l.add(Entry("Respaldo", "Enviar respaldo a otro teléfono",   // [QR-2b]
             "Con QR, por el Wi-Fi: sin cables ni correo", { confirmBackupQr() }))
 
         l.add(Entry("Acerca de", "Acerca de CASTV", "Versión, redes y contacto, librerías y licencia",
@@ -536,8 +536,8 @@ class SettingsActivity : AppCompatActivity() {
     private fun toggleTrash() {
         val now = !useTrash()
         prefs().edit().putBoolean("trash", now).apply()
-        toast(if (now) "🗑 Lo borrado irá a la papelera de Android"
-              else "⚠️ Lo borrado se eliminará para siempre")
+        toast(if (now) "🗑 Lo eliminado irá a la papelera de Android"
+              else "⚠️ Lo eliminado se perderá para siempre")
         render()
     }
 
@@ -1579,10 +1579,10 @@ class SettingsActivity : AppCompatActivity() {
     /** [QR-2b] Pide confirmación antes de abrir la puerta: el respaldo es lo más delicado que sale del teléfono. */
     private fun confirmBackupQr() {
         AlertDialog.Builder(this)
-            .setTitle("¿Enviar tu respaldo a otro móvil?")
+            .setTitle("¿Enviar tu respaldo a otro teléfono?")
             .setMessage("Se abre una dirección con QR, solo para tu Wi-Fi y de un solo uso (5 minutos). " +
                 "Quien la abra podrá bajar tus favoritos, listas M3U, historial y ajustes (sin claves Xtream). " +
-                "Úsalo solo con un móvil tuyo o de confianza.")
+                "Úsalo solo con un teléfono tuyo o de confianza.")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Continuar") { _, _ -> startBackupQr() }
             .show()
@@ -1626,8 +1626,8 @@ class SettingsActivity : AppCompatActivity() {
             box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
         }
         val t = TextView(this)
-        t.text = "Con el otro móvil del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\n" +
-            "Allí pulsa «Descargar respaldo» y, en CASTV de ese móvil, usa Ajustes › Respaldo para importarlo.\n\n" +
+        t.text = "Con el otro teléfono del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\n" +
+            "Allí pulsa «Descargar respaldo» y, en CASTV de ese teléfono, usa Ajustes › Respaldo para importarlo.\n\n" +
             "Se cierra solo al entregar el respaldo o en 5 minutos."
         t.textSize = 13f
         t.setTextColor(mutedColor)

@@ -174,12 +174,12 @@ object QrSend {
         if (t.isEmpty()) return "Esta lista no tiene enlace."
         val low = t.lowercase()
         if (low.startsWith("xtream://")) {
-            return "Las listas Xtream llevan usuario y clave y no se envían por QR. En el otro móvil añádela con el botón 🔑 Xtream."
+            return "Las listas Xtream llevan usuario y clave y no se envían por QR. En el otro teléfono añádela con el botón 🔑 Xtream."
         }
         if (!low.startsWith("http://") && !low.startsWith("https://")) return "Solo se pueden enviar listas con enlace http:// o https://."
         val host = low.substringAfter("://").substringBefore('/').substringBefore('?')
         if ((low.contains("username=") && low.contains("password=")) || host.contains('@')) {
-            return "Esta lista lleva usuario y clave en el enlace y no se envía por QR (viajaría sin cifrar). En el otro móvil añádela con el botón 🔑 Xtream."
+            return "Esta lista lleva usuario y clave en el enlace y no se envía por QR (viajaría sin cifrar). En el otro teléfono añádela con el botón 🔑 Xtream."
         }
         return QrAdd.checkUrl(t)
     }
@@ -296,10 +296,10 @@ object QrSend {
     /** Primera página: solo un botón (no entrega nada hasta pulsarlo). Con [backup] es la del respaldo. */
     fun askHtml(tok: String, backup: Boolean = false): String {
         val que = if (backup) {
-            "<p>Otro móvil quiere enviarte un <b>respaldo de CASTV</b> (favoritos, listas, historial y ajustes).</p>" +
-                "<p>Si lo importas en CASTV, <b>reemplaza</b> los datos de ese móvil: hazlo solo donde quieras esos datos.</p>"
+            "<p>Otro teléfono quiere enviarte un <b>respaldo de CASTV</b> (favoritos, listas, historial y ajustes).</p>" +
+                "<p>Si lo importas en CASTV, <b>reemplaza</b> los datos de ese teléfono: hazlo solo donde quieras esos datos.</p>"
         } else {
-            "<p>Otro móvil quiere enviarte una lista.</p>"
+            "<p>Otro teléfono quiere enviarte una lista.</p>"
         }
         return HEAD + "<h2>📺 CASTV: " + (if (backup) "respaldo para ti" else "lista para ti") + "</h2>" + que +
             "<form method='get' action='/send/" + esc(tok) + "'><input type='hidden' name='go' value='1'>" +
