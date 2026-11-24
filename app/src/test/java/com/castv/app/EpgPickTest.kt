@@ -65,4 +65,13 @@ class EpgPickTest {
         assertEquals(3, M3uParser.epgUrls(text).size)
         assertEquals(header, M3uParser.epgUrls(text, 300))
     }
+
+    // [EPG-REGION-1] guías de varias listas de una región
+    @Test fun unirGuiasSinRepetirYEnOrden() {
+        val a = listOf(g("IT1"), g("IT2"))
+        val b = listOf(g("IT2"), g("ES1"))
+        assertEquals(listOf(g("IT1"), g("IT2"), g("ES1")), M3uParser.mergeGuides(listOf(a, b)))
+        assertEquals(emptyList<String>(), M3uParser.mergeGuides(listOf(emptyList(), emptyList())))
+        assertEquals(emptyList<String>(), M3uParser.mergeGuides(emptyList()))
+    }
 }

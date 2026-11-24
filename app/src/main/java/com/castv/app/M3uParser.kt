@@ -75,6 +75,13 @@ object M3uParser {
         return emptyList()
     }
 
+    /** [EPG-REGION-1] Une las guías de las cabeceras de varias listas, sin repetidas y en el orden de las listas. */
+    fun mergeGuides(heads: List<List<String>>): List<String> {
+        val out = LinkedHashSet<String>()
+        for (h in heads) out.addAll(h)
+        return out.toList()
+    }
+
     /** [EPG-1b] País de un `tvg-id` (`Rai1.it` → `it`, `Canal.es@SD` → `es`); "" si no trae. */
     fun idCountry(tvgId: String): String {
         val id = tvgId.trim().substringBefore('@')

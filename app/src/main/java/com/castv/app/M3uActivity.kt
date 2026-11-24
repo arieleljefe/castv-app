@@ -70,6 +70,8 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var failBtn: TextView   // [FUENTES-1] "⚠ N": canales que fallan seguido (solo se ve si hay alguno)
     @Volatile private var failed: Map<String, Int> = emptyMap()   // [FUENTES-1] enlace → fallos seguidos (2 o más)
     private val reqPlayer = 4715
+    private var regionName: String? = null   // [EPG-REGION-1] región abierta (null con una lista suelta)
+    private var regionLists: List<M3uList> = emptyList()   // [EPG-REGION-1]
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
     // [CHECK-1] revisar qué canales responden
     private lateinit var checkBtn: TextView
@@ -296,6 +298,8 @@ class M3uActivity : AppCompatActivity() {
     private fun loadList(l: M3uList) {
         if (checking) stopCheck(null)   // [CHECK-1]
         current = l
+        regionName = null   // [EPG-REGION-1]
+        regionLists = emptyList()
         Epg.clear()   // [EPG-1] la guía de la lista anterior no se mezcla con esta
         Store.lastM3u = l.url
         listBtn.text = "📡 ${l.name} ▾"
@@ -378,7 +382,11 @@ class M3uActivity : AppCompatActivity() {
     /** [EPG-1] Recuadro 📅: de dónde sale la guía, pegar una URL XMLTV propia y actualizar ya. */
     private fun guideDialog() {
         val l = current
-        if (l == null) { toast("Elige una lista (la guía no va con «toda la región»)"); return }
+        if (l == null) {
+            val rn = regionName
+            if (rn != null) regionGuideDialog(rn, regionLists) else toast("Elige una lista o una región para ver su guía")   // [EPG-REGION-1]
+            return
+        }
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
         box.setPadding(dp(20), dp(8), dp(20), 0)
@@ -425,6 +433,66 @@ class M3uActivity : AppCompatActivity() {
                 if (f.exists()) body = f.readText()
             } catch (e: Exception) { }
             val res = loadEpg(l, body, list, gen, true)
+            runOnUiThread { if (!isFinishing) toast("📅 " + res) }
+        }
+    }
+
+    /** [EPG-REGION-1] Guía de «toda la región»: junta las guías de las cabeceras de sus listas. Llamar desde un hilo aparte. */
+    private fun loadEpgRegion(name: String, heads: List<List<String>>, list: List<M3uChannel>, gen: Int, force: Boolean): String {
+        if (!Epg.enabled(this)) return "apagada"
+        if (list.isEmpty()) return "sin canales"
+        val urls = Epg.regionSources(heads)
+        val res = if (urls.isEmpty()) {
+            val r = "las listas de esta región no traen guía"
+            Epg.lastResult = r
+            DebugLog.add("EPG: $r")
+            r
+        } else {
+            Epg.load(this, "region:" + name, urls, list, force, force || !onMobileData()) { gen == loadGen && !isFinishing }
+        }
+        runOnUiThread {
+            if (!isFinishing && gen == loadGen) {
+                chAdapter.notifyDataSetChanged()
+                refreshSections()
+            }
+        }
+        return res
+    }
+
+    /** [EPG-REGION-1] Recuadro 📅 de una región: de dónde sale la guía y «Actualizar ya». Sin URL propia (eso es por lista). */
+    private fun regionGuideDialog(name: String, lists: List<M3uList>) {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val info = TextView(this)
+        val src = if (Epg.lastSource.isEmpty()) "" else "Fuente: ${Epg.lastSource}.\n"
+        val res = if (Epg.lastResult.isEmpty()) "" else "Último intento: ${Epg.lastResult}.\n"
+        info.text = src + res + Epg.info() + "\n\nPara pegar una URL de guía propia, abre una sola lista."
+        info.textSize = 13f
+        info.setTextColor(mutedColor)
+        box.addView(info)
+        AlertDialog.Builder(this)
+            .setTitle("📅 Guía de la región")
+            .setView(box)
+            .setPositiveButton("Actualizar ya") { _, _ -> refreshEpgRegion(name, lists) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    /** [EPG-REGION-1] Descarga otra vez la guía de la región (sin la copia reciente, también con datos móviles). */
+    private fun refreshEpgRegion(name: String, lists: List<M3uList>) {
+        if (!Epg.enabled(this)) { toast("Activa la guía en Ajustes › Video"); return }
+        val gen = loadGen
+        val list = channels
+        toast("📅 Actualizando la guía…")
+        thread {
+            val heads = lists.map { l ->
+                try {
+                    val f = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
+                    if (f.exists()) M3uParser.epgUrls(f.readText(), 300) else emptyList()
+                } catch (e: Exception) { emptyList<String>() }
+            }
+            val res = loadEpgRegion(name, heads, list, gen, true)
             runOnUiThread { if (!isFinishing) toast("📅 " + res) }
         }
     }
@@ -479,7 +547,9 @@ class M3uActivity : AppCompatActivity() {
         if (lists.isEmpty()) return
         if (checking) stopCheck(null)   // [CHECK-1]
         current = null
-        Epg.clear()   // [EPG-1] la guía no va con «toda la región»
+        regionName = name   // [EPG-REGION-1] la guía de la región se arma con las cabeceras de sus listas
+        regionLists = lists
+        Epg.clear()   // [EPG-1] la guía de la lista anterior no se mezcla con esta
         groupFilter = null
         moodFilter = -1   // [ESTILO-3]
         groupBtn.text = "Grupo: Todos ▾"
@@ -494,6 +564,7 @@ class M3uActivity : AppCompatActivity() {
         val gen = ++loadGen
         val total = lists.size
         val results = arrayOfNulls<List<M3uChannel>>(total)
+        val heads = arrayOfNulls<List<String>>(total)   // [EPG-REGION-1] guías de la cabecera de cada lista
         val done = java.util.concurrent.atomic.AtomicInteger(0)
         val failed = java.util.concurrent.atomic.AtomicInteger(0)
         val kept = java.util.concurrent.atomic.AtomicInteger(0)   // [LISTA-VAL-1] listas que llegaron dañadas y usaron su copia
@@ -528,7 +599,10 @@ class M3uActivity : AppCompatActivity() {
                 val body = text
                 if (body == null) failed.incrementAndGet()
                 val parsed = pre ?: (if (body != null) M3uParser.parse(body) else emptyList())
-                synchronized(results) { results[idx] = parsed }
+                synchronized(results) {
+                    results[idx] = parsed
+                    heads[idx] = if (body != null) M3uParser.epgUrls(body, 300) else emptyList()   // [EPG-REGION-1]
+                }
                 val n = done.incrementAndGet()
                 // Une todo lo que ya llegó, en el orden de las listas (el primero que trae un enlace gana)
                 val merged = LinkedHashMap<String, M3uChannel>()
@@ -566,6 +640,11 @@ class M3uActivity : AppCompatActivity() {
                                 (if (kept.get() > 0) " · ${kept.get()} con copia anterior" else "") +   // [LISTA-VAL-1]
                                 (if (capped) " · tope de $regionMax" else "")
                     }
+                }
+                // [EPG-REGION-1] ya mostrada la región completa, se carga su guía (sigue en este hilo aparte)
+                if (n == total && gen == loadGen) {
+                    val hs = synchronized(results) { heads.map { it ?: emptyList() } }
+                    loadEpgRegion(name, hs, list, gen, false)
                 }
             }
         }

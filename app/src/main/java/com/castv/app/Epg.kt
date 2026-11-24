@@ -87,6 +87,13 @@ object Epg {
         return h
     }
 
+    /** [EPG-REGION-1] Guías de «toda la región»: las cabeceras (`url-tvg`) de todas sus listas, sin repetidas. */
+    fun regionSources(heads: List<List<String>>): List<String> {
+        val h = M3uParser.mergeGuides(heads)
+        lastSource = if (h.isEmpty()) "ninguna (las listas de la región no traen guía)" else "las cabeceras de las listas de la región"
+        return h
+    }
+
     // ------------------------------------------------------------ Cargar
 
     /**
