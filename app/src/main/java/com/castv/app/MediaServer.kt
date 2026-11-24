@@ -125,6 +125,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
     }
 
     override fun serve(session: IHTTPSession): Response {
+        // [QR-1] puerta temporal para recibir una lista desde otro dispositivo; va ANTES del registro de abajo para que la clave no quede en el /log
+        if (session.uri == "/qr" || session.uri.startsWith("/qr/")) return serveQr(session)
         if (session.uri == "/log") {
             if (session.parameters.containsKey("clear")) DebugLog.clear()
             return newFixedLengthResponse(Response.Status.OK, "text/plain; charset=utf-8", DebugLog.dump())
@@ -157,6 +159,24 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         DebugLog.add("404 ${session.uri}")
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
+    }
+
+    /** [QR-1] GET /qr/<clave>: formulario; con ?n=nombre&u=enlace recibe la lista. Cualquier otra cosa: 404 (sin pistas). */
+    private fun serveQr(session: IHTTPSession): Response {
+        fun html(status: Response.Status, body: String): Response {
+            val r = newFixedLengthResponse(status, "text/html; charset=utf-8", body)
+            r.addHeader("Cache-Control", "no-store")
+            r.addHeader("Referrer-Policy", "no-referrer")
+            return r
+        }
+        val notFound = { newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain; charset=utf-8", "No encontrado") }
+        if (session.method != Method.GET) return notFound()
+        val tok = session.uri.removePrefix("/qr").trim('/')
+        if (!QrAdd.accept(tok, session.headers["remote-addr"] ?: "")) return notFound()
+        val u = session.parameters["u"]?.firstOrNull()
+        if (u == null) return html(Response.Status.OK, QrAdd.page(tok, null))
+        val err = QrAdd.submit(tok, session.parameters["n"]?.firstOrNull() ?: "", u)
+        return if (err == null) html(Response.Status.OK, QrAdd.doneHtml()) else html(Response.Status.OK, QrAdd.page(tok, err))
     }
 
     /** [Etapa 13-A.2] Baja el mp4 del enlace original y se lo pasa al TV. Sigue redirecciones

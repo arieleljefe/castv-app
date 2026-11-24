@@ -591,7 +591,15 @@ class M3uActivity : AppCompatActivity() {
         }
         box.addView(nameIn)
         box.addView(urlIn)
-        AlertDialog.Builder(this)
+        var addDlg: AlertDialog? = null
+        val qrLink = TextView(this)   // [QR-1] pasar la lista desde otro dispositivo
+        qrLink.text = "📲 Desde otro dispositivo (QR)"
+        qrLink.textSize = 15f
+        qrLink.setTextColor(accent())
+        qrLink.setPadding(0, dp(16), 0, dp(8))
+        qrLink.setOnClickListener { addDlg?.dismiss(); startQr() }
+        box.addView(qrLink)
+        addDlg = AlertDialog.Builder(this)
             .setTitle("Añadir lista M3U")
             .setView(box)
             .setPositiveButton("Guardar y abrir") { _, _ ->
@@ -608,6 +616,63 @@ class M3uActivity : AppCompatActivity() {
             .setNeutralButton("🔑 Xtream") { _, _ -> xtreamDialog(null, null) }   // [XTREAM-1]
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    /** [QR-1] Comprueba que el servidor de CASTV responde y, si sí, abre el recuadro con el QR. */
+    private fun startQr() {
+        val ip = CastvNet.localIpAddress(null)
+        if (ip == null) { toast("Conéctate a un Wi-Fi para usar esto"); return }
+        thread {
+            val ok = try {
+                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", ServerPort.port), 700) }
+                true
+            } catch (e: Exception) { false }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                if (ok) showQrDialog(ip) else toast("El servidor de CASTV no está activo. Abre la pantalla principal y vuelve a intentarlo.")
+            }
+        }
+    }
+
+    /** [QR-1] Recuadro con el QR y la dirección. Se cierra solo al recibir la lista, a los 5 minutos o con «Cerrar». */
+    private fun showQrDialog(ip: String) {
+        var dlg: AlertDialog? = null
+        val tok = QrAdd.open { name, url ->
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                dlg?.dismiss()
+                val n = if (name.isEmpty()) (android.net.Uri.parse(url).host ?: "Lista") else name
+                Store.addM3uList(n, url)
+                loadList(M3uList(n, url))
+                toast("📲 Lista recibida: $n")
+            }
+        }
+        val addr = "http://$ip:${ServerPort.port}/qr/$tok"
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.gravity = Gravity.CENTER_HORIZONTAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val bmp = QrImage.make(addr, dp(240))
+        if (bmp != null) {
+            val img = ImageView(this)
+            img.setImageBitmap(bmp)
+            box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
+        }
+        val t = TextView(this)
+        t.text = "Con otro móvil u ordenador del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\nSe cierra solo al recibir la lista o en 5 minutos."
+        t.textSize = 13f
+        t.setTextColor(mutedColor)
+        t.setPadding(0, dp(12), 0, 0)
+        t.setTextIsSelectable(true)
+        box.addView(t)
+        dlg = AlertDialog.Builder(this)
+            .setTitle("📲 Desde otro dispositivo")
+            .setView(box)
+            .setNegativeButton("Cerrar", null)
+            .setOnDismissListener { QrAdd.close("recuadro cerrado") }
+            .show()
+        val d = dlg
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (d != null && d.isShowing) d.dismiss() }, 5L * 60_000L)
     }
 
     /** [XTREAM-1] Lista de un proveedor Xtream: servidor, usuario y clave. Con [reuse] se vuelve a poner el acceso de una lista existente. */
@@ -1171,6 +1236,7 @@ class M3uActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         checkGen++   // [CHECK-1] si se sale de la pantalla, la revisión se detiene
+        QrAdd.close("pantalla cerrada")   // [QR-1]
         checkPool?.shutdownNow()
         super.onDestroy()
     }
