@@ -66,6 +66,7 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var favBtn: TextView
     private lateinit var hiddenBtn: TextView   // [OCULTAR-1] "👁 N": canales ocultos (solo se ve si hay alguno)
     @Volatile private var hidden: Set<String> = emptySet()   // [OCULTAR-1] enlaces de los canales ocultos
+    private lateinit var guideBtn: TextView   // [EPG-1] "📅": guía de programación (solo se ve con la guía activada en Ajustes)
     private lateinit var failBtn: TextView   // [FUENTES-1] "⚠ N": canales que fallan seguido (solo se ve si hay alguno)
     @Volatile private var failed: Map<String, Int> = emptyMap()   // [FUENTES-1] enlace → fallos seguidos (2 o más)
     private val reqPlayer = 4715
@@ -245,6 +246,12 @@ class M3uActivity : AppCompatActivity() {
         failBtn.textSize = 13f
         failBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         failBtn.visibility = View.GONE
+        guideBtn = chip("📅") { guideDialog() }   // [EPG-1]
+        guideBtn.contentDescription = "Guía de programación"
+        guideBtn.textSize = 13f
+        guideBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE
+        statusRow.addView(guideBtn)
         statusRow.addView(failBtn)
         statusRow.addView(checkBtn)
         statusRow.setPadding(0, dp(6), 0, dp(2))   // [VISTA-4] "Revisar" con más aire respecto a los chips de ánimo
@@ -289,6 +296,7 @@ class M3uActivity : AppCompatActivity() {
     private fun loadList(l: M3uList) {
         if (checking) stopCheck(null)   // [CHECK-1]
         current = l
+        Epg.clear()   // [EPG-1] la guía de la lista anterior no se mezcla con esta
         Store.lastM3u = l.url
         listBtn.text = "📡 ${l.name} ▾"
         statusView.text = "Descargando lista…"
@@ -348,6 +356,76 @@ class M3uActivity : AppCompatActivity() {
                     else "❌ No se pudo descargar la lista. Revisa el enlace y tu conexión."
                 else if (list.isEmpty()) statusView.text = "La lista no tiene canales http/https."
             }
+            loadEpg(l, body, list, gen, false)   // [EPG-1] ya en el hilo aparte, después de mostrar la lista
+        }
+    }
+
+    /** [EPG-1] Carga la guía (copia reciente o descarga). Llamar desde un hilo aparte. Con datos móviles solo se descarga si [force]. */
+    private fun loadEpg(l: M3uList, body: String?, list: List<M3uChannel>, gen: Int, force: Boolean): String {
+        if (!Epg.enabled(this)) return "apagada"
+        if (list.isEmpty()) return "sin canales"
+        val urls = Epg.sources(this, l.url, body)
+        val res = Epg.load(this, l.url, urls, list, force, force || !onMobileData()) { gen == loadGen && !isFinishing }
+        runOnUiThread {
+            if (!isFinishing && gen == loadGen) {
+                chAdapter.notifyDataSetChanged()
+                refreshSections()
+            }
+        }
+        return res
+    }
+
+    /** [EPG-1] Recuadro 📅: de dónde sale la guía, pegar una URL XMLTV propia y actualizar ya. */
+    private fun guideDialog() {
+        val l = current
+        if (l == null) { toast("Elige una lista (la guía no va con «toda la región»)"); return }
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val info = TextView(this)
+        val src = if (Epg.lastSource.isEmpty()) "" else "Fuente: ${Epg.lastSource}.\n"
+        val res = if (Epg.lastResult.isEmpty()) "" else "Último intento: ${Epg.lastResult}.\n"
+        info.text = src + res + Epg.info()
+        info.textSize = 13f
+        info.setTextColor(mutedColor)
+        box.addView(info)
+        val urlIn = EditText(this)
+        urlIn.hint = "URL de guía propia (.xml o .xml.gz), opcional"
+        urlIn.setSingleLine(true)
+        urlIn.inputType = InputType.TYPE_TEXT_VARIATION_URI
+        urlIn.setText(Epg.manualUrl(this, l.url))
+        box.addView(urlIn)
+        AlertDialog.Builder(this)
+            .setTitle("📅 Guía de programación")
+            .setView(box)
+            .setPositiveButton("Guardar y actualizar") { _, _ ->
+                val u = urlIn.text.toString().trim()
+                if (u.isNotEmpty() && !u.startsWith("http://") && !u.startsWith("https://")) {
+                    toast("El enlace debe empezar con http:// o https://")
+                } else {
+                    Epg.setManualUrl(this, l.url, u)
+                    refreshEpg(l)
+                }
+            }
+            .setNeutralButton("Actualizar ya") { _, _ -> refreshEpg(l) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    /** [EPG-1] Descarga la guía otra vez (sin usar la copia reciente, también con datos móviles). */
+    private fun refreshEpg(l: M3uList) {
+        if (!Epg.enabled(this)) { toast("Activa la guía en Ajustes › Video"); return }
+        val gen = loadGen
+        val list = channels
+        toast("📅 Actualizando la guía…")
+        thread {
+            var body: String? = null
+            try {
+                val f = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
+                if (f.exists()) body = f.readText()
+            } catch (e: Exception) { }
+            val res = loadEpg(l, body, list, gen, true)
+            runOnUiThread { if (!isFinishing) toast("📅 " + res) }
         }
     }
 
@@ -401,6 +479,7 @@ class M3uActivity : AppCompatActivity() {
         if (lists.isEmpty()) return
         if (checking) stopCheck(null)   // [CHECK-1]
         current = null
+        Epg.clear()   // [EPG-1] la guía no va con «toda la región»
         groupFilter = null
         moodFilter = -1   // [ESTILO-3]
         groupBtn.text = "Grupo: Todos ▾"
@@ -590,6 +669,7 @@ class M3uActivity : AppCompatActivity() {
                 Store.removeM3uList(cur.url)
                 if (Xtream.isXtream(cur.url)) Xtream.remove(this, cur.url)   // [XTREAM-1] también se borra su usuario y clave
                 try { File(cacheDir, "m3u_" + cur.url.hashCode() + ".txt").delete() } catch (e: Exception) { }
+                Epg.forget(this, cur.url)   // [EPG-1] su URL de guía y su copia
                 current = null
                 val next = Store.m3uLists().firstOrNull()
                 if (next != null) {
@@ -715,6 +795,7 @@ class M3uActivity : AppCompatActivity() {
         failed = Store.failedChannels()   // [FUENTES-1] el reproductor pudo anotar fallos o aciertos
         if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else { chAdapter.notifyDataSetChanged(); updateFailBtn() } }
         refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
+        if (::guideBtn.isInitialized) guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE   // [EPG-1] pudo cambiar en Ajustes
     }
 
     /** Arma las dos filas de tarjetas de arriba. Se esconden al buscar, filtrar por grupo o con ★ Favs; una fila vacía no se muestra. */
@@ -777,6 +858,17 @@ class M3uActivity : AppCompatActivity() {
         name.maxLines = 2
         name.ellipsize = TextUtils.TruncateAt.END
         box.addView(name, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val nowT = Epg.nowTitle(c)   // [EPG-1] programa en curso
+        if (nowT != null) {
+            val g = TextView(this)
+            g.text = "▶ $nowT"
+            g.setTextColor(mutedColor)
+            g.textSize = 9f
+            g.gravity = Gravity.CENTER_HORIZONTAL
+            g.maxLines = 2
+            g.ellipsize = TextUtils.TruncateAt.END
+            box.addView(g, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
         box.setOnClickListener { openChannel(c) }
         box.setOnLongClickListener { confirmHide(c); true }
         return box
@@ -1270,8 +1362,8 @@ class M3uActivity : AppCompatActivity() {
             val (shownName, badges) = splitName(c.name)
             val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
             (box.getChildAt(0) as TextView).text = (if (failed.containsKey(c.url)) "⚠ " else "") + shownName   // [FUENTES-1]
-            (box.getChildAt(1) as TextView).text =
-                listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
+            (box.getChildAt(1) as TextView).text = Epg.nowLine(c)   // [EPG-1] con guía: «▶ programa · hasta HH:MM»; si no, categorías y etiquetas
+                ?: listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
             return v
         }
     }

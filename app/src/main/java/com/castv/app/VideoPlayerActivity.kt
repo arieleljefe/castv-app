@@ -1089,22 +1089,44 @@ class VideoPlayerActivity : AppCompatActivity() {
     /** Agrupa los botones menos usados de la barra para que el título del canal se lea completo. */
     private fun showMoreMenu() {
         val sl = if (::sleepChip.isInitialized) sleepChip.text.toString().removePrefix("😴").trim() else ""
-        val labels = arrayOf(
+        val labels = arrayListOf(
             "🔒 Bloquear controles",
             "🖼 Tamaño de imagen",
             if (sl.isEmpty()) "😴 Temporizador de apagado" else "😴 Temporizador · $sl",
             "🛠 Herramientas",
             "💬 Subtítulos")
+        val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
+        if (ch != null && Epg.nowNext(ch) != null) labels.add("📅 Guía: ahora y siguiente")
         AlertDialog.Builder(this)
-            .setItems(labels) { _, which ->
+            .setItems(labels.toTypedArray()) { _, which ->
                 when (which) {
                     0 -> lock()
                     1 -> cycleSize()
                     2 -> showSleepMenu()
                     3 -> showToolsMenu()
-                    else -> showSubtitleMenu()
+                    4 -> showSubtitleMenu()
+                    else -> showGuideNow()   // [EPG-1]
                 }
             }
+            .show()
+        keepControls()
+    }
+
+    /** [EPG-1] Qué dan ahora y qué viene después en el canal que se ve. */
+    private fun showGuideNow() {
+        val c = currentChannel() ?: return
+        val nn = Epg.nowNext(c)
+        if (nn == null) { toast("Sin guía para este canal"); return }
+        val sb = StringBuilder()
+        nn.first?.let { sb.append("▶ Ahora (").append(Epg.hhmm(it.start)).append("–").append(Epg.hhmm(it.stop)).append(")\n").append(it.title) }
+        nn.second?.let {
+            if (sb.isNotEmpty()) sb.append("\n\n")
+            sb.append("⏭ Después (").append(Epg.hhmm(it.start)).append("–").append(Epg.hhmm(it.stop)).append(")\n").append(it.title)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(c.name)
+            .setMessage(sb.toString())
+            .setPositiveButton("Cerrar", null)
             .show()
         keepControls()
     }

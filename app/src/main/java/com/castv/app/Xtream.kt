@@ -55,6 +55,15 @@ object Xtream {
         } catch (e: Exception) { null }
     }
 
+    /** [EPG-1] Enlace de la guía XMLTV del proveedor, con usuario y clave: solo para descargar (no se guarda; el /log lo tapa). */
+    fun epgUrl(ctx: Context, url: String): String? {
+        val o = read(ctx, url) ?: return null
+        return try {
+            o.getString("s") + "/xmltv.php?username=" + URLEncoder.encode(o.getString("u"), "UTF-8") +
+                "&password=" + URLEncoder.encode(o.getString("p"), "UTF-8")
+        } catch (e: Exception) { null }
+    }
+
     @Synchronized
     fun remove(ctx: Context, url: String) {
         sp(ctx).edit().remove(url.removePrefix(PREFIX)).apply()

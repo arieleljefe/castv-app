@@ -253,6 +253,7 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Video", "Deslizar a la derecha: brillo", gState("g_bright"), { toggleG("g_bright", "Brillo") }))
         l.add(Entry("Video", "Deslizar a la izquierda: volumen", gState("g_vol"), { toggleG("g_vol", "Volumen") }))
         l.add(Entry("Video", "Deslizar al centro: cambiar de canal", gState("g_zap") + " (arriba = siguiente, abajo = anterior; solo con canales de una lista)", { toggleG("g_zap", "Cambiar de canal") }))   // [ZAP-3]
+        l.add(Entry("Video", "📅 Guía de programación (EPG)", epgState() + " (muestra «Ahora» en Canales y en el reproductor; con datos móviles solo se actualiza a mano desde 📅)", { toggleEpg() }))   // [EPG-1]
         l.add(Entry("Video", "Doble toque", gState("g_dtap") + " (con el doble toque apagado, dos toques muestran u ocultan los controles)", { toggleG("g_dtap", "Doble toque") }))
         l.add(Entry("Video", "Mantener pulsado: acelerar", gState("g_hold"), { toggleG("g_hold", "Mantener pulsado") }))
         l.add(Entry("Video", "Velocidad al mantener pulsado", fastNames[fastIdx()], { pickFast() }))
@@ -1486,6 +1487,17 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun gOn(key: String): Boolean = prefs().getBoolean(key, true)
     private fun gState(key: String): String = if (gOn(key)) "Activado" else "Desactivado"
+
+    // [EPG-1] la guía viene apagada hasta que Ariel la active
+    private fun epgState(): String = if (prefs().getBoolean("epg_on", false)) "Activado" else "Desactivado"
+
+    private fun toggleEpg() {
+        val now = !prefs().getBoolean("epg_on", false)
+        prefs().edit().putBoolean("epg_on", now).apply()
+        if (!now) Epg.clear()
+        toast(if (now) "✅ Guía de programación: activada" else "🚫 Guía de programación: desactivada")
+        render()
+    }
 
     private fun toggleG(key: String, name: String) {
         val now = !gOn(key)

@@ -5,7 +5,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Un canal de una lista M3U. */
-data class M3uChannel(val name: String, val url: String, val group: String, val logo: String = "")
+data class M3uChannel(val name: String, val url: String, val group: String, val logo: String = "") {
+    /** [EPG-1] `tvg-id` del canal (para emparejar con la guía). Fuera del constructor: no cambia `equals` ni `copy`. */
+    var tvgId: String = ""
+}
 
 /** Lee listas .m3u / .m3u8 de canales (formato #EXTINF). Solo se aceptan enlaces http(s). */
 object M3uParser {
@@ -15,6 +18,8 @@ object M3uParser {
     private val groupRe = Regex("group-title=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
     private val logoRe = Regex("tvg-logo=\"([^\"]*)\"", RegexOption.IGNORE_CASE)   // [REGIONES-1c]
     private val attrRe = Regex("[\\w-]+=\"[^\"]*\"")
+    private val tvgIdRe = Regex("tvg-id=\"([^\"]*)\"", RegexOption.IGNORE_CASE)   // [EPG-1]
+    private val tvgUrlRe = Regex("(?:url-tvg|x-tvg-url)=\"([^\"]*)\"", RegexOption.IGNORE_CASE)   // [EPG-1]
 
     fun parse(text: String): List<M3uChannel> {
         val out = ArrayList<M3uChannel>()
@@ -22,12 +27,14 @@ object M3uParser {
         var group = ""
         var extGroup = ""
         var logo = ""
+        var tvgId = ""   // [EPG-1]
         for (raw in text.lineSequence()) {
             val line = raw.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("#EXTINF", ignoreCase = true)) {
                 group = groupRe.find(line)?.groupValues?.get(1)?.trim().orEmpty()
                 logo = logoRe.find(line)?.groupValues?.get(1)?.trim().orEmpty()
+                tvgId = tvgIdRe.find(line)?.groupValues?.get(1)?.trim().orEmpty()   // [EPG-1]
                 name = line.replace(attrRe, "").substringAfter(',', "").trim()
             } else if (line.startsWith("#EXTGRP:", ignoreCase = true)) {
                 extGroup = line.substringAfter(':').trim()
@@ -39,15 +46,33 @@ object M3uParser {
                     val g = if (group.isNotEmpty()) group else extGroup
                     val n = if (name.isNotEmpty()) name
                             else line.substringBefore('?').trimEnd('/').substringAfterLast('/')
-                    out.add(M3uChannel(n, line, if (g.isEmpty()) "Sin grupo" else g, logo))
+                    out.add(M3uChannel(n, line, if (g.isEmpty()) "Sin grupo" else g, logo).also { it.tvgId = tvgId })   // [EPG-1]
                 }
                 name = ""
                 group = ""
                 extGroup = ""
                 logo = ""
+                tvgId = ""   // [EPG-1]
             }
         }
         return out
+    }
+
+    /** [EPG-1] Enlaces de guía XMLTV de la cabecera (`#EXTM3U url-tvg="…"`, varios separados por coma); máximo 3. */
+    fun epgUrls(text: String): List<String> {
+        var seen = 0
+        for (raw in text.lineSequence()) {
+            val line = raw.trim()
+            if (line.isEmpty()) continue
+            if (line.startsWith("#EXTM3U", ignoreCase = true)) {
+                val v = tvgUrlRe.find(line)?.groupValues?.get(1).orEmpty()
+                return v.split(',').map { it.trim() }
+                    .filter { it.startsWith("http://", true) || it.startsWith("https://", true) }
+                    .take(3)
+            }
+            if (++seen >= 5) break
+        }
+        return emptyList()
     }
 
     /** Descarga una lista (sigue hasta 5 redirecciones, incluso de http a https). Lanza excepción si falla. */
