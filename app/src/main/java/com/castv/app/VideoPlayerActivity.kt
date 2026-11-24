@@ -754,6 +754,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private fun updateProgress() {
         val dur = try { video.duration } catch (e: Exception) { -1 }
         val pos = try { video.currentPosition } catch (e: Exception) { 0 }
+        setLiveUi(dur <= 0 && items.getOrNull(index)?.id == 0L)   // [VIVO-1] canal o enlace en vivo: sin tiempo, barra ni −10/+10
         if (dur > 0) {
             seek.isEnabled = true
             if (!dragging) {
@@ -765,8 +766,19 @@ class VideoPlayerActivity : AppCompatActivity() {
             seek.isEnabled = false
             seek.progress = 0
             tvPos.text = fmt(pos)
-            tvDur.text = "EN VIVO"
+            tvDur.text = if (seek.visibility == View.GONE) "● EN VIVO" else "EN VIVO"   // [VIVO-1]
         }
+    }
+
+    /** [VIVO-1] En vivo se esconden el tiempo, la barra y −10/+10; con video normal vuelven. */
+    private fun setLiveUi(live: Boolean) {
+        if (!::seek.isInitialized || !::tvPos.isInitialized || !::backSkip.isInitialized || !::fwdSkip.isInitialized) return
+        val v = if (live) View.GONE else View.VISIBLE
+        if (seek.visibility == v) return
+        seek.visibility = v
+        tvPos.visibility = v
+        backSkip.visibility = v
+        fwdSkip.visibility = v
     }
 
     private fun skipBtn(onClick: () -> Unit): TextView = TextView(this).apply {
