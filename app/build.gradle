@@ -8,7 +8,7 @@ plugins {
 def castvVc = System.getenv("CASTV_VERSION_CODE")
 def castvVersionCode = (castvVc && castvVc.isInteger()) ? castvVc.toInteger() : 3
 def castvVn = System.getenv("CASTV_VERSION_NAME")
-def castvVersionName = castvVn ? castvVn : "3.1"
+def castvVersionName = castvVn ? castvVn : "3.8"   // [VERSION-3] valor para compilar sin etiqueta; con etiqueta v* manda la etiqueta
 
 android {
     namespace 'com.castv.app'
