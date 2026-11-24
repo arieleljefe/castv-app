@@ -31,8 +31,40 @@ object Backup {
         else -> true
     }
 
+    // [XTREAM-1] Claves de castv_lib con enlaces de canales: los de Xtream llevan usuario y clave, así que no viajan en respaldos
+    private val URL_KEYS = setOf("chfav", "chfavmeta", "chhidden", "links", "chrecent", "chhealth")
+
+    /** Quita de [v] (texto JSON de la clave [k]) los enlaces con usuario y clave de Xtream. */
+    private fun scrub(k: String, v: String, leaks: (String) -> Boolean): String {
+        if (k !in URL_KEYS) return v
+        return try {
+            if (k == "chhealth") {
+                val o = JSONObject(v)
+                val out = JSONObject()
+                val ks = o.keys()
+                while (ks.hasNext()) {
+                    val u = ks.next()
+                    if (!leaks(u)) out.put(u, o.get(u))
+                }
+                out.toString()
+            } else {
+                val a = JSONArray(v)
+                val out = JSONArray()
+                for (i in 0 until a.length()) {
+                    val e = a.get(i)
+                    val u = if (e is JSONObject) e.optString("u") else e.toString()
+                    if (!leaks(u)) out.put(e)
+                }
+                out.toString()
+            }
+        } catch (ex: Exception) {
+            if (!leaks(v)) v else if (k == "chhealth") "{}" else "[]"
+        }
+    }
+
     /** Arma el JSON con las preferencias de la app. */
     fun build(ctx: Context): String {
+        val leaks = Xtream.leakFilter(ctx)   // [XTREAM-1]
         val root = JSONObject()
         root.put("app", APP)
         root.put("v", VERSION)
@@ -45,7 +77,7 @@ object Backup {
                 if (!keep(name, k)) continue@loop
                 val e = JSONObject()
                 when (v) {
-                    is String -> e.put("t", "s").put("v", v)
+                    is String -> e.put("t", "s").put("v", if (name == "castv_lib") scrub(k, v, leaks) else v)   // [XTREAM-1]
                     is Int -> e.put("t", "i").put("v", v)
                     is Long -> e.put("t", "l").put("v", v)
                     is Float -> e.put("t", "f").put("v", v.toDouble())
@@ -176,7 +208,7 @@ object Backup {
         val sp = ctx.getSharedPreferences("castv_lib", Context.MODE_PRIVATE)
         val o = JSONObject()
         for (k in keys) {
-            val v = sp.getString(k, null) ?: continue
+            val v = scrub(k, sp.getString(k, null) ?: continue, Xtream.leakFilter(ctx))   // [XTREAM-1] sin enlaces con usuario y clave
             val n = try { JSONArray(v).length() } catch (e: Exception) { 0 }
             if (n == 0) continue
             o.put(k, JSONObject().put("t", "s").put("v", v))

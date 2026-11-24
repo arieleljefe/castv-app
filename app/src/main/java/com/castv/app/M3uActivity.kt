@@ -300,6 +300,12 @@ class M3uActivity : AppCompatActivity() {
         groupBtn.text = "Grupo: Todos ▾"
         chAdapter.notifyDataSetChanged()
         refreshMoods()   // [ESTILO-3] lista vacía: la fila se esconde
+        val real = if (Xtream.isXtream(l.url)) Xtream.playlistUrl(this, l.url) else l.url   // [XTREAM-1] enlace con usuario y clave solo para descargar
+        if (real == null) {
+            statusView.text = "🔑 Esta lista necesita tu usuario y clave otra vez (no viajan en los respaldos)."
+            xtreamDialog(l.name, l.url)
+            return
+        }
         val gen = ++loadGen
         val cache = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
         thread {
@@ -308,7 +314,7 @@ class M3uActivity : AppCompatActivity() {
             var bad = false                          // [LISTA-VAL-1] la descarga llegó vacía o dañada
             var pre: List<M3uChannel>? = null        // [LISTA-VAL-1] ya parseada (no se parsea dos veces)
             try {
-                val t = M3uParser.download(l.url)
+                val t = M3uParser.download(real)
                 val p = M3uParser.parse(t)
                 if (p.isNotEmpty()) {
                     text = t
@@ -520,6 +526,56 @@ class M3uActivity : AppCompatActivity() {
                     loadList(M3uList(n, u))
                 }
             }
+            .setNeutralButton("🔑 Xtream") { _, _ -> xtreamDialog(null, null) }   // [XTREAM-1]
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [XTREAM-1] Lista de un proveedor Xtream: servidor, usuario y clave. Con [reuse] se vuelve a poner el acceso de una lista existente. */
+    private fun xtreamDialog(name: String?, reuse: String?) {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val nameIn = EditText(this)
+        nameIn.hint = "Nombre (ej. Mi proveedor)"
+        nameIn.setSingleLine(true)
+        if (name != null) nameIn.setText(name)
+        val srvIn = EditText(this)
+        srvIn.hint = "Servidor: http://servidor:puerto"
+        srvIn.setSingleLine(true)
+        srvIn.inputType = InputType.TYPE_TEXT_VARIATION_URI
+        val userIn = EditText(this)
+        userIn.hint = "Usuario"
+        userIn.setSingleLine(true)
+        userIn.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        val passIn = EditText(this)
+        passIn.hint = "Clave"
+        passIn.setSingleLine(true)
+        passIn.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        box.addView(nameIn)
+        box.addView(srvIn)
+        box.addView(userIn)
+        box.addView(passIn)
+        AlertDialog.Builder(this)
+            .setTitle("🔑 Lista Xtream")
+            .setMessage("El usuario y la clave se guardan solo en este teléfono: no entran en respaldos ni en el /log.")
+            .setView(box)
+            .setPositiveButton("Guardar y abrir") { _, _ ->
+                val s = srvIn.text.toString()
+                val u = userIn.text.toString().trim()
+                val p = passIn.text.toString()
+                if (!Xtream.validServer(s)) {
+                    toast("El servidor debe empezar con http:// o https://")
+                } else if (u.isEmpty() || p.isEmpty()) {
+                    toast("Falta el usuario o la clave")
+                } else {
+                    val url = Xtream.save(this, s, u, p, reuse)
+                    var n = nameIn.text.toString().trim()
+                    if (n.isEmpty()) n = android.net.Uri.parse(Xtream.cleanServer(s)).host ?: "Xtream"
+                    Store.addM3uList(n, url)
+                    loadList(M3uList(n, url))
+                }
+            }
             .setNegativeButton("Cancelar", null)
             .show()
     }
@@ -532,6 +588,7 @@ class M3uActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Quitar") { _, _ ->
                 Store.removeM3uList(cur.url)
+                if (Xtream.isXtream(cur.url)) Xtream.remove(this, cur.url)   // [XTREAM-1] también se borra su usuario y clave
                 try { File(cacheDir, "m3u_" + cur.url.hashCode() + ".txt").delete() } catch (e: Exception) { }
                 current = null
                 val next = Store.m3uLists().firstOrNull()
