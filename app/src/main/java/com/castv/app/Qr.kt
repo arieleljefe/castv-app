@@ -160,6 +160,7 @@ object QrSend {
     private var name = ""
     private var url = ""
     private var onDone: (() -> Unit)? = null
+    private var build: (() -> String)? = null   // [QR-2b] si hay, la puerta entrega un respaldo (se arma al bajarlo) y no una lista
 
     private fun newToken(): String {
         val b = ByteArray(12)
@@ -193,6 +194,7 @@ object QrSend {
         bad = 0
         name = listName.trim().take(MAX_NAME)
         url = listUrl.trim()
+        build = null
         onDone = done
         DebugLog.add("QR: puerta de envío abierta (5 minutos, un solo uso)")
         return t
@@ -204,6 +206,7 @@ object QrSend {
         token = null
         name = ""
         url = ""
+        build = null
         onDone = null
     }
 
@@ -234,12 +237,49 @@ object QrSend {
     fun take(tok: String): Pair<String, String>? {
         if (!isOpen()) return null
         val t = token ?: return null
+        if (build != null) return null   // [QR-2b] esta puerta es de un respaldo
         if (!MessageDigest.isEqual(t.toByteArray(), tok.toByteArray())) return null
         val out = Pair(name, url)
         val d = onDone
         close("lista entregada")
         if (d != null) d()
         return out
+    }
+
+    /**
+     * [QR-2b] Abre la puerta para enviar el RESPALDO de la app. [make] arma el texto al bajarlo (así va al día) y [done]
+     * se llama al entregarlo. Mismas reglas que con una lista: a mano, clave de un solo uso, 5 minutos, red local.
+     */
+    @Synchronized
+    fun openBackup(make: () -> String, done: () -> Unit): String {
+        val t = newToken()
+        token = t
+        until = System.currentTimeMillis() + TTL_MS
+        bad = 0
+        name = ""
+        url = ""
+        build = make
+        onDone = done
+        DebugLog.add("QR: puerta de envío de respaldo abierta (5 minutos, un solo uso)")
+        return t
+    }
+
+    /** ¿La puerta abierta es de un respaldo? */
+    @Synchronized
+    fun isBackup(): Boolean = token != null && build != null
+
+    /** Entrega el respaldo UNA sola vez y cierra la puerta. Null si la clave no vale, no es una puerta de respaldo o no se pudo armar (la puerta sigue abierta). */
+    @Synchronized
+    fun takeBackup(tok: String): String? {
+        if (!isOpen()) return null
+        val t = token ?: return null
+        val make = build ?: return null
+        if (!MessageDigest.isEqual(t.toByteArray(), tok.toByteArray())) return null
+        val text = try { make() } catch (e: Exception) { return null }
+        val d = onDone
+        close("respaldo entregado")
+        if (d != null) d()
+        return text
     }
 
     private fun esc(s: String): String =
@@ -253,11 +293,18 @@ object QrSend {
         "button{padding:12px 20px;font-size:16px;border:0;border-radius:8px;background:#26c6da;color:#000}" +
         ".m{color:#9fd}</style></head><body>"
 
-    /** Primera página: solo un botón (no entrega nada hasta pulsarlo). */
-    fun askHtml(tok: String): String =
-        HEAD + "<h2>📺 CASTV: lista para ti</h2><p>Otro móvil quiere enviarte una lista.</p>" +
+    /** Primera página: solo un botón (no entrega nada hasta pulsarlo). Con [backup] es la del respaldo. */
+    fun askHtml(tok: String, backup: Boolean = false): String {
+        val que = if (backup) {
+            "<p>Otro móvil quiere enviarte un <b>respaldo de CASTV</b> (favoritos, listas, historial y ajustes).</p>" +
+                "<p>Si lo importas en CASTV, <b>reemplaza</b> los datos de ese móvil: hazlo solo donde quieras esos datos.</p>"
+        } else {
+            "<p>Otro móvil quiere enviarte una lista.</p>"
+        }
+        return HEAD + "<h2>📺 CASTV: " + (if (backup) "respaldo para ti" else "lista para ti") + "</h2>" + que +
             "<form method='get' action='/send/" + esc(tok) + "'><input type='hidden' name='go' value='1'>" +
-            "<button type='submit'>📥 Recibir lista</button></form></body></html>"
+            "<button type='submit'>" + (if (backup) "📥 Descargar respaldo" else "📥 Recibir lista") + "</button></form></body></html>"
+    }
 
     /** Segunda página: nombre y enlace, con botón para copiarlo. */
     fun listHtml(listName: String, listUrl: String): String =

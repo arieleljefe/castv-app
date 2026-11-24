@@ -66,4 +66,46 @@ class QrSendTest {
         assertTrue(lista.contains("&amp;y=2"))
         assertFalse(lista.contains("<b>Mi"))
     }
+
+    @Test fun respaldo_unSoloUso() {
+        var hecho = false
+        val tok = QrSend.openBackup({ "respaldo-de-prueba" }) { hecho = true }
+        assertEquals(24, tok.length)
+        assertTrue(QrSend.isOpen())
+        assertTrue(QrSend.isBackup())
+        assertTrue(QrSend.accept(tok, "192.168.1.5"))
+        assertNull(QrSend.take(tok))   // no es una puerta de lista
+        assertTrue(QrSend.isOpen())
+        assertNull(QrSend.takeBackup("otra-clave"))
+        assertTrue(QrSend.isOpen())
+        assertEquals("respaldo-de-prueba", QrSend.takeBackup(tok))
+        assertTrue(hecho)
+        assertFalse(QrSend.isOpen())
+        assertFalse(QrSend.isBackup())
+        assertNull(QrSend.takeBackup(tok))
+    }
+
+    @Test fun listaNoEsRespaldo() {
+        val tok = QrSend.open("x", "https://ejemplo.com/lista.m3u") { }
+        assertNotNull(tok)
+        assertFalse(QrSend.isBackup())
+        assertNull(QrSend.takeBackup(tok!!))
+        assertTrue(QrSend.isOpen())
+        QrSend.close("prueba")
+    }
+
+    @Test fun respaldoQueFalla_noGastaLaClave() {
+        val tok = QrSend.openBackup({ throw IllegalStateException("fallo de prueba") }) { }
+        assertNull(QrSend.takeBackup(tok))
+        assertTrue(QrSend.isOpen())
+        QrSend.close("prueba")
+    }
+
+    @Test fun paginaDelRespaldo() {
+        val ask = QrSend.askHtml("abc", true)
+        assertTrue(ask.contains("/send/abc"))
+        assertTrue(ask.contains("respaldo"))
+        assertTrue(ask.contains("reemplaza"))
+        assertFalse(QrSend.askHtml("abc").contains("reemplaza"))
+    }
 }

@@ -163,7 +163,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No encontrado")
     }
 
-    /** [QR-2a] GET /send/<clave>: botón «Recibir lista»; con ?go=1 entrega la lista (una sola vez). Cualquier otra cosa: 404 (sin pistas). */
+    /** [QR-2a] GET /send/<clave>: botón «Recibir lista» (o «Descargar respaldo», [QR-2b]); con ?go=1 entrega la lista o el archivo del respaldo (una sola vez). Cualquier otra cosa: 404 (sin pistas). */
     private fun serveSend(session: IHTTPSession): Response {
         fun html(body: String): Response {
             val r = newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", body)
@@ -175,7 +175,16 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         if (session.method != Method.GET) return notFound()
         val tok = session.uri.removePrefix("/send").trim('/')
         if (!QrSend.accept(tok, session.headers["remote-addr"] ?: "")) return notFound()
-        if (session.parameters["go"] == null) return html(QrSend.askHtml(tok))
+        val backup = QrSend.isBackup()   // [QR-2b]
+        if (session.parameters["go"] == null) return html(QrSend.askHtml(tok, backup))
+        if (backup) {
+            val txt = QrSend.takeBackup(tok) ?: return notFound()
+            val r = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", txt)
+            r.addHeader("Content-Disposition", "attachment; filename=\"castv-respaldo.json\"")
+            r.addHeader("Cache-Control", "no-store")
+            r.addHeader("Referrer-Policy", "no-referrer")
+            return r
+        }
         val p = QrSend.take(tok) ?: return notFound()
         return html(QrSend.listHtml(p.first, p.second))
     }

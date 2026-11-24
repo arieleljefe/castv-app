@@ -203,6 +203,11 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        QrSend.close("pantalla cerrada")   // [QR-2b]
+        super.onDestroy()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("unlocked", unlocked)
@@ -350,6 +355,8 @@ class SettingsActivity : AppCompatActivity() {
 
         l.add(Entry("Respaldo", "Exportar o importar respaldo",
             "Favoritos, listas, historial de enlaces, listas M3U y ajustes", { sendAction("backup") }))
+        l.add(Entry("Respaldo", "Enviar respaldo a otro móvil",   // [QR-2b]
+            "Con QR, por el Wi-Fi: sin cables ni correo", { confirmBackupQr() }))
 
         l.add(Entry("Acerca de", "Acerca de CASTV", "Versión, redes y contacto, librerías y licencia",
             { startActivity(Intent(this, AboutActivity::class.java)) }))   // [ACERCA-1]
@@ -1567,6 +1574,74 @@ class SettingsActivity : AppCompatActivity() {
                 render()
             }
             .show()
+    }
+
+    /** [QR-2b] Pide confirmación antes de abrir la puerta: el respaldo es lo más delicado que sale del teléfono. */
+    private fun confirmBackupQr() {
+        AlertDialog.Builder(this)
+            .setTitle("¿Enviar tu respaldo a otro móvil?")
+            .setMessage("Se abre una dirección con QR, solo para tu Wi-Fi y de un solo uso (5 minutos). " +
+                "Quien la abra podrá bajar tus favoritos, listas M3U, historial y ajustes (sin claves Xtream). " +
+                "Úsalo solo con un móvil tuyo o de confianza.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Continuar") { _, _ -> startBackupQr() }
+            .show()
+    }
+
+    /** [QR-2b] Comprueba que haya Wi-Fi y que el servidor de CASTV responda; si sí, abre el recuadro con el QR. */
+    private fun startBackupQr() {
+        val ip = CastvNet.localIpAddress(null)
+        if (ip == null) { toast("Conéctate a un Wi-Fi para usar esto"); return }
+        Thread {
+            val ok = try {
+                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", ServerPort.port), 700) }
+                true
+            } catch (e: Exception) { false }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (ok) showBackupQr(ip) else toast("El servidor de CASTV no está activo. Abre la pantalla principal y vuelve a intentarlo.")
+            }
+        }.start()
+    }
+
+    /** [QR-2b] Recuadro con el QR y la dirección. Se cierra solo al entregar el respaldo, a los 5 minutos o con «Cerrar». */
+    private fun showBackupQr(ip: String) {
+        var dlg: AlertDialog? = null
+        val tok = QrSend.openBackup({ Backup.build(applicationContext) }) {
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                dlg?.dismiss()
+                toast("📤 Respaldo enviado")
+            }
+        }
+        val addr = "http://$ip:${ServerPort.port}/send/$tok"
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.gravity = Gravity.CENTER_HORIZONTAL
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val bmp = QrImage.make(addr, dp(240))
+        if (bmp != null) {
+            val img = android.widget.ImageView(this)
+            img.setImageBitmap(bmp)
+            box.addView(img, LinearLayout.LayoutParams(dp(240), dp(240)))
+        }
+        val t = TextView(this)
+        t.text = "Con el otro móvil del mismo Wi-Fi, escanea el QR o abre:\n$addr\n\n" +
+            "Allí pulsa «Descargar respaldo» y, en CASTV de ese móvil, usa Ajustes › Respaldo para importarlo.\n\n" +
+            "Se cierra solo al entregar el respaldo o en 5 minutos."
+        t.textSize = 13f
+        t.setTextColor(mutedColor)
+        t.setPadding(0, dp(12), 0, 0)
+        t.setTextIsSelectable(true)
+        box.addView(t)
+        dlg = AlertDialog.Builder(this)
+            .setTitle("📤 Enviar respaldo")
+            .setView(box)
+            .setNegativeButton("Cerrar", null)
+            .setOnDismissListener { QrSend.close("recuadro cerrado") }
+            .show()
+        val d = dlg
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (d != null && d.isShowing) d.dismiss() }, 5L * 60_000L)
     }
 
     /** Cierra Ajustes y le pide a MainActivity que abra respaldo o redes. */
