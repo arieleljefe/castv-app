@@ -293,12 +293,8 @@ class VideoPlayerActivity : AppCompatActivity() {
         favChip.visibility = View.GONE
         topBar.addView(favChip)
         topBar.addView(chip("🔄") { rotate() })   // [UI-2a]
-        topBar.addView(chip("🔒") { lock() })     // [UI-2a]
-        topBar.addView(chip("🖼") { cycleSize() })   // [UI-2c]
-        sleepChip = chip("😴") { showSleepMenu() }   // [GESTO-2]
-        topBar.addView(sleepChip)
-        topBar.addView(chip("🛠") { showToolsMenu() })   // [SALTO-1]
-        topBar.addView(chip("💬") { showSubtitleMenu() })
+        sleepChip = chip("😴") { showSleepMenu() }   // [GESTO-2] ya no va en la barra: solo guarda el texto del temporizador para el menú ⋯
+        topBar.addView(chip("⋯") { showMoreMenu() })   // [BARRA-1] 🔒 🖼 😴 🛠 💬 agrupados
         topBar.addView(chip("📺 TV") { sendToTv() })
         root.addView(
             topBar,
@@ -1047,6 +1043,31 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     /** Canales de la lista desde la que se abrió este canal (vacía si es un video o un enlace suelto). */
     private var zapList: List<M3uChannel> = emptyList()
+
+    // ------------------------------------------------------------ [BARRA-1] menú ⋯
+
+    /** Agrupa los botones menos usados de la barra para que el título del canal se lea completo. */
+    private fun showMoreMenu() {
+        val sl = if (::sleepChip.isInitialized) sleepChip.text.toString().removePrefix("😴").trim() else ""
+        val labels = arrayOf(
+            "🔒 Bloquear controles",
+            "🖼 Tamaño de imagen",
+            if (sl.isEmpty()) "😴 Temporizador de apagado" else "😴 Temporizador · $sl",
+            "🛠 Herramientas",
+            "💬 Subtítulos")
+        AlertDialog.Builder(this)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> lock()
+                    1 -> cycleSize()
+                    2 -> showSleepMenu()
+                    3 -> showToolsMenu()
+                    else -> showSubtitleMenu()
+                }
+            }
+            .show()
+        keepControls()
+    }
 
     // ------------------------------------------------------------ [FAV-REPRO-1] ★ en el reproductor
 
