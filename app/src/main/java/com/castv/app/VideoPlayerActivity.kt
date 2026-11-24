@@ -214,7 +214,11 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         // [Etapa 13-A] Enlace directo (mp4 / HLS .m3u8): un solo "video" con id 0 y la URL en uriString
         val streamUrl = intent.getStringExtra("url")
-        if (streamUrl != null) {
+        val zapChannels = Zap.takePhoneChannels(streamUrl)   // [ZAP-2] lista de canales para ⏮ ⏭ (null = un solo enlace)
+        if (streamUrl != null && zapChannels != null) {
+            zapList = zapChannels
+            items = zapChannels.map { MediaItem(id = 0L, name = it.name, uriString = it.url, isMusic = false, durationSec = 0) }
+        } else if (streamUrl != null) {
             items = listOf(
                 MediaItem(
                     id = 0L, name = intent.getStringExtra("urlTitle") ?: "Enlace",
@@ -234,6 +238,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             }
         }
         index = intent.getIntExtra("index", 0).coerceIn(0, items.size - 1)
+        if (zapList.size > 1) index = items.indexOfFirst { it.uriString == streamUrl }.coerceAtLeast(0)   // [ZAP-2]
         pendingStart = intent.getIntExtra("start", 0)
 
         val root = FrameLayout(this)
@@ -359,9 +364,13 @@ class VideoPlayerActivity : AppCompatActivity() {
                 finish()
                 return@setOnCompletionListener
             }
-            if (index + 1 < items.size) playAt(index + 1, saveCurrent = false) else finish()
+            if (zapList.size < 2 && index + 1 < items.size) playAt(index + 1, saveCurrent = false) else finish()   // [ZAP-2] con canales no se pasa solo al siguiente
         }
         video.setOnErrorListener { _, _, _ ->
+            if (zapList.size > 1) {   // [ZAP-2] se queda en el canal roto para elegir otro con ⏮ ⏭
+                toast("No se pudo reproducir: ${items[index].name}. Prueba otro canal con ⏮ ⏭")
+                return@setOnErrorListener true
+            }
             toast("No se pudo reproducir: ${items[index].name}")
             if (index + 1 < items.size) playAt(index + 1, saveCurrent = false) else finish()
             true
@@ -820,7 +829,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         // Fila 2: anterior · −N · play/pausa · +N · siguiente
         val btnRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
-        btnRow.addView(iconBtn(R.drawable.ic_prev) { playAt(index - 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        btnRow.addView(iconBtn(R.drawable.ic_prev) { stepOrZap(-1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
         backSkip = skipBtn { seekBy(-btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(backSkip)
         playBtn = ImageView(this).apply {
@@ -835,7 +844,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         })
         fwdSkip = skipBtn { seekBy(btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(fwdSkip)
-        btnRow.addView(iconBtn(R.drawable.ic_next) { playAt(index + 1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        btnRow.addView(iconBtn(R.drawable.ic_next) { stepOrZap(+1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
         bottomBar.addView(btnRow)
 
         root.addView(bottomBar, FrameLayout.LayoutParams(
@@ -851,6 +860,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             }
             KeyEvent.KEYCODE_MEDIA_PLAY -> { if (!locked && !video.isPlaying) togglePlay(); return true }
             KeyEvent.KEYCODE_MEDIA_PAUSE -> { if (!locked && video.isPlaying) togglePlay(); return true }
+            KeyEvent.KEYCODE_MEDIA_NEXT -> { if (zapList.size > 1) { if (!locked) stepOrZap(+1); return true } }   // [ZAP-2]
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { if (zapList.size > 1) { if (!locked) stepOrZap(-1); return true } }   // [ZAP-2]
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -1027,6 +1038,21 @@ class VideoPlayerActivity : AppCompatActivity() {
         ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
 
     // ------------------------------------------------------------ Reproducción
+
+    // ------------------------------------------------------------ [ZAP-2] ⏮ ⏭ entre canales
+
+    /** Canales de la lista desde la que se abrió este canal (vacía si es un video o un enlace suelto). */
+    private var zapList: List<M3uChannel> = emptyList()
+
+    /** ⏮ ⏭: con una lista de canales pasan al vecino (dando la vuelta); con videos normales, como siempre. */
+    private fun stepOrZap(delta: Int) {
+        if (zapList.size < 2) { playAt(index + delta); return }
+        playAt(Math.floorMod(index + delta, items.size))
+        val c = zapList.getOrNull(index) ?: return
+        Store.addLink(c.url, c.name)   // queda en el Historial
+        Store.rememberRecentChannel(c)   // y en «Continuar»
+        showHud("📺 " + c.name)
+    }
 
     private fun playAt(i: Int, startAt: Int = 0, saveCurrent: Boolean = true) {
         if (i !in items.indices) return

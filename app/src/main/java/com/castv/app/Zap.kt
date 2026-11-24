@@ -14,6 +14,23 @@ object Zap {
     @Volatile private var pending: Ctx? = null   // la lista del último canal enviado, a la espera de que el TV lo acepte
     @Volatile private var busy = false
 
+    // ------------------------------------------------- [ZAP-2] ⏮ ⏭ cuando el canal suena en el teléfono
+    // La lista va por memoria (no por Intent: una lista grande pasaría el límite de ~1 MB) y se entrega una sola vez.
+
+    @Volatile private var phoneList: List<M3uChannel>? = null
+
+    /** Se llama al abrir el canal [url] en el teléfono, con [shown] como lista visible. */
+    fun rememberPhone(shown: List<M3uChannel>, url: String) {
+        phoneList = if (shown.size > 1 && shown.any { it.url == url }) ArrayList(shown) else null
+    }
+
+    /** El reproductor del teléfono recoge la lista (y se borra, para no pegarla a otra reproducción). null si no hay. */
+    fun takePhoneChannels(url: String?): List<M3uChannel>? {
+        val l = phoneList
+        phoneList = null
+        return if (l != null && url != null && l.size > 1 && l.any { it.url == url }) l else null
+    }
+
     /** Se llama al mandar [current] al TV con [shown] como lista visible. */
     fun remember(shown: List<M3uChannel>, current: M3uChannel) {
         val i = shown.indexOfFirst { it.url == current.url }

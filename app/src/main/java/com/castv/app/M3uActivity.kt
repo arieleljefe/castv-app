@@ -998,6 +998,7 @@ class M3uActivity : AppCompatActivity() {
                 .show()
             return
         }
+        Zap.rememberPhone(if (shown.any { it.url == url }) shown else visible(channels), url)   // [ZAP-2] ⏮ ⏭ en el reproductor del teléfono
         val i = Intent(this, VideoPlayerActivity::class.java)
             .putExtra("url", url).putExtra("urlTitle", title)
         @Suppress("DEPRECATION")
@@ -1052,6 +1053,7 @@ class M3uActivity : AppCompatActivity() {
         // 📺 pulsado dentro del reproductor del móvil: se manda ese mismo canal al TV
         if (requestCode == reqPlayer && resultCode == RESULT_OK && data != null && data.hasExtra("tvUrl")) {
             val u = data.getStringExtra("tvUrl") ?: return
+            shown.firstOrNull { it.url == u }?.let { Zap.remember(shown, it) }   // [ZAP-2] ⏮ ⏭ también en el TV
             sendToTv(u, data.getStringExtra("tvName") ?: "Canal")
         }
     }
