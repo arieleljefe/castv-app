@@ -10,6 +10,9 @@ import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.PlaybackParams
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Equalizer
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -61,7 +64,8 @@ object PlayerCore {
     /** Lo que la pantalla recoge al volver a abrirse. */
     class Snapshot(
         val current: MediaItem, val list: List<MediaItem>, val index: Int, val queue: List<MediaItem>,
-        val repeat: Int, val fromQueue: Boolean, val sleepAfter: Boolean, val sleepAt: Long
+        val repeat: Int, val fromQueue: Boolean, val sleepAfter: Boolean, val sleepAt: Long,
+        val speed: Float = 1f, val speedTouched: Boolean = false   // [SINPANTALLA-1]
     )
 
     /** true mientras la música sigue sin MainActivity. */
@@ -76,6 +80,10 @@ object PlayerCore {
     private var hlFromQueue = false
     private var hlSleepAfter = false
     private var hlSleepAt = 0L          // SystemClock.elapsedRealtime() en que se apaga (0 = sin temporizador)
+    private var hlSpeed = 1f            // [SINPANTALLA-1] velocidad elegida en la pantalla (no se guarda en preferencias)
+    private var hlSpeedTouched = false
+    private var hlEq: Equalizer? = null
+    private var hlBass: BassBoost? = null
     private val main = Handler(Looper.getMainLooper())
     private var controlsReceiver: BroadcastReceiver? = null
     private var noisyReceiver: BroadcastReceiver? = null
@@ -84,7 +92,8 @@ object PlayerCore {
     /** MainActivity se cierra con música del teléfono sonando: la música sigue aquí. */
     fun handOff(
         ctx: Context, cur: MediaItem, list: List<MediaItem>, index: Int, queue: List<MediaItem>,
-        repeat: Int, fromQueue: Boolean, sleepAfter: Boolean, sleepAt: Long
+        repeat: Int, fromQueue: Boolean, sleepAfter: Boolean, sleepAt: Long,
+        speed: Float = 1f, speedTouched: Boolean = false
     ) {
         val mp = player ?: return
         appCtx = ctx.applicationContext
@@ -96,8 +105,11 @@ object PlayerCore {
         hlFromQueue = fromQueue
         hlSleepAfter = sleepAfter
         hlSleepAt = sleepAt
+        hlSpeed = speed
+        hlSpeedTouched = speedTouched
         headless = true
         bindListeners(mp)
+        if (prepared) { attachHlEffects(mp); applyHlSpeed(mp) }   // [SINPANTALLA-1] la pista que ya suena conserva ecualizador y velocidad
         registerReceivers()
         scheduleSleep()
         notifyNow()
@@ -112,7 +124,8 @@ object PlayerCore {
         unregisterReceivers()
         main.removeCallbacks(sleepRunnable)
         headless = false
-        return Snapshot(cur, ArrayList(hlList), hlIndex, ArrayList(hlQueue), hlRepeat, hlFromQueue, hlSleepAfter, hlSleepAt)
+        releaseHlEffects()   // [SINPANTALLA-1] la pantalla vuelve a poner los suyos
+        return Snapshot(cur, ArrayList(hlList), hlIndex, ArrayList(hlQueue), hlRepeat, hlFromQueue, hlSleepAfter, hlSleepAt, hlSpeed, hlSpeedTouched)
     }
 
     private fun bindListeners(mp: MediaPlayer) {
@@ -120,6 +133,8 @@ object PlayerCore {
             if (headless && player === p) {
                 prepared = true
                 try { p.start() } catch (e: Exception) { }
+                attachHlEffects(p)   // [SINPANTALLA-1]
+                applyHlSpeed(p)
                 notifyNow()
             }
         }
@@ -161,6 +176,7 @@ object PlayerCore {
         val ctx = appCtx ?: return
         val old = player
         player = null   // los avisos del reproductor anterior ya no cuentan
+        releaseHlEffects()   // [SINPANTALLA-1]
         try { old?.release() } catch (e: Exception) { }
         prepared = false
         pausedByFocus = false
@@ -191,7 +207,7 @@ object PlayerCore {
         val mp = player ?: return
         if (!prepared) return
         try {
-            if (mp.isPlaying) mp.pause() else { pausedByFocus = false; mp.start() }
+            if (mp.isPlaying) mp.pause() else { pausedByFocus = false; mp.start(); applyHlSpeed(mp) }
         } catch (e: Exception) { }
         notifyNow()
     }
@@ -207,6 +223,8 @@ object PlayerCore {
         headless = false
         main.removeCallbacks(sleepRunnable)
         unregisterReceivers()
+        releaseHlEffects()   // [SINPANTALLA-1]
+        hlSpeed = 1f; hlSpeedTouched = false
         try { mp?.release() } catch (e: Exception) { }
         if (ctx != null) {
             try {
@@ -221,6 +239,80 @@ object PlayerCore {
                 ctx.getSystemService(NotificationManager::class.java).notify(1, n)
             } catch (e: Exception) { }
         }
+    }
+
+    // ------------------------------------------------------------ [SINPANTALLA-1] Ecualizador y velocidad sin pantalla
+
+    private fun releaseHlEffects() {
+        try { hlEq?.release() } catch (e: Exception) { }
+        try { hlBass?.release() } catch (e: Exception) { }
+        hlEq = null
+        hlBass = null
+    }
+
+    /** Preset propio activo (nivel de cada banda), leído de las mismas preferencias que usa MainActivity ([EQ-PRE-1]). */
+    private fun userPresetLevels(sp: android.content.SharedPreferences): IntArray? {
+        val name = sp.getString("eq_user_on", "") ?: ""
+        if (name.isEmpty()) return null
+        try {
+            val arr = org.json.JSONArray(sp.getString("eq_user", "[]") ?: "[]")
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                if (o.getString("n") == name) {
+                    val l = o.getJSONArray("l")
+                    return IntArray(l.length()) { j -> l.getInt(j) }
+                }
+            }
+        } catch (e: Exception) { }
+        return null
+    }
+
+    /** Igual que attachEffects() de MainActivity: preset del sistema o propio y graves, desde las preferencias `castv`. */
+    private fun attachHlEffects(mp: MediaPlayer) {
+        releaseHlEffects()
+        val ctx = appCtx ?: return
+        val sp = ctx.getSharedPreferences("castv", Context.MODE_PRIVATE)
+        val preset = sp.getInt("eqPreset", -1)
+        val bassOn = sp.getBoolean("bassOn", false)
+        try {
+            val eq = Equalizer(0, mp.audioSessionId)
+            val n = eq.numberOfPresets.toInt()
+            val up = userPresetLevels(sp)
+            if (up != null) {
+                eq.setEnabled(true)
+                val lo = eq.bandLevelRange[0].toInt()
+                val hi = eq.bandLevelRange[1].toInt()
+                for (b in 0 until eq.numberOfBands.toInt()) {
+                    if (b < up.size) eq.setBandLevel(b.toShort(), up[b].coerceIn(lo, hi).toShort())
+                }
+            } else if (preset in 0 until n) {
+                eq.usePreset(preset.toShort())
+                eq.setEnabled(true)
+            } else {
+                eq.setEnabled(false)
+            }
+            hlEq = eq
+        } catch (e: Exception) {
+            hlEq = null
+        }
+        try {
+            val bb = BassBoost(0, mp.audioSessionId)
+            if (bassOn && bb.strengthSupported) {
+                bb.setStrength(800.toShort())
+                bb.setEnabled(true)
+            } else {
+                bb.setEnabled(false)
+            }
+            hlBass = bb
+        } catch (e: Exception) {
+            hlBass = null
+        }
+    }
+
+    /** Solo se toca la velocidad con el reproductor sonando (igual que applySpeed() de MainActivity). */
+    private fun applyHlSpeed(mp: MediaPlayer) {
+        if (!hlSpeedTouched) return
+        try { if (mp.isPlaying) mp.playbackParams = PlaybackParams().setSpeed(hlSpeed) } catch (e: Exception) { }
     }
 
     private fun scheduleSleep() {

@@ -673,7 +673,8 @@ class MainActivity : AppCompatActivity() {
                 releaseEffects()
                 PlayerCore.handOff(
                     applicationContext, curSong, playlist, playIndex, queue,
-                    repeatMode.ordinal, playingFromQueue, sleepAfterTrack, sleepAtMs
+                    repeatMode.ordinal, playingFromQueue, sleepAfterTrack, sleepAtMs,
+                    speed, speedTouched   // [SINPANTALLA-1]
                 )
                 handedOff = true
             } catch (e: Exception) { }
@@ -762,6 +763,7 @@ class MainActivity : AppCompatActivity() {
         repeatMode = Repeat.values().getOrElse(s.repeat) { Repeat.OFF }
         sleepAfterTrack = s.sleepAfter
         sleepAtMs = s.sleepAt
+        speed = s.speed; speedTouched = s.speedTouched   // [SINPANTALLA-1]
         val item = s.current
         playingItem = item
         Zap.nowTitle = null; linkOnTv = false; linkDurSec = 0
