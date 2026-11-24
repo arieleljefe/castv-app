@@ -1871,10 +1871,12 @@ class VideoPlayerActivity : AppCompatActivity() {
         val cur = items.getOrNull(index) ?: return
         if (cur.id == 0L) { toast("Los marcadores solo sirven en videos del teléfono"); return }
         val list = Store.marks(cur)
-        val labels = ArrayList<String>()
-        labels.add("➕ Añadir marcador aquí (" + fmt(curPos()) + ")")
-        for (m in list) labels.add("🔖 " + fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else ""))
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-8]
+        val ic = b.context
+        val labels = ArrayList<CharSequence>()
+        labels.add(CastvIcons.item(ic, R.drawable.ic_vp_add, "Añadir marcador aquí (" + fmt(curPos()) + ")"))
+        for (m in list) labels.add(CastvIcons.item(ic, R.drawable.ic_vp_bookmark, fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else "")))
+        b
             .setTitle("🔖 Marcadores")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == 0) askMarkName(cur) else markActions(cur, list[which - 1])
@@ -1907,9 +1909,11 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun markActions(cur: MediaItem, m: VideoMark) {
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-8]
+        val ic = b.context
+        b
             .setTitle("🔖 " + fmt(m.sec * 1000) + (if (m.name.isNotBlank()) " · " + m.name else ""))
-            .setItems(arrayOf("▶ Saltar aquí", "🗑 Borrar marcador")) { _, which ->
+            .setItems(arrayOf<CharSequence>(CastvIcons.item(ic, R.drawable.ic_vp_play, "Saltar aquí"), CastvIcons.item(ic, R.drawable.ic_vp_delete, "Borrar marcador"))) { _, which ->
                 if (which == 0) {
                     video.seekTo(m.sec * 1000)
                     showHud("⏩ " + fmt(m.sec * 1000))
