@@ -1521,10 +1521,12 @@ class M3uActivity : AppCompatActivity() {
     private fun isHls(url: String) = url.substringBefore('?').lowercase().endsWith(".m3u8")
 
     private fun openChannel(c: M3uChannel) {
-        val labels = arrayOf(
-            "📺 Al TV",   // [HLS-TEXTO-1] los canales HLS ya van bien al TV
-            "📱 En el teléfono")
-        AlertDialog.Builder(this)
+        val b = AlertDialog.Builder(this)   // [ICONOS-6]
+        val ic = b.context
+        val labels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_tv, "Al TV"),   // [HLS-TEXTO-1] los canales HLS ya van bien al TV
+            CastvIcons.item(ic, R.drawable.ic_vp_phone, "En el teléfono"))
+        b
             .setTitle(c.name)
             .setItems(labels) { _, which -> playChannel(c, which == 0) }
             .show()
