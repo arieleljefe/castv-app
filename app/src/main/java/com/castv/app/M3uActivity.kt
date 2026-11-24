@@ -23,6 +23,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.text.Normalizer
 import java.util.concurrent.Executors
@@ -1153,17 +1154,26 @@ class M3uActivity : AppCompatActivity() {
         hiddenBtn.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 
-    /** Siempre se pide confirmación antes de quitar un canal. */
+    /** [DESHACER-1] Ya no pregunta: quita el canal al momento y ofrece DESHACER unos segundos (también sigue el 👁). */
     private fun confirmHide(c: M3uChannel) {
-        val isFav = favs.contains(c.url)
-        AlertDialog.Builder(this)
-            .setTitle("¿Quitar este canal?")
-            .setMessage("«${c.name}» dejará de salir en tus listas, aunque la lista se vuelva a descargar." +
-                (if (isFav) "\n\nTambién se quitará de tus favoritos ★." else "") +
-                "\n\nPodrás devolverlo con el botón 👁.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Quitar") { _, _ -> hideChannel(c) }
+        val wasFav = favs.contains(c.url)
+        hideChannel(c)
+        Snackbar.make(findViewById<View>(android.R.id.content), "🗑 «${c.name}» quitado" + (if (wasFav) " (y de favoritos)" else ""), Snackbar.LENGTH_LONG)
+            .setAction("DESHACER") { undoHide(c, wasFav) }
             .show()
+    }
+
+    private fun undoHide(c: M3uChannel, wasFav: Boolean) {
+        Store.unhideChannels(listOf(c.url))
+        if (wasFav && !Store.chFavs().contains(c.url)) {
+            Store.toggleChFav(c.url)   // vuelve la ★ que se quitó al ocultarlo
+            Store.rememberChFav(c)
+        }
+        hidden = Store.hiddenUrls()
+        favs = Store.chFavs()
+        if (favOnly) reloadFavChannels()
+        applyFilter()
+        updateHiddenBtn()
     }
 
     private fun hideChannel(c: M3uChannel) {
@@ -1173,7 +1183,6 @@ class M3uActivity : AppCompatActivity() {
         if (favOnly) reloadFavChannels()
         applyFilter()
         updateHiddenBtn()
-        toast("🗑 Canal quitado (👁 para restaurar)")
     }
 
     private fun showHiddenDialog() {
