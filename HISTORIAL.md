@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v373
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v375
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -113,3 +113,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VOCABULARIO-3 · 24 nov · `VOCABULARIO.md` creado en la raíz del repo con los términos decididos · `VOCABULARIO.md`
 - EPG-BUSCAR-1 · 24 nov · con la guía activada, el buscador de Canales también encuentra por el programa que dan ahora (solo mira el programa si el nombre no coincidió); probado: Free-TV › Italia, «noti» → Mediaset Italia («Dentro La Notizia») · `M3uActivity.kt` (`applyFilter`)
 - TESTS-2 · 24 nov · 11 pruebas automáticas del respaldo (`BackupTest`: claves respaldadas, `scrub` sin enlaces con usuario y clave, unión de parciales, `describe`, `readLimited`); `keep/scrub/merge*` pasan a `internal` y `build.gradle` suma `org.json:json:20231013` para pruebas; build en verde · `Backup.kt`, `app/build.gradle`, `BackupTest.kt`
+- EPG-AGENDA-1 · 24 nov · en el reproductor, ⋯ › «📅 Guía: ahora y lo que sigue» muestra también «Más tarde:» con hasta 6 programas más («HH:MM  título») de las próximas ~24 h · `Epg.kt` (`upcoming`), `VideoPlayerActivity.kt` (`showGuideNow`)
