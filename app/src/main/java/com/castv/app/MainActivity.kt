@@ -3016,9 +3016,13 @@ class MainActivity : AppCompatActivity() {
             startPlayback(item, startAt)
         }
         if (saved >= 10) {
-            AlertDialog.Builder(this)
+            val bldRs = AlertDialog.Builder(this)   // [ICONOS-10]
+            val icRs = bldRs.context
+            bldRs
                 .setTitle(prettyTitle(item))
-                .setItems(arrayOf("⏩ Continuar desde ${fmt(saved)}", "↺ Desde el inicio")) { _, which ->
+                .setItems(arrayOf<CharSequence>(
+                    CastvIcons.item(icRs, R.drawable.ic_vp_play, "Continuar desde ${fmt(saved)}"),
+                    CastvIcons.item(icRs, R.drawable.ic_mn_replay, "Desde el inicio"))) { _, which ->
                     go(if (which == 0) saved else 0)
                 }
                 .show()
@@ -3191,10 +3195,12 @@ class MainActivity : AppCompatActivity() {
                 (if (skipped > 0) " · $skipped ya estaban" else ""))
         }
         val names = Store.listNames()
-        val labels = ArrayList<String>()
+        val bldAl = AlertDialog.Builder(this)   // [ICONOS-10]
+        val icAl = bldAl.context
+        val labels = ArrayList<CharSequence>()
         labels.addAll(names)
-        labels.add("➕ Nueva lista…")
-        AlertDialog.Builder(this)
+        labels.add(CastvIcons.item(icAl, R.drawable.ic_vp_add, "Nueva lista…"))
+        bldAl
             .setTitle("Añadir ${sel.size} a lista")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == names.size) promptNewList { n -> addAllTo(n) }
@@ -3451,36 +3457,38 @@ class MainActivity : AppCompatActivity() {
 
     /** Menú de una fila (botón ⋮). */
     private fun showItemMenu(item: MediaItem) {
-        val labels = ArrayList<String>()
+        val bldIt = AlertDialog.Builder(this)   // [ICONOS-10]
+        val icIt = bldIt.context
+        val labels = ArrayList<CharSequence>()
         val actions = ArrayList<() -> Unit>()
-        labels.add("➕ Añadir a la cola")
+        labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_queue_add, "Añadir a la cola"))
         actions.add {
             queue.add(item); updateQueueBadge(); toast("➕ En cola: ${prettyTitle(item)}")
         }
-        labels.add("⏭ Reproducir a continuación")
+        labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_skip_next, "Reproducir a continuación"))
         actions.add {
             queue.add(0, item); updateQueueBadge(); toast("⏭ Sonará después de este")
         }
-        labels.add(if (Store.isFav(item)) "★ Quitar de favoritos" else "☆ Añadir a favoritos")
+        labels.add(if (Store.isFav(item)) CastvIcons.item(icIt, R.drawable.ic_vp_star_border, "Quitar de favoritos") else CastvIcons.item(icIt, R.drawable.ic_vp_star, "Añadir a favoritos"))
         actions.add { toggleFav(item) }
-        labels.add("📃 Añadir a lista…")
+        labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_queue_music, "Añadir a lista…"))
         actions.add { addToListDialog(item) }
         selectedPlaylist?.let { pl ->
-            labels.add("➖ Quitar de «$pl»")
+            labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_remove, "Quitar de «$pl»"))
             actions.add { Store.removeFromList(pl, item); applyFilters() }
         }
-        labels.add("🗑 Eliminar del teléfono…")
+        labels.add(CastvIcons.item(icIt, R.drawable.ic_vp_delete, "Eliminar del teléfono…"))
         actions.add { confirmDelete(listOf(item)) }
         if (Store.resumeAt(item) >= 10) {
-            labels.add("↺ Olvidar el punto guardado")
+            labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_replay, "Olvidar el punto guardado"))
             actions.add { Store.clearResume(item); applyFilters() }
         }
         if (!item.isMusic) {   // [VISTO-1]
             val seen = Store.isSeen(item)
-            labels.add(if (seen) "👁 Marcar como no visto" else "👁 Marcar como visto")
+            labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_visibility, if (seen) "Marcar como no visto" else "Marcar como visto"))
             actions.add { Store.markSeen(item, !seen); refreshSeen() }   // [NOVISTOS-1]
         }
-        AlertDialog.Builder(this)
+        bldIt
             .setTitle(prettyTitle(item))
             .setItems(labels.toTypedArray()) { _, which -> actions[which]() }
             .show()
@@ -3769,11 +3777,13 @@ class MainActivity : AppCompatActivity() {
     private fun showUserPresets() {
         val list = readUserPresets()
         val on = activeUserPreset()?.first
-        val labels = ArrayList<String>()
+        val bldPs = AlertDialog.Builder(this)   // [ICONOS-10]
+        val icPs = bldPs.context
+        val labels = ArrayList<CharSequence>()
         for (p in list) labels.add((if (p.first == on) "✓ " else "") + p.first)
-        labels.add("➕ Nuevo preset…")
-        if (on != null) labels.add("⏹ Dejar de usar mi preset")
-        AlertDialog.Builder(this)
+        labels.add(CastvIcons.item(icPs, R.drawable.ic_vp_add, "Nuevo preset…"))
+        if (on != null) labels.add(CastvIcons.item(icPs, R.drawable.ic_mn_stop, "Dejar de usar mi preset"))
+        bldPs
             .setTitle("🎛 Mis presets")
             .setItems(labels.toTypedArray()) { _, which ->
                 when {
@@ -3907,10 +3917,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPlaylists() {
         val names = Store.listNames()
-        val labels = ArrayList<String>()
-        for (n in names) labels.add("📃 $n (${Store.listSize(n)})")
-        labels.add("➕ Nueva lista…")
-        AlertDialog.Builder(this)
+        val bldPl2 = AlertDialog.Builder(this)   // [ICONOS-10]
+        val icPl2 = bldPl2.context
+        val labels = ArrayList<CharSequence>()
+        for (n in names) labels.add(CastvIcons.item(icPl2, R.drawable.ic_mn_queue_music, "$n (${Store.listSize(n)})"))
+        labels.add(CastvIcons.item(icPl2, R.drawable.ic_vp_add, "Nueva lista…"))
+        bldPl2
             .setTitle("Mis listas")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == names.size) {
@@ -3948,10 +3960,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun addToListDialog(item: MediaItem) {
         val names = Store.listNames()
-        val labels = ArrayList<String>()
+        val bldAd = AlertDialog.Builder(this)   // [ICONOS-10]
+        val icAd = bldAd.context
+        val labels = ArrayList<CharSequence>()
         for (n in names) labels.add((if (Store.inList(n, item)) "✓ " else "") + n)
-        labels.add("➕ Nueva lista…")
-        AlertDialog.Builder(this)
+        labels.add(CastvIcons.item(icAd, R.drawable.ic_vp_add, "Nueva lista…"))
+        bldAd
             .setTitle("Añadir a lista")
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == names.size) {
