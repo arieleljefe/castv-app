@@ -1419,9 +1419,15 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     private fun showBackupMenu() {
-        AlertDialog.Builder(this)
+        val bldBk = AlertDialog.Builder(this)   // [ICONOS-9]
+        val icBk = bldBk.context
+        bldBk
             .setTitle("Respaldo")
-            .setItems(arrayOf("📤 Exportar respaldo", "📥 Importar respaldo", "📨 Compartir…", "🔁 Restaurar copia automática…")) { _, which ->
+            .setItems(arrayOf<CharSequence>(
+                CastvIcons.item(icBk, R.drawable.ic_mn_upload, "Exportar respaldo"),
+                CastvIcons.item(icBk, R.drawable.ic_mn_download, "Importar respaldo"),
+                CastvIcons.item(icBk, R.drawable.ic_mn_share, "Compartir…"),
+                CastvIcons.item(icBk, R.drawable.ic_mn_history, "Restaurar copia automática…"))) { _, which ->
                 when (which) {
                     2 -> showShareMenu()        // [AUTORESPALDO-1]
                     3 -> showAutoRestore()      // [AUTORESPALDO-1]
@@ -1572,9 +1578,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showShareMenu() {
-        AlertDialog.Builder(this)
+        val bldSh = AlertDialog.Builder(this)   // [ICONOS-9]
+        val icSh = bldSh.context
+        bldSh
             .setTitle("📨 Compartir")
-            .setItems(arrayOf("📦 Respaldo completo", "🕘 Solo historial", "⭐ Solo canales favoritos")) { _, which ->
+            .setItems(arrayOf<CharSequence>(
+                CastvIcons.item(icSh, R.drawable.ic_mn_archive, "Respaldo completo"),
+                CastvIcons.item(icSh, R.drawable.ic_mn_history, "Solo historial"),
+                CastvIcons.item(icSh, R.drawable.ic_vp_star, "Solo canales favoritos"))) { _, which ->
                 confirmShare(when (which) { 0 -> "full"; 1 -> "history"; else -> "favs" })
             }
             .setNegativeButton("Cerrar", null)
@@ -3775,9 +3786,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun userPresetMenu(name: String) {
-        AlertDialog.Builder(this)
+        val bldUp = AlertDialog.Builder(this)   // [ICONOS-9]
+        val icUp = bldUp.context
+        bldUp
             .setTitle(name)
-            .setItems(arrayOf("✅ Usar", "✏ Editar", "🗑 Eliminar")) { _, which ->
+            .setItems(arrayOf<CharSequence>(
+                CastvIcons.item(icUp, R.drawable.ic_mn_check, "Usar"),
+                CastvIcons.item(icUp, R.drawable.ic_mn_edit, "Editar"),
+                CastvIcons.item(icUp, R.drawable.ic_vp_delete, "Eliminar"))) { _, which ->
                 when (which) {
                     0 -> { setActiveUserPreset(name); toast("🎛 Usando «$name»") }
                     1 -> editUserPreset(name)
@@ -3907,9 +3923,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openPlaylistMenu(name: String) {
-        AlertDialog.Builder(this)
+        val bldPl = AlertDialog.Builder(this)   // [ICONOS-9]
+        val icPl = bldPl.context
+        bldPl
             .setTitle(name)
-            .setItems(arrayOf("📂 Abrir", "🗑 Quitar lista")) { _, which ->
+            .setItems(arrayOf<CharSequence>(
+                CastvIcons.item(icPl, R.drawable.ic_mn_folder_open, "Abrir"),
+                CastvIcons.item(icPl, R.drawable.ic_vp_delete, "Quitar lista"))) { _, which ->
                 if (which == 0) {
                     selectedPlaylist = name
                     viewMode = ViewMode.ALL
