@@ -67,9 +67,7 @@ jobs:
           fi
 
       - name: Pruebas automaticas (TESTS-1)
-        # continue-on-error: si fallan, se ve el aviso pero el APK se sigue construyendo.
-        # Cuando salgan en verde un par de veces, quitar esta linea para que bloqueen el build.
-        continue-on-error: true
+        # Si una prueba falla, el build se detiene antes de compilar el APK.
         run: |
           chmod +x gradlew
           ./gradlew testDebugUnitTest --stacktrace
