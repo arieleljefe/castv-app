@@ -83,6 +83,9 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var failBtn: TextView   // [FUENTES-1] "⚠ N": canales que fallan seguido (solo se ve si hay alguno)
     @Volatile private var failed: Map<String, Int> = emptyMap()   // [FUENTES-1] enlace → fallos seguidos (2 o más)
     private val reqPlayer = 4715
+    private val reqSave = 4716   // [M3U-EXPORT-1] «Guardar…» el .m3u de favoritos
+    private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
+    private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
     private var regionName: String? = null   // [EPG-REGION-1] región abierta (null con una lista suelta)
     private var regionLists: List<M3uList> = emptyList()   // [EPG-REGION-1]
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
@@ -236,6 +239,18 @@ class M3uActivity : AppCompatActivity() {
         iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         iconLabel(addBtn, R.drawable.ic_add, "Lista")
         iconLabel(delBtn, R.drawable.ic_delete, "Quitar")
+        // [M3U-EXPORT-1] solo se ve con ★ Favs activo: exporta los favoritos como .m3u
+        exportBtn = chip("📤") { exportFavsDialog() }
+        exportBtn.contentDescription = "Exportar favoritos como .m3u"
+        exportBtn.textSize = 13f
+        exportBtn.maxLines = 1
+        exportBtn.setPadding(dp(6), dp(8), dp(6), dp(8))
+        (exportBtn.layoutParams as LinearLayout.LayoutParams).apply {
+            width = 0
+            weight = 1f
+        }
+        exportBtn.visibility = View.GONE
+        row1.addView(exportBtn, 1)
         updateHiddenBtn()
         root.addView(row1)
 
@@ -1583,7 +1598,80 @@ class M3uActivity : AppCompatActivity() {
         favOnly = !favOnly
         if (favOnly) iconLabel(favBtn, R.drawable.ic_star, "Favs", accent()) else iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         if (favOnly) reloadFavChannels()   // [FAV-1]
+        exportBtn.visibility = if (favOnly) View.VISIBLE else View.GONE   // [M3U-EXPORT-1]
         applyFilter()
+    }
+
+    // ------------------------------------------------------------ [M3U-EXPORT-1] Exportar ★ Favoritos como .m3u
+
+    /** Arma el .m3u con los favoritos de todas las listas. Los canales con usuario y clave (Xtream) y los que no son http(s) se omiten; devuelve el texto y cuántos se omitieron. */
+    private fun favM3u(): Pair<String, Int> {
+        val leak = Xtream.leakFilter(this)
+        val sb = StringBuilder("#EXTM3U\n")
+        var skipped = 0
+        for (c in Store.chFavChannels()) {
+            val low = c.url.lowercase()
+            if (!(low.startsWith("http://") || low.startsWith("https://")) || leak(c.url)) { skipped++; continue }
+            val name = c.name.replace(Regex("[\\r\\n]+"), " ").trim().ifEmpty { "Canal" }
+            sb.append("#EXTINF:-1")
+            if (c.logo.startsWith("http", ignoreCase = true)) sb.append(" tvg-logo=\"").append(c.logo.replace("\"", "%22").replace(Regex("\\s"), "")).append("\"")
+            val g = c.group.replace(Regex("[\\r\\n]+"), " ").replace('"', '\'').trim()
+            if (g.isNotEmpty()) sb.append(" group-title=\"").append(g).append("\"")
+            sb.append(',').append(name).append('\n').append(c.url).append('\n')
+        }
+        return Pair(sb.toString(), skipped)
+    }
+
+    private fun exportFavsDialog() {
+        val (text, skipped) = favM3u()
+        val n = text.lineSequence().count { it.startsWith("#EXTINF") }
+        if (n == 0) {
+            toast(if (skipped > 0) "Tus favoritos son de Xtream (llevan usuario y clave): no se exportan" else "Aún no tienes favoritos")
+            return
+        }
+        val extra = if (skipped > 0) "\n\n$skipped canal(es) no se incluyen (Xtream: llevan usuario y clave)." else ""
+        AlertDialog.Builder(this)
+            .setTitle("📤 Exportar favoritos")
+            .setMessage("$n canales en un archivo .m3u.$extra")
+            .setPositiveButton("Compartir") { _, _ -> shareFavM3u(text) }
+            .setNeutralButton("Guardar…") { _, _ -> saveFavM3u(text) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun shareFavM3u(text: String) {
+        try {
+            val dir = File(cacheDir, "share")
+            dir.mkdirs()
+            val f = File(dir, "castv-favoritos.m3u")
+            f.writeText(text, Charsets.UTF_8)
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.shareprovider", f)
+            val i = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/x-mpegurl"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = android.content.ClipData.newRawUri("", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(i, "Compartir favoritos"))
+        } catch (e: Exception) {
+            toast("No se pudo compartir el archivo")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun saveFavM3u(text: String) {
+        exportPending = text
+        val i = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "audio/x-mpegurl"
+            putExtra(Intent.EXTRA_TITLE, "castv-favoritos.m3u")
+        }
+        try {
+            startActivityForResult(i, reqSave)
+        } catch (e: Exception) {
+            exportPending = null
+            toast("No se pudo abrir el selector de archivos")
+        }
     }
 
     /** [FAV-1] Vuelve a leer los favoritos de todas las listas (con su nombre). */
@@ -1701,6 +1789,20 @@ class M3uActivity : AppCompatActivity() {
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == reqSave) {   // [M3U-EXPORT-1]
+            val text = exportPending
+            exportPending = null
+            val uri = data?.data
+            if (resultCode == RESULT_OK && uri != null && text != null) {
+                try {
+                    contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                    toast("✅ Favoritos guardados")
+                } catch (e: Exception) {
+                    toast("No se pudo guardar el archivo")
+                }
+            }
+            return
+        }
         // 📺 pulsado dentro del reproductor del móvil: se manda ese mismo canal al TV
         if (requestCode == reqPlayer && resultCode == RESULT_OK && data != null && data.hasExtra("tvUrl")) {
             val u = data.getStringExtra("tvUrl") ?: return
