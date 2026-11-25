@@ -114,7 +114,8 @@ class MainActivity : AppCompatActivity() {
     private enum class Repeat { OFF, ALL, ONE }
 
     private enum class ViewMode(val label: String) {
-        ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar")
+        ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar"),
+        GROUPS("Ver: Álbumes / carpetas"), LISTS("Ver: Listas")   // [TABS-1]
     }
 
     // Salida de la música: false = TV, true = el propio teléfono (los videos siempre van al TV)
@@ -199,6 +200,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var viewMode = ViewMode.ALL
+    private var groupReturn: ViewMode? = null   // [TABS-1] pestaña (Álbumes/Carpetas/Listas) a la que vuelve ✕ o Atrás
+    private var groupsShown = false             // [TABS-1] la lista muestra grupos y no archivos
+    private val groupAdapter by lazy { GroupAdapter() }   // [TABS-1]
     private var onlyUnseen = false   // [NOVISTOS-1] filtro "solo no vistos" (solo videos; no se guarda)
     private var dupIds: Set<Long> = emptySet()               // copias repetidas (se conserva la más antigua)
     private val queue = ArrayList<MediaItem>()               // cola: suena antes de seguir con la lista
@@ -449,14 +453,14 @@ class MainActivity : AppCompatActivity() {
         navFolders.setOnClickListener { runMenuAction(16) }   // [UI-5] Canales
         navQueue.setOnClickListener { showQueue() }
         navMore.setOnClickListener { showMoreSheet() }   // [UI-1]
-        tabAll.setOnClickListener { viewMode = ViewMode.ALL; applyFilters() }
-        tabFavs.setOnClickListener { viewMode = ViewMode.FAVS; applyFilters() }
-        tabResume.setOnClickListener { viewMode = ViewMode.RESUME; applyFilters() }
+        tabAll.setOnClickListener { groupReturn = null; viewMode = ViewMode.ALL; applyFilters() }
+        tabFavs.setOnClickListener { groupReturn = null; resetFilters(); viewMode = ViewMode.GROUPS; applyFilters() }   // [TABS-1] Álbumes / Carpetas
+        tabResume.setOnClickListener { groupReturn = null; resetFilters(); viewMode = ViewMode.LISTS; applyFilters() }   // [TABS-1] Listas
         fab.setOnClickListener { shuffleAndPlay() }
         tvFilter.setOnClickListener { clearFilters() }
         listFiles.setOnScrollListener(object : AbsListView.OnScrollListener {
             override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) {
-                setFabShown(scrollState == AbsListView.OnScrollListener.SCROLL_STATE_IDLE)
+                setFabShown(scrollState == AbsListView.OnScrollListener.SCROLL_STATE_IDLE && !groupsShown)
             }
             override fun onScroll(view: AbsListView?, firstVisibleItem: Int, visibleItemCount: Int, totalItemCount: Int) {}
         })
@@ -591,12 +595,20 @@ class MainActivity : AppCompatActivity() {
 
         listFiles.setOnItemClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
+            if (groupsShown) {   // [TABS-1]
+                groupAdapter.rows.getOrNull(idx)?.let { openGroup(it) }
+                return@setOnItemClickListener
+            }
             if (idx in currentList.indices) {
                 if (selecting) toggleSelect(currentList[idx]) else playFromList(idx)
             }
         }
         listFiles.setOnItemLongClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
+            if (groupsShown) {   // [TABS-1] mantener pulsada una lista: Abrir / Quitar lista
+                groupAdapter.rows.getOrNull(idx)?.let { if (it.kind == 2) openPlaylistMenu(it.key) }
+                return@setOnItemLongClickListener true
+            }
             if (idx in currentList.indices) {
                 if (selecting) toggleSelect(currentList[idx]) else startSelection(currentList[idx])
             }
@@ -886,6 +898,7 @@ class MainActivity : AppCompatActivity() {
                     selectedFolder = null
                     selectedArtist = null
                     selectedAlbum = null
+                    groupReturn = null   // [TABS-1]
                 }
                 applyFilters()
                 updateTabs()
@@ -939,6 +952,17 @@ class MainActivity : AppCompatActivity() {
     private fun naturalCompare(a: String, b: String): Int = CastvText.naturalCompare(a, b)
 
     private fun applyFilters() {
+        // [TABS-1] con un filtro elegido (artista, carpeta, lista…) se sale de las pestañas de grupos
+        if (inGroups() && groupReturn == null &&
+            (selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null || onlyUnseen)) {
+            viewMode = ViewMode.ALL
+        }
+        if (inGroups()) { showGroups(); return }
+        if (groupsShown) {
+            groupsShown = false
+            listFiles.adapter = adapter
+            setFabShown(true)
+        }
         var list = allItems
         selectedFolder?.let { f -> list = list.filter { it.folder == f } }
         selectedArtist?.let { ar -> list = list.filter { it.artist == ar } }
@@ -949,7 +973,7 @@ class MainActivity : AppCompatActivity() {
         when (viewMode) {
             ViewMode.FAVS -> list = list.filter { Store.isFav(it) }
             ViewMode.RESUME -> list = list.filter { Store.resumeAt(it) >= 10 }
-            ViewMode.ALL -> {}
+            else -> {}
         }
         if (query.isNotEmpty()) {
             val toks = norm(query).split(' ').filter { it.isNotEmpty() }
@@ -1036,20 +1060,122 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasActiveFilter(): Boolean =
-        selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null
+        selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null ||
+            viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME   // [TABS-1]
 
-    private fun clearFilters() {
+    private fun resetFilters() {
         selectedFolder = null
         selectedArtist = null
         selectedAlbum = null
         selectedPlaylist = null
         onlyUnseen = false   // [NOVISTOS-1]
+    }
+
+    private fun clearFilters() {
+        resetFilters()
+        if (viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME) viewMode = ViewMode.ALL   // [TABS-1]
+        groupReturn?.let { viewMode = it }   // [TABS-1] volver a Álbumes / Carpetas / Listas
+        groupReturn = null
+        applyFilters()
+    }
+
+    // ------------------------------------------- [TABS-1] Álbumes, Carpetas y Listas
+
+    private class GroupRow(val kind: Int, val title: String, val sub: String, val rep: MediaItem?, val key: String)
+
+    private fun inGroups(): Boolean = viewMode == ViewMode.GROUPS || viewMode == ViewMode.LISTS
+
+    private fun countLabel(n: Int, one: String, many: String): String = if (n == 1) "1 $one" else "$n $many"
+
+    /** Arma las filas de la pestaña Álbumes (música), Carpetas (videos) o Listas. */
+    private fun showGroups() {
+        val base = if (Store.hideDups) allItems.filter { it.id !in dupIds } else allItems
+        val unit1 = if (showingMusic) "pista" else "video"
+        val unitN = if (showingMusic) "pistas" else "videos"
+        var rows = ArrayList<GroupRow>()
+        if (viewMode == ViewMode.LISTS) {
+            for (n in Store.listNames()) {
+                val members = base.filter { Store.inList(n, it) }
+                rows.add(GroupRow(2, n, if (members.isEmpty()) "Vacía" else countLabel(members.size, unit1, unitN), members.firstOrNull(), n))
+            }
+        } else if (showingMusic) {
+            val byAlbum = base.filter { it.album.isNotBlank() }.groupBy { it.album }
+            for (name in byAlbum.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }) {
+                val items = byAlbum[name] ?: continue
+                val artists = items.map { it.artist }.filter { it.isNotBlank() }.distinct()
+                val total = items.sumOf { it.durationSec }
+                val parts = ArrayList<String>()
+                if (artists.size == 1) parts.add(artists[0]) else if (artists.size > 1) parts.add("Varios artistas")
+                parts.add(countLabel(items.size, unit1, unitN))
+                if (total > 0) parts.add(fmt(total))
+                rows.add(GroupRow(0, name, parts.joinToString("  ·  "), items.first(), name))
+            }
+        } else {
+            val byFolder = base.groupBy { it.folder }
+            for (f in byFolder.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }) {
+                val items = byFolder[f] ?: continue
+                rows.add(GroupRow(1, f.substringAfterLast('/'), countLabel(items.size, unit1, unitN) + "  ·  " + f, items.first(), f))
+            }
+        }
+        val q = norm(query).trim()
+        if (q.isNotEmpty()) rows = ArrayList(rows.filter { norm(it.title + " " + it.sub).contains(q) })
+        if (viewMode == ViewMode.LISTS && q.isEmpty()) rows.add(GroupRow(3, "＋ Nueva lista", "Crea una lista de reproducción", null, ""))
+
+        if (!groupsShown) {
+            groupsShown = true
+            listFiles.adapter = groupAdapter
+        }
+        groupAdapter.rows = rows
+        groupAdapter.notifyDataSetChanged()
+        tvEmptyAction.visibility = View.GONE
+        if (rows.isEmpty()) {
+            tvEmpty.text = when {
+                !hasMediaPermission() -> "Falta el permiso para leer tus archivos.\nActívalo en Ajustes › Apps › CASTV › Permisos."
+                q.isNotEmpty() -> "Sin resultados para «$query»."
+                viewMode == ViewMode.GROUPS && showingMusic -> "Tus archivos no traen el dato del álbum."
+                else -> "No se encontraron videos en el teléfono."
+            }
+            tvEmpty.visibility = View.VISIBLE
+            if (footerAttached) {
+                listFiles.removeFooterView(footerView)
+                footerAttached = false
+            }
+        } else {
+            tvEmpty.visibility = View.GONE
+            if (!footerAttached) {
+                listFiles.addFooterView(footerView, null, false)
+                footerAttached = true
+            }
+        }
+        setFabShown(false)
+        updateTabs()
+        updateFilterChip()
+    }
+
+    /** Toca una fila de grupo: abre sus archivos (Atrás o ✕ vuelve a la pestaña). */
+    private fun openGroup(g: GroupRow) {
+        when (g.kind) {
+            0 -> selectedAlbum = g.key
+            1 -> selectedFolder = g.key
+            2 -> selectedPlaylist = g.key
+            else -> {
+                promptNewList { n ->
+                    toast("Lista «$n» creada. Añade pistas con ⋮ › Añadir a lista")
+                    applyFilters()
+                }
+                return
+            }
+        }
+        groupReturn = viewMode
+        viewMode = ViewMode.ALL
         applyFilters()
     }
 
     /** Etiqueta con los filtros activos; al tocarla se quitan todos. */
     private fun updateFilterChip() {
         val parts = ArrayList<String>()
+        if (viewMode == ViewMode.FAVS) parts.add("⭐ Favoritos")   // [TABS-1]
+        if (viewMode == ViewMode.RESUME) parts.add("⏩ Continuar")   // [TABS-1]
         selectedFolder?.let { parts.add("📁 " + it.substringAfterLast('/')) }
         selectedArtist?.let { parts.add("🎤 $it") }
         selectedAlbum?.let { parts.add("💿 $it") }
@@ -1175,8 +1301,10 @@ class MainActivity : AppCompatActivity() {
         }
         tabAll.text = if (showingMusic) "PISTAS" else "VIDEOS"
         tab(tabAll, viewMode == ViewMode.ALL)
-        tab(tabFavs, viewMode == ViewMode.FAVS)
-        tab(tabResume, viewMode == ViewMode.RESUME)
+        tabFavs.text = if (showingMusic) "ÁLBUMES" else "CARPETAS"   // [TABS-1] antes FAVORITOS
+        tabResume.text = "LISTAS"                                     // [TABS-1] antes CONTINUAR
+        tab(tabFavs, viewMode == ViewMode.GROUPS)
+        tab(tabResume, viewMode == ViewMode.LISTS)
     }
 
     private fun toggleSearch() {
@@ -1256,6 +1384,8 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 19, 11, "🕵️‍♂️ Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
         if (!showingMusic) menu.add(0, 20, 11, "👁 No vistos: " + (if (onlyUnseen) "Solo no vistos" else "Todos"))   // [NOVISTOS-1]
         menu.add(0, 21, 11, "Lo más visto")   // [TOP-1]
+        menu.add(0, 22, 11, "Favoritos: " + allItems.count { Store.isFav(it) })   // [TABS-1]
+        menu.add(0, 23, 11, "Continuar: " + allItems.count { Store.resumeAt(it) >= 10 })   // [TABS-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -1297,6 +1427,8 @@ class MainActivity : AppCompatActivity() {
                 updateIncogBadge()   // [INCOG-2]
             }
             21 -> showTop()   // [TOP-1]
+            22 -> { groupReturn = null; viewMode = ViewMode.FAVS; applyFilters() }   // [TABS-1]
+            23 -> { groupReturn = null; viewMode = ViewMode.RESUME; applyFilters() }   // [TABS-1]
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
                 else { onlyUnseen = !onlyUnseen; applyFilters() }
@@ -1320,7 +1452,7 @@ class MainActivity : AppCompatActivity() {
 
         val groups = ArrayList<Pair<String, List<Int>>>()
         groups.add("Reproducir y canales" to listOf(15, 18, 10, 3))
-        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21))
+        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21, 22, 23))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
         val inSettings = setOf(11, 12, 13, 14, 16, 17)   // [UI-1b] viven en la pantalla Ajustes
@@ -1370,6 +1502,8 @@ class MainActivity : AppCompatActivity() {
                     15 -> R.drawable.ic_mas_link
                     18 -> R.drawable.ic_mas_folder
                     21 -> R.drawable.ic_mas_list   // [TOP-1]
+                    22 -> R.drawable.ic_vp_star   // [TABS-1]
+                    23 -> R.drawable.ic_vp_play   // [TABS-1]
                     else -> R.drawable.ic_nav_more
                 }
                 val row = android.widget.LinearLayout(this).apply {
@@ -4001,6 +4135,7 @@ class MainActivity : AppCompatActivity() {
                 CastvIcons.item(icPl, R.drawable.ic_vp_delete, "Quitar lista"))) { _, which ->
                 if (which == 0) {
                     selectedPlaylist = name
+                    groupReturn = if (inGroups()) viewMode else null   // [TABS-1]
                     viewMode = ViewMode.ALL
                     applyFilters()
                 } else {
@@ -4008,6 +4143,8 @@ class MainActivity : AppCompatActivity() {
                     if (selectedPlaylist == name) {
                         selectedPlaylist = null
                         applyFilters()
+                    } else if (groupsShown) {
+                        applyFilters()   // [TABS-1] repinta la pestaña Listas
                     }
                     toast("Lista quitada")
                 }
@@ -4194,6 +4331,41 @@ class MainActivity : AppCompatActivity() {
             action.visibility = View.VISIBLE
             v.findViewById<View>(R.id.itemRow).setBackgroundResource(
                 if (isPlaying || sel) R.drawable.item_bg_playing else R.drawable.item_bg)
+            return v
+        }
+    }
+
+    /** [TABS-1] Filas de Álbumes / Carpetas / Listas. */
+    private inner class GroupAdapter : BaseAdapter() {
+        var rows: List<GroupRow> = emptyList()
+
+        override fun getCount() = rows.size
+        override fun getItem(position: Int) = rows[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val v = convertView ?: LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_group, parent, false)
+            val g = rows[position]
+            v.findViewById<TextView>(R.id.groupTitle).text = g.title
+            v.findViewById<TextView>(R.id.groupSub).text = g.sub
+            val icon = v.findViewById<ImageView>(R.id.groupIcon)
+            icon.setImageResource(when (g.kind) {
+                0 -> R.drawable.ic_mas_album
+                1 -> R.drawable.ic_mas_folder
+                3 -> R.drawable.ic_vp_add
+                else -> R.drawable.ic_mas_list
+            })
+            icon.setColorFilter(if (g.kind == 3) accentColor() else col(R.color.vlc_muted))
+            val thumb = v.findViewById<ImageView>(R.id.groupThumb)
+            val rep = g.rep
+            if (rep != null) {
+                bindThumb(rep, thumb)
+            } else {
+                thumb.tag = null
+                thumb.setImageDrawable(null)
+                thumb.visibility = View.GONE
+            }
             return v
         }
     }
