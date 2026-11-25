@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v420
+# CASTV: CHANGELOG (cerebro) · v421
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -93,6 +93,7 @@ rm -f ~/storage/downloads/*_actual.*
 ## 4. ESTADO VIVO
 
 ### ▶ RETOMAR AQUÍ (24 nov 2026, noche)
+- **LIVE-3 · 🧪 (24 nov, noche; Ariel: «rastrea bien el error y démosle solución»; entra en `v3.13`):** Qué: el canal de todos los días (Cartoon Network HD, `15.204.246.24:8080`, con el audio en lista aparte) abre en el TV pero a los 30-60 s sale «error de red»; en el teléfono solo va bien. Causa (del `/log` y de `MediaServer.kt`): en cada fragmento se bajaba primero el video y después el audio, en fila (con hasta 2 s de espera y 3 reintentos aunque diera 404), y el servidor solo guarda ~4 fragmentos; el canal se atrasaba, los fragmentos viejos daban 404 (cada uno tardaba ~2 s en saltarse), se llegaba a 25 s sin datos («atasco») y el TV cortaba. Cambios: (1) audio y video se bajan a la vez (hilo `castv-live-audio`); (2) un 404/410 ya no se reintenta (video y audio, se salta enseguida); (3) si la cola crece (atraso de 3 o más fragmentos) se salta a los 2 más nuevos (`LIVE atrasado`). Archivos: `MediaServer.kt` (parche `live3.patch`). Cómo probar: el teléfono tiene `v3.12` (sin CALIDAD-1), así que hace falta la etiqueta: con el build de `main` en verde, `git tag v3.13 && git push origin v3.13`, actualizar desde Ajustes › Actualizaciones y dejar el canal en el TV 3 minutos o más; en el `/log` deben salir «audio+video» y no series de 404; si se atrasa, «LIVE atrasado» y sigue. Riesgos: al saltar fragmentos el TV puede dar un tirón de 1-2 s; sin compilador local (R4: si falla el build, pasar el mensaje de GitHub Actions). Siguiente: ✅ con el «ya funciona» de Ariel; EPG-RECORDA-1 queda en pausa hasta entonces.
 - **LOTE v3.13 (24 nov; Ariel: «me gustan todas»; archivos recibidos y código revisado, 24 nov noche).** «Dale» recibido («Sigamos», 24 nov): orden CALIDAD-1 › EPG-RECORDA-1 › TOP-1, un parche por ítem. Etiqueta `v3.13` al cerrar el lote (R12).
   1. **CAIDOS-1 · ⛔ ya existe (24 nov):** tras 🔎 Revisar, `finishCheck()` ofrece «Ocultar» todos o «Ver cuáles»; además el botón ⚠ «N fallan» (`showFailedDialog()`). Sin parche.
   2. **TEMP-TV-1 · ⛔ ya existe (24 nov):** `pauseAll()` manda Pause al TV cuando no hay reproducción local, y `checkSleep()` corre en el bucle del TV. Duda sin confirmar: en canales en vivo el TV podría ignorar Pause (habría que mandar Stop). Solo si Ariel lo ve fallar.
