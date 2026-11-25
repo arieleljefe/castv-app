@@ -620,6 +620,7 @@ class MainActivity : AppCompatActivity() {
         updateQueueBadge()
         if (savedInstanceState == null) {   // [ATAJOS-1] abierta desde un atajo del icono (no al recrearse)
             pendingShortcut = intent?.action?.takeIf { it.startsWith("com.castv.app.SC_") }
+            handleReminderTap(intent)   // [AVISO-TV-1]
         }
         registerShortcuts()   // [ATAJOS-1]
         checkPermissionsAndStart()
@@ -671,6 +672,31 @@ class MainActivity : AppCompatActivity() {
             pendingShortcut = a
             if (monitoring) applyPendingShortcut()
         }
+        handleReminderTap(intent)   // [AVISO-TV-1]
+    }
+
+    /** [AVISO-TV-1] Se tocó el aviso de un programa (EPG-RECORDA-1). Con la salida en TV el canal se manda al TV (si el TV
+     *  no aparece en 6 s o no lo acepta, se abre en el teléfono y se avisa); con la salida en Teléfono, igual que antes. */
+    private fun handleReminderTap(i: Intent?) {
+        if (i == null) return
+        val url = i.getStringExtra("remind_url") ?: return
+        val ch = i.getStringExtra("remind_title") ?: "Canal"
+        i.removeExtra("remind_url")   // que no se repita al girar o volver
+        if (outPhone) { openReminderOnPhone(url, ch); return }
+        toast("📺 Abriendo $ch en el TV…")
+        thread {
+            var tries = 0
+            while (TvController.tvIp == null && tries < 12) { try { Thread.sleep(500) } catch (e: InterruptedException) { return@thread }; tries++ }
+            val why = if (TvController.tvIp == null) "TV no encontrado" else Zap.sendUrl(applicationContext, ch, url)
+            if (why != null) {
+                DebugLog.add("AVISO-TV: $ch: $why")
+                runOnUiThread { toast("⚠️ $why. Se abre en el teléfono"); openReminderOnPhone(url, ch) }
+            }
+        }
+    }
+
+    private fun openReminderOnPhone(url: String, ch: String) {
+        try { startActivity(Intent(this, VideoPlayerActivity::class.java).putExtra("url", url).putExtra("urlTitle", ch)) } catch (e: Exception) { }
     }
 
     override fun onDestroy() {

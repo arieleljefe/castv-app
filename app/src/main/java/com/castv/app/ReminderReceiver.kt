@@ -27,7 +27,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
 /** [EPG-RECORDA-1] Avisos de programas. Se anotan en las preferencias `castv_remind` (no entran en los respaldos) y se
  *  programan con una alarma inexacta de Android: no hace falta el permiso de alarmas exactas, así que pueden llegar con
- *  unos minutos de retraso, y se pierden si se reinicia el teléfono. Tocar el aviso abre el canal en el reproductor. */
+ *  unos minutos de retraso, y se pierden si se reinicia el teléfono. Tocar el aviso abre el canal en el TV (salida TV) o en el reproductor del teléfono [AVISO-TV-1]. */
 object Reminders {
     private const val CHANNEL = "castv_avisos"
     private const val PREFS = "castv_remind"
@@ -102,9 +102,10 @@ object Reminders {
             if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
                 nm.createNotificationChannel(NotificationChannel(CHANNEL, "Avisos de programas", NotificationManager.IMPORTANCE_HIGH))
             }
-            val open = Intent(ctx, VideoPlayerActivity::class.java)
-                .putExtra("url", url).putExtra("urlTitle", ch)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // [AVISO-TV-1] el aviso abre MainActivity, que decide: salida TV → el canal va al TV; salida Teléfono → reproductor del teléfono
+            val open = Intent(ctx, MainActivity::class.java)
+                .putExtra("remind_url", url).putExtra("remind_title", ch)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             val tap = PendingIntent.getActivity(ctx, code(url, start), open, flags())
             val n = NotificationCompat.Builder(ctx, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
