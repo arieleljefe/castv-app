@@ -1137,12 +1137,46 @@ class VideoPlayerActivity : AppCompatActivity() {
             sb.append("\n\nMás tarde:")
             for (p in rest) sb.append("\n").append(Epg.hhmm(p.start)).append("  ").append(p.title)
         }
-        AlertDialog.Builder(this)
+        val gb = AlertDialog.Builder(this)
             .setTitle(c.name)
             .setMessage(sb.toString())
             .setPositiveButton("Cerrar", null)
+        // [EPG-RECORDA-1] con programas por venir, «⏰ Avisarme» deja elegir uno para que llegue un aviso a su hora
+        val nowMs = System.currentTimeMillis()
+        val future = (listOfNotNull(nn.second) + rest).filter { it.start > nowMs }
+        if (future.isNotEmpty()) gb.setNeutralButton("⏰ Avisarme") { _, _ -> showRemindPicker(c, future) }
+        gb.show()
+        keepControls()
+    }
+
+    /** [EPG-RECORDA-1] Programas que vienen: al tocar uno se pone el aviso (⏰) o se quita si ya lo tenía. */
+    private fun showRemindPicker(c: M3uChannel, progs: List<Epg.Prog>) {
+        val labels = progs.map { p ->
+            (if (Reminders.has(this, c.url, p.start)) "⏰ " else "      ") + Epg.hhmm(p.start) + "  " + p.title
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("⏰ Avisarme · " + c.name)
+            .setItems(labels) { _, which -> remindToggle(c, progs[which]) }
+            .setNegativeButton("Cerrar", null)
             .show()
         keepControls()
+    }
+
+    private fun remindToggle(c: M3uChannel, p: Epg.Prog) {
+        if (Reminders.has(this, c.url, p.start)) {
+            Reminders.remove(this, c.url, p.start)
+            toast("Aviso quitado: " + p.title)
+            return
+        }
+        if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 41)
+            }
+            toast("Activa las notificaciones de CASTV y vuelve a tocar el programa")
+            return
+        }
+        if (Reminders.add(this, c.name, c.url, p.title, p.start)) toast("⏰ Te aviso a las " + Epg.hhmm(p.start) + ": " + p.title)
+        else toast("No se pudo programar el aviso")
     }
 
     // ------------------------------------------------------------ [FAV-REPRO-1] ★ en el reproductor
