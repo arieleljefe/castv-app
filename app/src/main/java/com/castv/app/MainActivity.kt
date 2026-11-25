@@ -1255,6 +1255,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
         menu.add(0, 19, 11, "🕵️‍♂️ Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
         if (!showingMusic) menu.add(0, 20, 11, "👁 No vistos: " + (if (onlyUnseen) "Solo no vistos" else "Todos"))   // [NOVISTOS-1]
+        menu.add(0, 21, 11, "Lo más visto")   // [TOP-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -1295,6 +1296,7 @@ class MainActivity : AppCompatActivity() {
                       else "🕵️‍♂️ Incógnito desactivado")
                 updateIncogBadge()   // [INCOG-2]
             }
+            21 -> showTop()   // [TOP-1]
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
                 else { onlyUnseen = !onlyUnseen; applyFilters() }
@@ -1318,7 +1320,7 @@ class MainActivity : AppCompatActivity() {
 
         val groups = ArrayList<Pair<String, List<Int>>>()
         groups.add("Reproducir y canales" to listOf(15, 18, 10, 3))
-        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20))
+        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
         val inSettings = setOf(11, 12, 13, 14, 16, 17)   // [UI-1b] viven en la pantalla Ajustes
@@ -1367,6 +1369,7 @@ class MainActivity : AppCompatActivity() {
                     10 -> R.drawable.ic_tv
                     15 -> R.drawable.ic_mas_link
                     18 -> R.drawable.ic_mas_folder
+                    21 -> R.drawable.ic_mas_list   // [TOP-1]
                     else -> R.drawable.ic_nav_more
                 }
                 val row = android.widget.LinearLayout(this).apply {
@@ -1415,6 +1418,55 @@ class MainActivity : AppCompatActivity() {
             sheet.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
         }
         sheet.show()
+    }
+
+    // ------------------------------------------- [TOP-1] Lo más visto
+
+    /** [TOP-1] Más › «Lo más visto»: los 10 de música y los 10 de video del teléfono con más reproducciones
+     *  (`castv_stats`). Los canales no se cuentan. Tocar uno lo reproduce. */
+    private fun showTop() {
+        toast("Buscando lo más visto…")
+        thread {
+            val hide = hiddenFolderSet()
+            fun top(all: List<MediaItem>): List<MediaItem> = all
+                .filter { it.folder !in hide && Store.playCount(it) > 0 }
+                .distinctBy { Store.key(it) }
+                .sortedWith(compareByDescending<MediaItem> { Store.playCount(it) }.thenByDescending { Store.watchSec(it) })
+                .take(10)
+            val m = try { top(MediaScanner.scanMusic(this)) } catch (e: Exception) { emptyList() }
+            val v = try { top(MediaScanner.scanVideos(this)) } catch (e: Exception) { emptyList() }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                if (m.isEmpty() && v.isEmpty()) {
+                    toast("Aún no hay reproducciones guardadas (en incógnito no se cuentan)")
+                } else {
+                    val startMusic = if (showingMusic) (m.isNotEmpty() || v.isEmpty()) else v.isEmpty()
+                    showTopDialog(startMusic, m, v)
+                }
+            }
+        }
+    }
+
+    private fun showTopDialog(music: Boolean, m: List<MediaItem>, v: List<MediaItem>) {
+        val list = if (music) m else v
+        val labels = list.mapIndexed { i, p ->
+            val n = Store.playCount(p)
+            val w = Store.watchSec(p)
+            "${i + 1}. ${prettyTitle(p)}\n     " + (if (n == 1) "1 reproducción" else "$n reproducciones") +
+                (if (w > 0) " · ${fmt(w)} vistos" else "")
+        }.toTypedArray()
+        val b = AlertDialog.Builder(this)
+            .setTitle(if (music) "🎵 Lo más escuchado" else "🎬 Lo más visto")
+            .setItems(labels) { _, idx ->
+                playlist = ArrayList(list)
+                playIndex = idx
+                playingFromQueue = false
+                startPlayback(list[idx], 0)
+            }
+            .setNegativeButton("Cerrar", null)
+        val other = if (music) v else m
+        if (other.isNotEmpty()) b.setNeutralButton(if (music) "🎬 Videos" else "🎵 Música") { _, _ -> showTopDialog(!music, m, v) }
+        b.show()
     }
 
     // ------------------------------------------- Respaldo (exportar / importar)
