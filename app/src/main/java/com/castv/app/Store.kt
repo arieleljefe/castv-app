@@ -26,6 +26,7 @@ object Store {
     private lateinit var resumePrefs: SharedPreferences
     private lateinit var statsPrefs: SharedPreferences
     private lateinit var badPrefs: SharedPreferences   // [ATOMIC-1] copias de texto ilegible
+    private lateinit var topPrefs: SharedPreferences   // [TOP-CANALES-1] veces que se abrió cada canal (fuera de respaldos)
     private var favs: MutableSet<String> = HashSet()
     private var lists: LinkedHashMap<String, MutableList<String>> = LinkedHashMap()
 
@@ -36,6 +37,7 @@ object Store {
         resumePrefs = app.getSharedPreferences("castv_resume", Context.MODE_PRIVATE)
         statsPrefs = app.getSharedPreferences("castv_stats", Context.MODE_PRIVATE)
         badPrefs = app.getSharedPreferences("castv_bad", Context.MODE_PRIVATE)
+        topPrefs = app.getSharedPreferences("castv_top", Context.MODE_PRIVATE)
         favs = HashSet(prefs.getStringSet("fav", emptySet()) ?: emptySet())
         loadLists()
     }
@@ -466,6 +468,7 @@ object Store {
     @Synchronized
     fun rememberRecentChannel(c: M3uChannel) {
         if (incognito) return
+        countChannel(c)   // [TOP-CANALES-1]
         val l = recentChannels().filter { it.url != c.url }.toMutableList()
         l.add(0, c)
         try {
@@ -473,6 +476,62 @@ object Store {
             for (x in l.take(MAX_RECENT_CH)) arr.put(JSONObject().put("u", x.url).put("n", x.name).put("g", x.group).put("l", x.logo))
             prefs.edit().putString("chrecent", arr.toString()).apply()
         } catch (e: Exception) { }
+    }
+
+    // ------------------------------------------------- [TOP-CANALES-1] Canales más vistos
+    // Archivo propio "castv_top" (JSON {enlace: {c: veces, t: última vez, n/g/l: nombre, grupo, logo}}). No entra en respaldos
+    // ni en la copia automática (los enlaces Xtream llevan usuario y clave). Tope de 300 canales; en incógnito no se cuenta.
+
+    private const val MAX_TOP_CH = 300
+
+    private fun readTopCh(): JSONObject {
+        if (!::topPrefs.isInitialized) return JSONObject()
+        val raw = topPrefs.getString("chtop", null) ?: return JSONObject()
+        return try { JSONObject(raw) } catch (e: Exception) { rescue("chtop", raw, e); JSONObject() }
+    }
+
+    /** Suma una vez al canal [c] (se llama cada vez que se abre en el teléfono o en el TV). */
+    @Synchronized
+    fun countChannel(c: M3uChannel) {
+        if (incognito || c.url.isEmpty() || !::topPrefs.isInitialized) return
+        try {
+            val o = readTopCh()
+            val e = o.optJSONObject(c.url) ?: JSONObject()
+            e.put("c", e.optInt("c", 0) + 1).put("t", System.currentTimeMillis())
+                .put("n", c.name).put("g", c.group).put("l", c.logo)
+            o.put(c.url, e)
+            if (o.length() > MAX_TOP_CH) {
+                val keys = ArrayList<String>()
+                val ks = o.keys()
+                while (ks.hasNext()) keys.add(ks.next())
+                val drop = keys.sortedWith(compareBy<String>({ o.getJSONObject(it).optInt("c", 0) }, { o.getJSONObject(it).optLong("t", 0L) }))
+                    .take(o.length() - MAX_TOP_CH)
+                for (k in drop) o.remove(k)
+            }
+            topPrefs.edit().putString("chtop", o.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Los canales más abiertos (con [min] veces o más), el más visto primero, con su número de veces. */
+    @Synchronized
+    fun topChannels(limit: Int = 10, min: Int = 2): List<Pair<M3uChannel, Int>> {
+        val o = readTopCh()
+        val all = ArrayList<Triple<M3uChannel, Int, Long>>()
+        val ks = o.keys()
+        while (ks.hasNext()) {
+            val u = ks.next()
+            val e = o.optJSONObject(u) ?: continue
+            val n = e.optInt("c", 0)
+            if (n >= min) all.add(Triple(M3uChannel(e.optString("n", ""), u, e.optString("g", ""), e.optString("l", "")), n, e.optLong("t", 0L)))
+        }
+        return all.sortedWith(compareByDescending<Triple<M3uChannel, Int, Long>> { it.second }.thenByDescending { it.third })
+            .take(limit).map { Pair(it.first, it.second) }
+    }
+
+    /** Reinicia solo el contador de «Más vistos». */
+    @Synchronized
+    fun clearTopChannels() {
+        if (::topPrefs.isInitialized) topPrefs.edit().remove("chtop").apply()
     }
 
     // ------------------------------------------------- Canales ocultos [OCULTAR-1]

@@ -72,6 +72,7 @@ object Zap {
                     if (why == null) {
                         active = Ctx(a.list, i)
                         pending = null
+                        Store.countChannel(c)   // [TOP-CANALES-1]
                         onResult(c, "📺 ${c.name}")
                         return@thread
                     }

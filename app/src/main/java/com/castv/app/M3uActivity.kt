@@ -1215,9 +1215,24 @@ class M3uActivity : AppCompatActivity() {
         val favList = Store.chFavChannels().filter { !h.contains(it.url) }.take(20)
         addSection("🕘 Continuar", recent)
         addSection("★ Favoritos", favList)   // [VISTA-4] misma estrella (color de acento) que la lista
+        val top = Store.topChannels().filter { !h.contains(it.first.url) }   // [TOP-CANALES-1]
+        addSection("🔥 Más vistos", top.map { it.first }, top.associate { it.first.url to it.second }) { confirmResetTop() }
     }
 
-    private fun addSection(title: String, list: List<M3uChannel>) {
+    /** [TOP-CANALES-1] Mantener pulsado el título «Más vistos» ofrece reiniciar solo el contador. */
+    private fun confirmResetTop() {
+        AlertDialog.Builder(this)
+            .setTitle("¿Reiniciar «Más vistos»?")
+            .setMessage("Solo se borra el contador de veces. Tus favoritos, listas e historial no cambian.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Reiniciar") { _, _ ->
+                Store.clearTopChannels()
+                refreshSections()
+            }
+            .show()
+    }
+
+    private fun addSection(title: String, list: List<M3uChannel>, plays: Map<String, Int>? = null, onHeaderLong: (() -> Unit)? = null) {
         if (list.isEmpty()) return
         val t = TextView(this)
         val sp = android.text.SpannableString(title)
@@ -1229,10 +1244,11 @@ class M3uActivity : AppCompatActivity() {
         t.setTypeface(null, android.graphics.Typeface.BOLD)
         t.setTextColor(txtColor)
         t.setPadding(dp(4), dp(6), dp(4), dp(2))   // [VISTA-2]
+        if (onHeaderLong != null) t.setOnLongClickListener { onHeaderLong(); true }   // [TOP-CANALES-1]
         sections.addView(t)
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
-        for (c in list) row.addView(card(c), LinearLayout.LayoutParams(dp(96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
+        for (c in list) row.addView(card(c, plays?.get(c.url)), LinearLayout.LayoutParams(dp(96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
         val scroll = HorizontalScrollView(this)
         scroll.isHorizontalScrollBarEnabled = false
         scroll.addView(row)
@@ -1240,7 +1256,7 @@ class M3uActivity : AppCompatActivity() {
     }
 
     /** Tarjeta pequeña: logo y nombre. Tocar = mismo menú 📺 / 📱; mantener pulsado = quitar (como en la lista). */
-    private fun card(c: M3uChannel): View {
+    private fun card(c: M3uChannel, plays: Int? = null): View {
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
         box.gravity = Gravity.CENTER_HORIZONTAL
@@ -1274,6 +1290,15 @@ class M3uActivity : AppCompatActivity() {
             g.maxLines = 2
             g.ellipsize = TextUtils.TruncateAt.END
             box.addView(g, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        if (plays != null) {   // [TOP-CANALES-1]
+            val p = TextView(this)
+            p.text = if (plays == 1) "1 vez" else "$plays veces"
+            p.setTextColor(accent())
+            p.textSize = 10f
+            p.gravity = Gravity.CENTER_HORIZONTAL
+            p.maxLines = 1
+            box.addView(p, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
         box.setOnClickListener { openChannel(c) }
         box.setOnLongClickListener { confirmHide(c); true }
