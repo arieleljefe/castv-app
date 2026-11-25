@@ -450,10 +450,11 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private val segKey = HashMap<String, Triple<String, String?, Long>>()
         private val keyCache = HashMap<String, ByteArray>()
         // [MUS-1] audio en una lista aparte (#EXT-X-MEDIA:TYPE=AUDIO): se baja y se une al video fragmento a fragmento
-        private var audioListUrl: String? = null
+        @Volatile private var audioListUrl: String? = null   // [LIVE-3] @Volatile: lo toca también el hilo del audio
         private val audioBySeq = LinkedHashMap<Long, String>()   // número de secuencia -> URL del fragmento de audio
         private val segSeq = HashMap<String, Long>()             // URL del fragmento de video -> número de secuencia
         private val tsMux = TsMux()
+        private val audioLock = java.util.concurrent.locks.ReentrantLock()   // [LIVE-3] un solo hilo toca la lista de audio a la vez
         private var muxLogged = 0
         private var muxFails = 0
         private var refreshFails = 0     // [RECUP-1] lecturas seguidas de la lista que fallaron
@@ -660,6 +661,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     return true
                 } catch (e: Exception) {
                     DebugLog.add("  LIVE fragmento falló ($t/3): ${e.javaClass.simpleName}: ${e.message}")
+                    // [LIVE-3] un 404/410 es un fragmento que ya salió de la lista del servidor: reintentar no sirve
+                    if (e is HttpFail && (e.code == 404 || e.code == 410)) return false
                     try { Thread.sleep(500) } catch (_: InterruptedException) {}
                 }
             }
@@ -706,6 +709,13 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                         idleMs += wait
                         continue
                     }
+                }
+                // [LIVE-3] en vivo, si la cola creció (se atrasó 3 o más fragmentos), lo viejo ya no existe en el servidor
+                // (404): se salta a lo más nuevo y se vuelve al directo, en vez de arrastrar el atraso para siempre
+                if (!endList && count > 0 && pending.size > 2) {
+                    val drop = pending.size - 2
+                    repeat(drop) { val old = pending.removeFirst(); segSeq.remove(old); segKey.remove(old) }
+                    DebugLog.add("  LIVE atrasado: se saltan $drop fragmentos para volver al directo")
                 }
                 val vu = pending.removeFirst()
                 if (!openSegment(vu)) {
@@ -774,11 +784,52 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             }
         }
 
-        /** [MUS-1] El fragmento de video [videoUrl] ya está abierto en [cur]: se baja entero, se baja el de audio
-         *  de la misma secuencia y [cur] pasa a ser un solo TS con los dos. Si algo falla, queda solo el video. */
+        /** [LIVE-3] Baja el audio del fragmento de número de secuencia [seq]. Corre en un hilo aparte, a la vez que se
+         *  baja el video (antes iba primero el video y luego el audio, y en el directo no daba el tiempo: el canal se
+         *  atrasaba hasta que el servidor borraba los fragmentos). Lanza IllegalStateException si no hay audio. */
+        private fun fetchAudio(seq: Long?): ByteArray {
+            audioLock.lock()
+            try {
+                if (seq == null) throw IllegalStateException("sin número de secuencia")
+                var au = audioBySeq[seq]
+                var t = 0
+                while (au == null && t < 6 && audioListUrl != null && !closed) {
+                    refreshAudio()
+                    au = audioBySeq[seq]
+                    t++
+                    if (au == null) { try { Thread.sleep(500) } catch (_: InterruptedException) {} }
+                }
+                if (au == null) throw IllegalStateException("el audio de la secuencia $seq no está publicado")
+                var tries = 0
+                while (!closed && tries < 3) {
+                    tries++
+                    try {
+                        val opened = LiveHttp.open(au, 15000)
+                        try { return readAll(opened.first.inputStream) } finally { try { opened.first.disconnect() } catch (_: Exception) {} }
+                    } catch (e: Exception) {
+                        DebugLog.add("  LIVE audio falló ($tries/3): ${e.javaClass.simpleName}: ${e.message}")
+                        val gone = e is HttpFail && (e.code == 404 || e.code == 410)
+                        if (gone && tries >= 2) break
+                        try { Thread.sleep(300) } catch (_: InterruptedException) {}
+                    }
+                }
+                throw IllegalStateException("no se pudo bajar el audio")
+            } finally { audioLock.unlock() }
+        }
+
+        /** [MUS-1] El fragmento de video [videoUrl] ya está abierto en [cur]: se baja entero (y a la vez, en otro hilo,
+         *  el de audio de la misma secuencia: [LIVE-3]) y [cur] pasa a ser un solo TS con los dos. Si algo falla, queda solo el video. */
         private fun joinAudio(videoUrl: String) {
             val seq = segSeq.remove(videoUrl)
             val src = cur ?: return
+            val audioBox = arrayOfNulls<ByteArray>(1)
+            val audioErr = arrayOfNulls<String>(1)
+            val at = Thread {
+                try { audioBox[0] = fetchAudio(seq) } catch (e: Exception) { audioErr[0] = "${e.javaClass.simpleName}: ${e.message}" }
+            }
+            at.isDaemon = true
+            at.name = "castv-live-audio"
+            at.start()
             val vb: ByteArray = try { readAll(src) } catch (e: Exception) {
                 DebugLog.add("  LIVE error leyendo fragmento $count: ${e.javaClass.simpleName}: ${e.message}")
                 closeCur()
@@ -787,34 +838,12 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
             closeCur()
             var out = vb
             try {
-                if (seq == null) throw IllegalStateException("sin número de secuencia")
-                var au = audioBySeq[seq]
-                var t = 0
-                while (au == null && t < 4 && audioListUrl != null && !closed) {
-                    refreshAudio()
-                    au = audioBySeq[seq]
-                    t++
-                    if (au == null) { try { Thread.sleep(500) } catch (_: InterruptedException) {} }
-                }
-                if (au == null) throw IllegalStateException("el audio de la secuencia $seq no está publicado")
-                var ab: ByteArray? = null
-                var tries = 0
-                while (ab == null && tries < 3 && !closed) {
-                    tries++
-                    try {
-                        val opened = LiveHttp.open(au, 15000)
-                        try { ab = readAll(opened.first.inputStream) } finally { try { opened.first.disconnect() } catch (_: Exception) {} }
-                    } catch (e: Exception) {
-                        DebugLog.add("  LIVE audio falló ($tries/3): ${e.javaClass.simpleName}: ${e.message}")
-                        try { Thread.sleep(300) } catch (_: InterruptedException) {}
-                    }
-                }
-                if (ab == null) throw IllegalStateException("no se pudo bajar el audio")
+                try { at.join(4000) } catch (_: InterruptedException) {}
+                val ab = audioBox[0] ?: throw IllegalStateException(audioErr[0] ?: "el audio no llegó a tiempo")
                 out = tsMux.join(vb, ab)
                 if (muxLogged < 3) {
                     muxLogged++
-                    DebugLog.add("  LIVE audio+video: ${videoUrl.substringAfterLast('/')} + ${au.substringAfterLast('/')} " +
-                        "(video ${vb.size} + audio ${ab.size} -> ${out.size} bytes)")
+                    DebugLog.add("  LIVE audio+video: ${videoUrl.substringAfterLast('/')} (video ${vb.size} + audio ${ab.size} -> ${out.size} bytes)")
                 }
             } catch (e: Exception) {
                 muxFails++
