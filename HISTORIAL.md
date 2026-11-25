@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v425
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v427
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -143,3 +143,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CALIDAD-1 · 24 nov · Ajustes › Emisión al TV › «Calidad en TV» (Baja por defecto / Media / Alta) para canales en vivo al TV: `MediaServer.liveQuality` (clave `tv_quality` en `castv`, leída al abrir cada canal) y `LiveHlsStream.pickByQuality`; `/log` anota «LIVE variante elegida (calidad N)»; no entra en respaldos · `MediaServer.kt`, `SettingsActivity.kt`
 - LIVE-3 · 24 nov · canal en vivo al TV sin cortes («error de red» a los 30-60 s con audio en lista aparte): el audio se baja a la vez que el video (hilo `castv-live-audio`), un 404/410 no se reintenta (video y audio) y, si la cola se atrasa 3 o más fragmentos, se salta a los 2 más nuevos («LIVE atrasado») · `MediaServer.kt`
 - EPG-RECORDA-1 · 24 nov · «⏰ Avisarme» en la guía del reproductor (⋯ › Guía): lista los programas por venir y, al tocar uno, programa un aviso a su hora de inicio (alarma inexacta, guardado en `castv_remind`, sin entrar en respaldos) y lo marca con ⏰ (otro toque lo quita); la notificación abre el canal en el reproductor; si las notificaciones están apagadas pide el permiso; los avisos se pierden al reiniciar el teléfono · `VideoPlayerActivity.kt`, `ReminderReceiver.kt` (nuevo), `AndroidManifest.xml`
+- TOP-1 · 24 nov · Más › Biblioteca › «Lo más visto» (id 21): top 10 de música («🎵 Lo más escuchado») y de videos («🎬 Lo más visto») con «N reproducciones · tiempo visto», cambio de lista con botón, tocar un título lo reproduce con la lista como cola; lee `castv_stats` y escanea con `MediaScanner` en un hilo, respeta carpetas ocultas; los canales no se cuentan · `MainActivity.kt` (`showTop`, `showTopDialog`)
