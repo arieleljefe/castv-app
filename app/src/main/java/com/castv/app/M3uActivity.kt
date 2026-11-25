@@ -16,6 +16,7 @@ import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
@@ -1183,6 +1184,22 @@ class M3uActivity : AppCompatActivity() {
     }
 
     // ------------------------------------------------------------ [ESTILO-2] Continuar y Favoritos
+
+    /** [VOLUMEN-TV-1] Con un canal en el TV, los botones de volumen del teléfono suben/bajan el volumen del TV (de 5 en 5). */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) &&
+            TvController.tvIp != null && Zap.nowTitle != null) {
+            val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 5 else -5
+            thread {
+                val base = if (TvController.lastVol >= 0) TvController.lastVol else (TvController.getVolume() ?: 0).let { if (it > 0) it else 20 }
+                val v = (base + delta).coerceIn(0, 100)
+                val ok = TvController.setVolume(v)
+                runOnUiThread { toast(if (ok) "🔊 Volumen del TV: $v" else "⚠️ El TV no cambió el volumen") }
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     override fun onResume() {
         super.onResume()

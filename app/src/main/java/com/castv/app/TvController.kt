@@ -496,14 +496,21 @@ $innerXml
         }
     }
 
+    /** [VOLUMEN-TV-1] Último volumen conocido del TV (-1 = ninguno). La TV da 0 en GetVolume hasta el primer SetVolume,
+     *  por eso solo se anota un valor leído si es mayor que 0. */
+    @Volatile var lastVol = -1
+
     fun getVolume(): Int? {
         val body = rcCall("GetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel>") ?: return null
-        return tag(body, "CurrentVolume")?.trim()?.toIntOrNull()
+        val v = tag(body, "CurrentVolume")?.trim()?.toIntOrNull()
+        if (v != null && v > 0) lastVol = v   // [VOLUMEN-TV-1]
+        return v
     }
 
     fun setVolume(v: Int): Boolean {
         val ok = rcCall("SetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>") != null
         DebugLog.add("TV VOLUMEN set=${v.coerceIn(0, 100)} -> ${if (ok) "OK" else "FALLO"}")   // [REMOTO-1b]
+        if (ok && v > 0) lastVol = v.coerceIn(0, 100)   // [VOLUMEN-TV-1]
         return ok
     }
 

@@ -720,10 +720,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Con algo sonando en el TV, los botones de volumen del teléfono suben/bajan el volumen del TV. */
+    /** Con algo sonando en el TV (música o video del teléfono, o un canal o enlace), los botones de volumen del teléfono suben/bajan el volumen del TV. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) &&
-            !localActive && TvController.tvIp != null && playingItem != null) {
+            !localActive && TvController.tvIp != null && (playingItem != null || linkOnTv)) {   // [VOLUMEN-TV-1] linkOnTv
             val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 5 else -5
             val v = (volSeek.progress + delta).coerceIn(0, 100)
             volSeek.progress = v
