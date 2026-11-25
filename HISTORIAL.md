@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v421
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v422
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -141,3 +141,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TESTS-4 · 24 nov · 14 pruebas automáticas de respaldo con un `Context` de mentira en memoria (`TestCtx`/`TestPrefs`): validación de `Backup.restore`, reemplazo que respeta `tvIp`/`pin_hash`/estadísticas, ida y vuelta `build`→`restore`, unión con Xtream y parciales; build en verde (74 pruebas) · `BackupRestoreTest.kt`
 - TAG-3.12 · 24 nov · etiqueta `v3.12` publicada; Release `CASTV-v3.12.apk` instalado desde la app (incluye BUSCA-TODO-1, M3U-EXPORT-1 y TESTS-4) · `build.yml`
 - CALIDAD-1 · 24 nov · Ajustes › Emisión al TV › «Calidad en TV» (Baja por defecto / Media / Alta) para canales en vivo al TV: `MediaServer.liveQuality` (clave `tv_quality` en `castv`, leída al abrir cada canal) y `LiveHlsStream.pickByQuality`; `/log` anota «LIVE variante elegida (calidad N)»; no entra en respaldos · `MediaServer.kt`, `SettingsActivity.kt`
+- LIVE-3 · 24 nov · canal en vivo al TV sin cortes («error de red» a los 30-60 s con audio en lista aparte): el audio se baja a la vez que el video (hilo `castv-live-audio`), un 404/410 no se reintenta (video y audio) y, si la cola se atrasa 3 o más fragmentos, se salta a los 2 más nuevos («LIVE atrasado») · `MediaServer.kt`
