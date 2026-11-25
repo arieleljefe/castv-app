@@ -144,6 +144,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var sleepChip: TextView
     private var sleepAt = 0L           // uptimeMillis en que se detiene (0 = sin temporizador por tiempo)
     private var sleepEnd = false       // detener al terminar este video
+    private var fadeStartAt = 0L       // [FUNDIDO-1] uptimeMillis en que empezó el fundido del temporizador (0 = sin fundido)
 
     // [UI-2a] bloqueo de controles y giro de pantalla
     private var locked = false
@@ -175,7 +176,9 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private val tick = object : Runnable {
         override fun run() {
-            if (sleepAt > 0L && SystemClock.uptimeMillis() >= sleepAt) { sleepNow(); return }   // [GESTO-2]
+            val nowMs = SystemClock.uptimeMillis()
+            if (sleepAt > 0L && nowMs >= sleepAt) startSleepFade()   // [GESTO-2] [FUNDIDO-1]
+            if (fadeStartAt > 0L && sleepFadeStep(nowMs)) return   // [FUNDIDO-1]
             abLoop()   // [AB-1]
             trackWatch()   // [TIEMPO-1]
             updateSub()
@@ -769,6 +772,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun togglePlay() {
+        cancelSleepFade()   // [FUNDIDO-1]
         pausedByFocus = false   // [FOCO-1] si pausa o reanuda a mano, el foco ya no decide
         if (video.isPlaying) { video.pause(); focusAbandon() } else video.start()
         updatePlayIcon()
@@ -961,6 +965,7 @@ class VideoPlayerActivity : AppCompatActivity() {
     }
 
     private fun setSleep(which: Int) {
+        cancelSleepFade()   // [FUNDIDO-1]
         sleepEnd = false
         sleepAt = 0L
         when (which) {
@@ -989,8 +994,34 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (sleepChip.text.toString() != t) sleepChip.text = t
     }
 
+    /** [FUNDIDO-1] Se cumplió el tiempo: ~10 s bajando el volumen y luego se cierra el video (si no suena nada, se cierra ya). */
+    private fun startSleepFade() {
+        sleepAt = 0L
+        sleepEnd = false
+        if (mpRef == null || !video.isPlaying) { sleepNow(); return }
+        fadeStartAt = SystemClock.uptimeMillis()
+        toast("😴 Temporizador: bajando el volumen…")
+        updateSleepChip()
+    }
+
+    /** Un paso del fundido (cada 250 ms). true = terminó y se cerró el video. */
+    private fun sleepFadeStep(now: Long): Boolean {
+        val f = 1f - (now - fadeStartAt) / 10_000f
+        if (f <= 0f) { sleepNow(); return true }
+        try { mpRef?.setVolume(f, f) } catch (e: Exception) { }
+        return false
+    }
+
+    /** Cancela el fundido y devuelve el volumen (pausar o reanudar a mano, nuevo temporizador). */
+    private fun cancelSleepFade() {
+        if (fadeStartAt == 0L) return
+        fadeStartAt = 0L
+        try { mpRef?.setVolume(1f, 1f) } catch (e: Exception) { }
+    }
+
     /** Se acabó el tiempo: se cierra el video (onPause guarda el punto de reanudación). */
     private fun sleepNow() {
+        fadeStartAt = 0L
         sleepAt = 0L
         sleepEnd = false
         toast("😴 Temporizador: reproducción detenida")

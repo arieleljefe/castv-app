@@ -87,7 +87,37 @@ object PlayerCore {
     private val main = Handler(Looper.getMainLooper())
     private var controlsReceiver: BroadcastReceiver? = null
     private var noisyReceiver: BroadcastReceiver? = null
-    private val sleepRunnable = Runnable { if (headless) stopHeadless() }
+    private val sleepRunnable = Runnable { if (headless) startFade() }   // [FUNDIDO-1]
+
+    // [FUNDIDO-1] al cumplirse el temporizador, ~10 s bajando el volumen y luego se detiene
+    private var fading = false
+    private var fadeStep = 0
+    private val fadeRunnable = object : Runnable {
+        override fun run() {
+            if (!headless || !fading) return
+            fadeStep++
+            val f = (1f - fadeStep / 10f).coerceAtLeast(0f)
+            try { player?.setVolume(f, f) } catch (e: Exception) { }
+            if (fadeStep >= 10) { fading = false; stopHeadless() } else main.postDelayed(this, 1000)
+        }
+    }
+
+    private fun startFade() {
+        val mp = player
+        val sonando = try { mp != null && prepared && mp.isPlaying } catch (e: Exception) { false }
+        if (!sonando) { stopHeadless(); return }
+        fading = true
+        fadeStep = 0
+        main.postDelayed(fadeRunnable, 1000)
+    }
+
+    /** Cancela el fundido y devuelve el volumen (pausar/reanudar, pista nueva a mano, volver la pantalla). */
+    private fun cancelFade() {
+        if (!fading) return
+        fading = false
+        main.removeCallbacks(fadeRunnable)
+        try { player?.setVolume(1f, 1f) } catch (e: Exception) { }
+    }
 
     /** MainActivity se cierra con música del teléfono sonando: la música sigue aquí. */
     fun handOff(
@@ -123,6 +153,7 @@ object PlayerCore {
         if (cur == null || player == null) { stopHeadless(); return null }
         unregisterReceivers()
         main.removeCallbacks(sleepRunnable)
+        cancelFade()   // [FUNDIDO-1]
         headless = false
         releaseHlEffects()   // [SINPANTALLA-1] la pantalla vuelve a poner los suyos
         return Snapshot(cur, ArrayList(hlList), hlIndex, ArrayList(hlQueue), hlRepeat, hlFromQueue, hlSleepAfter, hlSleepAt, hlSpeed, hlSpeedTouched)
@@ -206,6 +237,7 @@ object PlayerCore {
     private fun toggle() {
         val mp = player ?: return
         if (!prepared) return
+        cancelFade()   // [FUNDIDO-1]
         try {
             if (mp.isPlaying) mp.pause() else { pausedByFocus = false; mp.start(); applyHlSpeed(mp) }
         } catch (e: Exception) { }
@@ -221,6 +253,8 @@ object PlayerCore {
         prepared = false
         pausedByFocus = false
         headless = false
+        fading = false   // [FUNDIDO-1]
+        main.removeCallbacks(fadeRunnable)
         main.removeCallbacks(sleepRunnable)
         unregisterReceivers()
         releaseHlEffects()   // [SINPANTALLA-1]
@@ -330,8 +364,8 @@ object PlayerCore {
                 override fun onReceive(c: Context?, intent: Intent?) {
                     if (!headless) return
                     when (intent?.action) {
-                        MainActivity.ACT_PREV -> step(-1)
-                        MainActivity.ACT_NEXT -> step(+1)
+                        MainActivity.ACT_PREV -> { cancelFade(); step(-1) }   // [FUNDIDO-1]
+                        MainActivity.ACT_NEXT -> { cancelFade(); step(+1) }
                         MainActivity.ACT_TOGGLE -> toggle()
                     }
                 }

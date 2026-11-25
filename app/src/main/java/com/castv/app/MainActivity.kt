@@ -700,6 +700,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        cancelSleepFade()   // [FUNDIDO-1] que el reproductor no se quede con el volumen a medias al pasar a modo sin pantalla
         fullDialog?.dismiss()   // [UI-3b]
         monitoring = false
         // [SERVICIO-1b] con música del teléfono sonando, la música sigue sin pantalla (PlayerCore); si no, se detiene como siempre
@@ -2518,6 +2519,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Pausa / reanuda, ya sea en el teléfono o en el TV. */
     private fun togglePlayPause() {
+        cancelSleepFade()   // [FUNDIDO-1]
         if (localActive) {
             if (localIsPlaying()) {
                 withLocal { it.pause() }
@@ -3789,11 +3791,62 @@ class MainActivity : AppCompatActivity() {
         val t = sleepAtMs
         if (t > 0 && SystemClock.elapsedRealtime() >= t) {
             sleepAtMs = 0L
-            runOnUiThread {
-                pauseAll()
-                toast("😴 Temporizador: reproducción en pausa")
-            }
+            runOnUiThread { sleepFadeAndPause() }   // [FUNDIDO-1]
         }
+    }
+
+    // ------------------------------------------- [FUNDIDO-1] El temporizador baja el volumen poco a poco antes de pausar
+
+    private val fadeSecs = 10
+    @Volatile private var fadeGen = 0          // cambia al cancelar: el hilo del fundido se detiene
+    @Volatile private var fadeActive = false
+    private var fadeTvVol = -1                 // volumen del TV al empezar el fundido (para devolverlo)
+
+    /** Se cumplió el temporizador: ~10 s bajando el volumen (teléfono o TV) y luego pausa; después el volumen vuelve a como estaba. */
+    private fun sleepFadeAndPause() {
+        val phone = localActive
+        val tvVol = volSeek.progress
+        val canFade = if (phone) localIsPlaying() else (tvPlaying && tvVol > 0)
+        if (!canFade) {   // sin nada sonando o volumen del TV desconocido: pausa directa, como siempre
+            pauseAll()
+            toast("😴 Temporizador: reproducción en pausa")
+            return
+        }
+        val gen = ++fadeGen
+        fadeActive = true
+        fadeTvVol = if (phone) -1 else tvVol
+        toast("😴 Temporizador: bajando el volumen…")
+        thread {
+            for (i in 1..fadeSecs) {
+                try { Thread.sleep(1000) } catch (e: InterruptedException) { return@thread }
+                if (gen != fadeGen) return@thread
+                val f = 1f - i / fadeSecs.toFloat()
+                if (phone) runOnUiThread { if (gen == fadeGen) try { localPlayer?.setVolume(f, f) } catch (e: Exception) { } }
+                else TvController.setVolume((tvVol * f).toInt())
+            }
+            if (gen != fadeGen) return@thread
+            runOnUiThread {
+                if (gen == fadeGen) {
+                    pauseAll()
+                    if (phone) applyLocalVolume()
+                    toast("😴 Temporizador: reproducción en pausa")
+                }
+            }
+            if (!phone) {   // el TV ya recibió la pausa: se devuelve el volumen para la próxima vez
+                try { Thread.sleep(1500) } catch (e: InterruptedException) { }
+                if (gen == fadeGen) TvController.setVolume(tvVol)
+            }
+            if (gen == fadeGen) fadeActive = false
+        }
+    }
+
+    /** Si hay un fundido en marcha lo cancela y devuelve el volumen (pausar/reanudar a mano, nuevo temporizador, cerrar la pantalla). */
+    private fun cancelSleepFade() {
+        if (!fadeActive) return
+        fadeGen++
+        fadeActive = false
+        if (localActive) applyLocalVolume()
+        else { val v = fadeTvVol; if (v > 0) thread { TvController.setVolume(v) } }
     }
 
     /** true si había que parar al terminar la pista (y ya no se sigue con la siguiente). */
@@ -3815,6 +3868,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pickSleepTimer() {
+        cancelSleepFade()   // [FUNDIDO-1]
         val labels = arrayListOf("15 minutos", "30 minutos", "45 minutos", "1 hora", "1 hora 30 min", "Al terminar la pista")
         val mins = intArrayOf(15, 30, 45, 60, 90)
         if (sleepAtMs > 0 || sleepAfterTrack) labels.add("✕ Cancelar temporizador")
