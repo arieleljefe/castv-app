@@ -596,7 +596,7 @@ class MainActivity : AppCompatActivity() {
         listFiles.setOnItemClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
             if (groupsShown) {   // [TABS-1]
-                groupAdapter.rows.getOrNull(idx)?.let { openGroup(it) }
+                if (!groupAdapter.grid) groupAdapter.rows.getOrNull(idx)?.let { openGroup(it) }   // [ALBUMES-2] en la cuadrícula toca cada tarjeta
                 return@setOnItemClickListener
             }
             if (idx in currentList.indices) {
@@ -1126,6 +1126,7 @@ class MainActivity : AppCompatActivity() {
             listFiles.adapter = groupAdapter
         }
         groupAdapter.rows = rows
+        groupAdapter.grid = viewMode == ViewMode.GROUPS && showingMusic   // [ALBUMES-2] los álbumes van en cuadrícula de dos columnas
         groupAdapter.notifyDataSetChanged()
         tvEmptyAction.visibility = View.GONE
         if (rows.isEmpty()) {
@@ -4338,12 +4339,75 @@ class MainActivity : AppCompatActivity() {
     /** [TABS-1] Filas de Álbumes / Carpetas / Listas. */
     private inner class GroupAdapter : BaseAdapter() {
         var rows: List<GroupRow> = emptyList()
+        var grid = false   // [ALBUMES-2] dos tarjetas por fila
 
-        override fun getCount() = rows.size
-        override fun getItem(position: Int) = rows[position]
+        override fun getCount() = if (grid) (rows.size + 1) / 2 else rows.size
+        override fun getItem(position: Int): Any = if (grid) position else rows[position]
         override fun getItemId(position: Int) = position.toLong()
+        override fun getViewTypeCount() = 2
+        override fun getItemViewType(position: Int) = if (grid) 1 else 0
+
+        /** [ALBUMES-2] Lado de la carátula cuadrada: la mitad del ancho menos márgenes. */
+        private fun albumSide(): Int {
+            val m = resources.displayMetrics
+            return ((m.widthPixels - 20 * m.density) / 2 - 12 * m.density).toInt()
+        }
+
+        private fun bindAlbumCard(card: View, g: GroupRow?) {
+            if (g == null) {
+                card.visibility = View.INVISIBLE
+                card.setOnClickListener(null)
+                card.isClickable = false
+                return
+            }
+            card.visibility = View.VISIBLE
+            card.setOnClickListener { openGroup(g) }
+            val cover = card.findViewById<View>(R.id.albCover)
+            val lp = cover.layoutParams
+            lp.height = albumSide()
+            cover.layoutParams = lp
+            card.findViewById<TextView>(R.id.albTitle).text = g.title
+            card.findViewById<TextView>(R.id.albSub).text = g.sub
+            card.findViewById<ImageView>(R.id.albIcon).setColorFilter(col(R.color.vlc_muted))
+            val thumb = card.findViewById<ImageView>(R.id.albThumb)
+            val rep = g.rep
+            if (rep == null) {
+                thumb.tag = null
+                thumb.setImageDrawable(null)
+                thumb.visibility = View.GONE
+                return
+            }
+            val tkey = Thumbs.key(rep)
+            thumb.tag = tkey
+            val big = Thumbs.cachedBig(rep)
+            val first = big ?: Thumbs.cached(rep)
+            if (first != null) {
+                thumb.setImageBitmap(first)
+                thumb.visibility = View.VISIBLE
+            } else {
+                thumb.setImageDrawable(null)
+                thumb.visibility = View.GONE
+            }
+            if (big == null) {
+                Thumbs.loadBig(this@MainActivity, rep) { bmp ->
+                    if (thumb.tag != tkey) return@loadBig
+                    val show = bmp ?: Thumbs.cached(rep)
+                    if (show != null) {
+                        thumb.setImageBitmap(show)
+                        thumb.visibility = View.VISIBLE
+                    }
+                }
+            }
+        }
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            if (grid) {   // [ALBUMES-2]
+                val gv = convertView ?: LayoutInflater.from(parent.context)
+                    .inflate(R.layout.item_group_grid, parent, false)
+                bindAlbumCard(gv.findViewById<View>(R.id.cardA), rows.getOrNull(position * 2))
+                bindAlbumCard(gv.findViewById<View>(R.id.cardB), rows.getOrNull(position * 2 + 1))
+                return gv
+            }
             val v = convertView ?: LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_group, parent, false)
             val g = rows[position]
