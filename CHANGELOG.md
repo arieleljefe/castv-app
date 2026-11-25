@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v428
+# CASTV: CHANGELOG (cerebro) · v429
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -100,7 +100,9 @@ rm -f ~/storage/downloads/*_actual.*
   4. **EPG-RECORDA-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12; entra en `v3.13`).
   5. **TOP-1 · ✅ (24 nov, Ariel: «Ya funciona»)** · ver `HISTORIAL`. Sin etiqueta (R12; entra en `v3.13`).
   6. **TABS-1 · ✅ (24 nov, Ariel: «Funciona todo bien»)** · ver `HISTORIAL`. Sin etiqueta (R12; entra en `v3.14`).
-  7. **LIMPIA-1 · ⬜** (pendiente de v3.12) plantilla E; ✅ con el «listo» de Ariel.
+  7. **ÁLBUMES-2 · 🧪 entregado (24 nov, parche `albumes2.patch`; falta aplicar y probar; va DESPUÉS de TABS-1):** Ariel: «Vamos con todos». Qué: la pestaña ÁLBUMES (solo música) pasa a cuadrícula de dos columnas con carátulas cuadradas grandes (usa la carátula nítida `Thumbs.loadBig`), título y «artista · N pistas · duración»; CARPETAS y LISTAS siguen como filas. Cada tarjeta se toca por separado y abre el álbum como en TABS-1. Archivos: `MainActivity.kt` (`GroupAdapter` con `grid`, `albumSide`, `bindAlbumCard`), `item_album_card.xml` y `item_group_grid.xml` (nuevos). Cómo probar: Audio › ÁLBUMES (dos columnas, carátulas que llegan sin desfigurarse al bajar), tocar cada tarjeta, número impar de álbumes (la última fila queda con una sola), girar la pantalla, buscar texto. Riesgos: sin compilador (R4); en el primer scroll las carátulas nítidas tardan un instante. Siguiente: ✅ con el «ya funciona» de Ariel.
+  8. **TOP-CANALES-1 · ⬜ en curso (pidió «Vamos con todos»; esperando archivos con la plantilla A):** contar las veces que se abre cada canal (clave nueva en `Store`, sin contar en incógnito) y mostrar «Canales más vistos» en Canales. Archivos que faltan: `M3uActivity.kt`, `VideoPlayerActivity.kt`, `Zap.kt` (`Store.kt` ya recibido).
+  9. **LIMPIA-1 · ⬜** (pendiente de v3.12) plantilla E; ✅ con el «listo» de Ariel.
 - **Nota (24 nov, 23:21):** la captura de Ariel muestra la app en **3.13** instalada (la etiqueta `v3.13` ya salió); él aún no lo confirmó con palabras ni dijo «listo» de LIMPIA-1. Los cambios siguientes entran en `v3.14`.
 - COMPAT-TV-1 ⏳ sigue esperando la visita a la TV del amigo.
 
