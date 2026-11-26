@@ -391,10 +391,15 @@ object Store {
         return out
     }
 
-    private fun writeChFavMeta(l: List<M3uChannel>) {
+    private fun writeChFavMeta(l: List<M3uChannel>, groups: Map<String, String> = readChFavGroups()) {   // [FAV-GRUPOS-1] "fg" se conserva
         try {
             val arr = JSONArray()
-            for (c in l) arr.put(JSONObject().put("u", c.url).put("n", c.name).put("g", c.group).put("l", c.logo))
+            for (c in l) {
+                val o = JSONObject().put("u", c.url).put("n", c.name).put("g", c.group).put("l", c.logo)
+                val fg = groups[c.url]
+                if (!fg.isNullOrEmpty()) o.put("fg", fg)
+                arr.put(o)
+            }
             prefs.edit().putString("chfavmeta", arr.toString()).apply()
         } catch (e: Exception) { }
     }
@@ -454,6 +459,66 @@ object Store {
         l.add(0, l.removeAt(i))
         writeChFavMeta(l)
         return true
+    }
+
+    // [FAV-GRUPOS-1] Grupo propio de cada favorito (campo "fg" dentro de "chfavmeta"; no hay clave nueva, así que respaldo,
+    // compartir favoritos y el filtro de claves Xtream siguen igual). Un grupo existe mientras tenga algún canal.
+
+    private fun readChFavGroups(): MutableMap<String, String> {
+        val out = LinkedHashMap<String, String>()
+        val raw = prefs.getString("chfavmeta", null) ?: return out
+        try {
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val fg = o.optString("fg", "")
+                if (fg.isNotEmpty()) out[o.getString("u")] = fg
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    private fun cleanGroupName(s: String): String = s.replace(Regex("[\\r\\n\"]+"), " ").trim().take(30)
+
+    /** Enlace del favorito → su grupo (solo los que tienen grupo y siguen siendo favoritos). */
+    fun chFavGroupMap(): Map<String, String> {
+        val urls = chFavs()
+        return readChFavGroups().filterKeys { urls.contains(it) }
+    }
+
+    fun chFavGroup(url: String): String = chFavGroupMap()[url] ?: ""
+
+    /** Pone el favorito [url] en el grupo [name] (vacío = quitarlo del grupo). true si cambió algo. */
+    @Synchronized
+    fun setChFavGroup(url: String, name: String): Boolean {
+        val g = cleanGroupName(name)
+        val groups = readChFavGroups()
+        if ((groups[url] ?: "") == g) return false
+        if (g.isEmpty()) groups.remove(url) else groups[url] = g
+        writeChFavMeta(ArrayList(chFavChannels()), groups)
+        return true
+    }
+
+    /** Cambia el nombre del grupo [old] a [new] (si [new] ya existe, se unen). Devuelve cuántos canales cambiaron. */
+    @Synchronized
+    fun renameChFavGroup(old: String, new: String): Int {
+        val g = cleanGroupName(new)
+        if (g.isEmpty() || g == old) return 0
+        val groups = readChFavGroups()
+        var n = 0
+        for (k in groups.keys.toList()) if (groups[k] == old) { groups[k] = g; n++ }
+        if (n > 0) writeChFavMeta(ArrayList(chFavChannels()), groups)
+        return n
+    }
+
+    /** Quita el grupo [name]: sus canales siguen en favoritos, sin grupo. Devuelve cuántos eran. */
+    @Synchronized
+    fun deleteChFavGroup(name: String): Int {
+        val groups = readChFavGroups()
+        var n = 0
+        for (k in groups.keys.toList()) if (groups[k] == name) { groups.remove(k); n++ }
+        if (n > 0) writeChFavMeta(ArrayList(chFavChannels()), groups)
+        return n
     }
 
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */

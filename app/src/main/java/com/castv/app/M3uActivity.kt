@@ -75,6 +75,7 @@ class M3uActivity : AppCompatActivity() {
     private var cacheNote = " · sin conexión (copia guardada)"   // [LISTA-VAL-1] texto del pie cuando se usa la copia
     private var favs: Set<String> = emptySet()
     private var favOnly = false
+    private var favGroup: String? = null   // [FAV-GRUPOS-1] grupo de favoritos activo (null = todos; "" = los que no tienen grupo)
     private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
     private var favNorm: List<String> = emptyList()
     private lateinit var favBtn: TextView
@@ -1086,9 +1087,17 @@ class M3uActivity : AppCompatActivity() {
         // [FAV-1] con ★ Favs activo la base son los favoritos de TODAS las listas
         val base = if (favOnly) favChannels else channels
         val baseNames = if (favOnly) favNorm else normNames
+        var fgm: Map<String, String>? = null   // [FAV-GRUPOS-1]
+        if (favOnly && favGroup != null) {
+            val gm = Store.chFavGroupMap()
+            val fg = favGroup
+            val gone = if (fg == "") favChannels.all { gm.containsKey(it.url) } else (fg != null && !gm.containsValue(fg))
+            if (gone) favGroup = null else fgm = gm   // el grupo ya no existe (o ya no hay favoritos sin grupo)
+        }
         for (i in base.indices) {
             val c = base[i]
             if (hidden.isNotEmpty() && hidden.contains(c.url)) continue   // [OCULTAR-1]
+            if (fgm != null && (fgm[c.url] ?: "") != favGroup) continue   // [FAV-GRUPOS-1]
             if (!favOnly && g != null && !groupKeys(c).contains(g)) continue   // [GRUPOS-1]
             if (!favOnly && mood >= 0 && (moodMask(c.group) and (1 shl mood)) == 0) continue   // [ESTILO-3]
             val n = baseNames[i]
@@ -1106,7 +1115,8 @@ class M3uActivity : AppCompatActivity() {
         chAdapter.notifyDataSetChanged()
         if (favOnly) {
             statusView.text = if (favChannels.isEmpty()) "Aún no tienes favoritos: marca ★ en un canal"
-                else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)"
+                else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)" +
+                    (if (favGroup != null) " · " + (if (favGroup == "") "sin grupo" else "«$favGroup»") else "")
         } else if (channels.isNotEmpty()) {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
                 (if (fromCache) cacheNote else "")
@@ -1141,8 +1151,7 @@ class M3uActivity : AppCompatActivity() {
     private fun refreshMoods() {
         if (!::moodRow.isInitialized) return
         if (favOnly) {
-            moodScroll.visibility = View.GONE
-            moodDrawn = ""
+            drawFavGroups()   // [FAV-GRUPOS-1] con ★ Favs la fila muestra los grupos de favoritos
             return
         }
         val sig = System.identityHashCode(channels).toString() + "|" + channels.size + "|" + hidden.size
@@ -1181,6 +1190,108 @@ class M3uActivity : AppCompatActivity() {
             moodRow.addView(t)
         }
         moodScroll.visibility = if (any) View.VISIBLE else View.GONE
+    }
+
+    // ------------------------------------------------------------ [FAV-GRUPOS-1] Grupos propios de favoritos
+
+    private fun styleActiveChip(t: TextView) {
+        t.setTextColor(accent())
+        t.setTypeface(null, android.graphics.Typeface.BOLD)
+        t.background = GradientDrawable().apply {
+            setColor(0x33888888)
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(2), accent())
+        }
+    }
+
+    /** Con ★ Favs: fila de chips con los grupos (tocar = filtrar; mantener pulsado = renombrar o quitar el grupo). Sin grupos, se esconde. */
+    private fun drawFavGroups() {
+        val gm = Store.chFavGroupMap()
+        val names = gm.values.distinct().sortedBy { it.lowercase() }
+        moodDrawn = ""   // al salir de ★ Favs se vuelve a dibujar la fila de ánimos
+        moodRow.removeAllViews()
+        if (names.isEmpty()) { moodScroll.visibility = View.GONE; return }
+        fun add(label: String, value: String, long: (() -> Unit)?) {
+            val t = chip(label) { favGroup = if (favGroup == value) null else value; applyFilter() }
+            t.textSize = 14f
+            t.setPadding(dp(12), dp(6), dp(12), dp(6))
+            if (favGroup == value) styleActiveChip(t)
+            if (long != null) t.setOnLongClickListener { long(); true }
+            moodRow.addView(t)
+        }
+        for (n in names) add("📁 $n", n) { favGroupMenu(n) }
+        if (favChannels.any { !gm.containsKey(it.url) }) add("Sin grupo", "", null)
+        moodScroll.visibility = View.VISIBLE
+    }
+
+    private fun favGroupMenu(name: String) {
+        AlertDialog.Builder(this)
+            .setTitle("📁 $name")
+            .setItems(arrayOf("✏ Renombrar", "Quitar el grupo (los canales siguen en favoritos)")) { _, which ->
+                if (which == 0) {
+                    val box = LinearLayout(this)
+                    box.setPadding(dp(20), dp(8), dp(20), 0)
+                    val nameIn = EditText(this)
+                    nameIn.setSingleLine(true)
+                    nameIn.setText(name)
+                    box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                    AlertDialog.Builder(this)
+                        .setTitle("Renombrar grupo")
+                        .setView(box)
+                        .setPositiveButton("Guardar") { _, _ ->
+                            if (Store.renameChFavGroup(name, nameIn.text.toString()) > 0) {
+                                if (favGroup == name) favGroup = nameIn.text.toString().trim()
+                                reloadFavChannels(); applyFilter()
+                            }
+                        }
+                        .setNegativeButton("Cancelar", null)
+                        .show()
+                } else {
+                    val n = Store.deleteChFavGroup(name)
+                    if (favGroup == name) favGroup = null
+                    reloadFavChannels(); applyFilter()
+                    toast("Grupo quitado ($n canales siguen en favoritos)")
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun setFavGroup(c: M3uChannel, name: String) {
+        if (Store.setChFavGroup(c.url, name)) { reloadFavChannels(); applyFilter() }
+    }
+
+    private fun pickFavGroup(c: M3uChannel) {
+        val cur = Store.chFavGroup(c.url)
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        for (n in Store.chFavGroupMap().values.distinct().sortedBy { it.lowercase() }) {
+            if (n == cur) continue
+            opts.add("📁 $n"); acts.add { setFavGroup(c, n) }
+        }
+        opts.add("＋ Grupo nuevo…"); acts.add {
+            val box = LinearLayout(this)
+            box.setPadding(dp(20), dp(8), dp(20), 0)
+            val nameIn = EditText(this)
+            nameIn.hint = "Nombre (ej. Noticias)"
+            nameIn.setSingleLine(true)
+            box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            AlertDialog.Builder(this)
+                .setTitle("Grupo nuevo")
+                .setView(box)
+                .setPositiveButton("Crear") { _, _ ->
+                    val g = nameIn.text.toString().trim()
+                    if (g.isEmpty()) toast("Escribe un nombre") else setFavGroup(c, g)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+        if (cur.isNotEmpty()) { opts.add("✕ Quitar de «$cur»"); acts.add { setFavGroup(c, "") } }
+        AlertDialog.Builder(this)
+            .setTitle("Mover «${c.name}» a…")
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------------------------ [ESTILO-2] Continuar y Favoritos
@@ -1403,6 +1514,7 @@ class M3uActivity : AppCompatActivity() {
             val next = shown[i + 1].url
             opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
         }
+        opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
         opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
             .setTitle(c.name)
@@ -1662,6 +1774,7 @@ class M3uActivity : AppCompatActivity() {
 
     private fun toggleFavOnly() {
         favOnly = !favOnly
+        favGroup = null   // [FAV-GRUPOS-1]
         if (favOnly) iconLabel(favBtn, R.drawable.ic_star, "Favs", accent()) else iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         if (favOnly) reloadFavChannels()   // [FAV-1]
         exportBtn.visibility = if (favOnly) View.VISIBLE else View.GONE   // [M3U-EXPORT-1]
@@ -1675,13 +1788,14 @@ class M3uActivity : AppCompatActivity() {
         val leak = Xtream.leakFilter(this)
         val sb = StringBuilder("#EXTM3U\n")
         var skipped = 0
+        val fgm = Store.chFavGroupMap()   // [FAV-GRUPOS-1] el grupo propio manda sobre el de la lista
         for (c in Store.chFavChannels()) {
             val low = c.url.lowercase()
             if (!(low.startsWith("http://") || low.startsWith("https://")) || leak(c.url)) { skipped++; continue }
             val name = c.name.replace(Regex("[\\r\\n]+"), " ").trim().ifEmpty { "Canal" }
             sb.append("#EXTINF:-1")
             if (c.logo.startsWith("http", ignoreCase = true)) sb.append(" tvg-logo=\"").append(c.logo.replace("\"", "%22").replace(Regex("\\s"), "")).append("\"")
-            val g = c.group.replace(Regex("[\\r\\n]+"), " ").replace('"', '\'').trim()
+            val g = (fgm[c.url] ?: c.group).replace(Regex("[\\r\\n]+"), " ").replace('"', '\'').trim()
             if (g.isNotEmpty()) sb.append(" group-title=\"").append(g).append("\"")
             sb.append(',').append(name).append('\n').append(c.url).append('\n')
         }
