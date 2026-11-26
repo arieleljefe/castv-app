@@ -93,6 +93,7 @@ class M3uActivity : AppCompatActivity() {
     private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
     private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
     private lateinit var playBtn: TextView   // [PLAY-GRUPO-1] «▶ Reproducir» (solo con ★ Favs)
+    private var pendingQueue: List<M3uChannel>? = null   // [ALEATORIO-1] lista mezclada para ⏮ ⏭ (solo si se abrió con «al azar»)
     // [MULTI-FAV-1] selección múltiple: «☑» activa; un toque marca en vez de abrir; barra «N elegidos · ★ · 📁 · Ocultar»
     private var selecting = false
     private val picked = LinkedHashMap<String, M3uChannel>()   // enlace → canal elegido
@@ -329,7 +330,8 @@ class M3uActivity : AppCompatActivity() {
         pickBtn.maxLines = 1
         pickBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         playBtn = chip("▶ Reproducir") { playShown() }   // [PLAY-GRUPO-1]
-        playBtn.contentDescription = "Reproducir lo que se ve"
+        playBtn.contentDescription = "Reproducir lo que se ve (mantener pulsado: al azar)"
+        playBtn.setOnLongClickListener { playShuffled(); true }   // [ALEATORIO-1]
         playBtn.textSize = 13f
         playBtn.maxLines = 1
         playBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
@@ -2017,6 +2019,21 @@ class M3uActivity : AppCompatActivity() {
         openChannel(first)
     }
 
+    /** [ALEATORIO-1] Mantener pulsado «▶ Reproducir»: mezcla lo que se ve y abre el primero; ⏮ ⏭ recorren esa lista mezclada. */
+    private fun playShuffled() {
+        val list = shown.shuffled()
+        if (list.isEmpty()) { toast("No hay canales para reproducir"); return }
+        toast("🔀 Al azar")
+        openChannel(list[0], list)
+    }
+
+    /** [ALEATORIO-1] Lista para ⏮ ⏭: la mezclada (si se abrió con «al azar» y trae ese canal) o la que se ve. */
+    private fun queueFor(url: String): List<M3uChannel> {
+        val q = pendingQueue
+        if (q != null && q.any { it.url == url }) return q
+        return if (shown.any { it.url == url }) shown else visible(channels)
+    }
+
     // ------------------------------------------------------------ [MULTI-FAV-1] Elegir varios canales
 
     private fun startSelect() {
@@ -2241,7 +2258,8 @@ class M3uActivity : AppCompatActivity() {
 
     private fun isHls(url: String) = url.substringBefore('?').lowercase().endsWith(".m3u8")
 
-    private fun openChannel(c: M3uChannel) {
+    private fun openChannel(c: M3uChannel, queue: List<M3uChannel>? = null) {
+        pendingQueue = queue   // [ALEATORIO-1] una apertura normal borra la lista mezclada
         val b = AlertDialog.Builder(this)   // [ICONOS-6]
         val ic = b.context
         val labels = arrayOf<CharSequence>(
@@ -2259,7 +2277,7 @@ class M3uActivity : AppCompatActivity() {
         Store.rememberRecentChannel(c)   // [ESTILO-2] fila "Continuar"
         if (toTv) {
             // [ZAP-1] la lista que se ve ahora queda como contexto para cambiar de canal con ⏮ ⏭
-            Zap.remember(if (shown.any { it.url == c.url }) shown else visible(channels), c)
+            Zap.remember(queueFor(c.url), c)
             sendToTv(c.url, c.name)
         } else playOnPhone(c.url, c.name)
     }
@@ -2287,7 +2305,7 @@ class M3uActivity : AppCompatActivity() {
                 .show()
             return
         }
-        Zap.rememberPhone(if (shown.any { it.url == url }) shown else visible(channels), url)   // [ZAP-2] ⏮ ⏭ en el reproductor del teléfono
+        Zap.rememberPhone(queueFor(url), url)   // [ZAP-2] ⏮ ⏭ en el reproductor del teléfono
         val i = Intent(this, VideoPlayerActivity::class.java)
             .putExtra("url", url).putExtra("urlTitle", title)
         @Suppress("DEPRECATION")
