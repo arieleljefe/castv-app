@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v451
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v452
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -162,3 +162,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FAV-ORDEN-1 · 26 nov · con ★ Favs, mantener pulsado un canal abre «⤒ Poner el primero · ▲ Subir · ▼ Bajar · Ocultar…»; el orden se guarda en `chfavmeta` y lo siguen la fila «★ Favoritos» y la exportación .m3u · `Store.kt` (`moveChFavNear`, `moveChFavFirst`), `M3uActivity.kt` (`favRowMenu`)
 - REFUERZO-1 · 26 nov · el origen se reabre a los 12 s sin datos (antes 25 s) y el relleno de TS nulos sigue mientras se reconecta (tope 40 s), para que la TV no quite el canal; motivado por dos atascos de 25 s del origen de Pluto · `MediaServer.kt` (`stallMs`, `fillMaxMs`, vigilante)
 - TAG-3.15 · 26 nov · etiqueta `v3.15` publicada e instalada (Release `CASTV-v3.15.apk`); incluye TABS-1, ÁLBUMES-2, TOP-CANALES-1, SEGUNDO-PLANO-1, LOG-2, AUTO-REENVIO-1, PAUSA-LIVE-1, HUECOS-TS-1, VOLUMEN-TV-1, AVISO-TV-1, FUNDIDO-1, LIVE-FRESCO-1, DIAG-1, COLA-LISTA-1, FAV-ORDEN-1, REFUERZO-1 y FAV-GRUPOS-1
+- ENVIAR-CANAL-1 · 26 nov · mantener pulsado un canal abre «↗ Compartir canal · Ocultar…» (antes ocultaba directo); en ★ Favs el menú también trae «↗ Compartir canal»; manda nombre y enlace por el menú de compartir de Android; los canales Xtream (usuario y clave) y los no http(s) no se comparten · `M3uActivity.kt` (`channelMenu`, `shareChannel`, `favRowMenu`)
+- GRUPOS-ORDEN-1 · 26 nov · los chips de grupos de favoritos se ordenan con «◀ Mover antes / ▶ Mover después» (mantener pulsado el chip); orden en la clave `chfavgrporder` (castv_lib, va en el respaldo completo); renombrar conserva el lugar; ⏮ ⏭ ya recorrían solo el grupo abierto · `Store.kt` (`chFavGroupNames`, `moveChFavGroup`), `M3uActivity.kt` (`favGroupMenu`, `renameFavGroup`)
+- VOZ-1 · 26 nov · botón 🎤 junto al buscador de canales: dictado de Android que rellena el buscador (sin permisos; avisa si no hay dictado) · `M3uActivity.kt` (`startVoiceSearch`, `reqVoice`)
+- ANTERIOR-1 · 26 nov · botón «↩» en la barra «Ahora» de Canales: vuelve al canal que estaba antes en el TV y otra vez regresa al de ahora; solo en memoria y solo si Canales está abierta al cambiar de canal · `Zap.kt` (`prevUrl`, setter de `nowUrl`), `M3uActivity.kt` (`nowBack`, `backToPrevChannel`)
