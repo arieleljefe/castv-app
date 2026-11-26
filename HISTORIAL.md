@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v455
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v456
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -166,3 +166,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - GRUPOS-ORDEN-1 · 26 nov · los chips de grupos de favoritos se ordenan con «◀ Mover antes / ▶ Mover después» (mantener pulsado el chip); orden en la clave `chfavgrporder` (castv_lib, va en el respaldo completo); renombrar conserva el lugar; ⏮ ⏭ ya recorrían solo el grupo abierto · `Store.kt` (`chFavGroupNames`, `moveChFavGroup`), `M3uActivity.kt` (`favGroupMenu`, `renameFavGroup`)
 - VOZ-1 · 26 nov · botón 🎤 junto al buscador de canales: dictado de Android que rellena el buscador (sin permisos; avisa si no hay dictado) · `M3uActivity.kt` (`startVoiceSearch`, `reqVoice`)
 - ANTERIOR-1 · 26 nov · botón «↩» en la barra «Ahora» de Canales: vuelve al canal que estaba antes en el TV y otra vez regresa al de ahora; solo en memoria y solo si Canales está abierta al cambiar de canal · `Zap.kt` (`prevUrl`, setter de `nowUrl`), `M3uActivity.kt` (`nowBack`, `backToPrevChannel`)
+- PLAY-GRUPO-1 · 26 nov · con ★ Favs activo aparece el chip «▶ Reproducir» (fila de estado, junto a 📅 Guía y 🔎 Revisar): abre el primer canal de lo que se ve (todos, un grupo 📁, «Sin grupo» o una búsqueda), pregunta TV o teléfono y ⏮ ⏭ recorren esa lista; se esconde fuera de ★ Favs o sin canales · `M3uActivity.kt` (`playBtn`, `playShown`, `applyFilter`)
