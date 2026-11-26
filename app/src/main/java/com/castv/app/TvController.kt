@@ -448,6 +448,15 @@ $innerXml
         // Stop previo: evita que el TV se quede con la URI/caché anterior
         sendSoap("Stop", "<InstanceID>0</InstanceID>")
         Thread.sleep(400)
+        // [LIVE-FRESCO-1] canal en vivo: se cierra el flujo guardado para que la TV reciba uno nuevo en directo
+        if (mediaUrl.contains("/live/")) {
+            try {
+                val tok = mediaUrl.substringAfter("/live/").substringBefore('?').substringBeforeLast('.')
+                val real = String(android.util.Base64.decode(tok,
+                    android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING), Charsets.UTF_8)
+                MediaServer.dropLive(real)
+            } catch (e: Exception) { }
+        }
         val ok1 = sendSoap("SetAVTransportURI", inner)
         if (!ok1) {
             DebugLog.add("TV rechazó SetAVTransportURI (mime=$mime)")   // [COMPAT-TV-1]

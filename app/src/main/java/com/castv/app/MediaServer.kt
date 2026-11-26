@@ -21,7 +21,18 @@ import java.net.URL
  *  por http al teléfono. */
 class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
+    init { instance = this }   // [LIVE-FRESCO-1]
+
     companion object {
+        /** [LIVE-FRESCO-1] El servidor en marcha (para cerrar flujos de canales desde fuera). */
+        @Volatile private var instance: MediaServer? = null
+
+        /** [LIVE-FRESCO-1] Cierra el flujo guardado del canal [url] (si lo hay) para que la TV reciba uno nuevo en directo.
+         *  Se llama al mandar un canal al TV; sin flujo abierto no hace nada. */
+        fun dropLive(url: String) {
+            try { instance?.dropLiveHub(url) } catch (e: Exception) { DebugLog.add("LIVE-FRESCO error: ${e.javaClass.simpleName}: ${e.message}") }
+        }
+
         /** [CALIDAD-1] Calidad de los canales en vivo al TV: 0 = Baja (la de siempre), 1 = Media, 2 = Alta. Se lee de Ajustes al abrir cada canal. */
         @Volatile var liveQuality: Int = 0
 
@@ -1241,6 +1252,17 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     /** Hasta dónde (en bytes) se acepta abrir un canal nuevo: los sondeos al final del "archivo" no lo abren. */
     private val LIVE_REACH = 8L * 1024 * 1024
+
+    /** [LIVE-FRESCO-1] Quita y cierra el flujo del canal [url]; el próximo pedido de la TV abre uno nuevo. */
+    private fun dropLiveHub(url: String) {
+        val token = android.util.Base64.encodeToString(url.toByteArray(Charsets.UTF_8),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+        val h = synchronized(hubs) { hubs.remove(token) }
+        if (h != null) {
+            h.close()
+            DebugLog.add("  LIVE-FRESCO: flujo anterior cerrado")
+        }
+    }
 
     /** [GZIP-1] Crea el flujo del canal y lee la primera lista; ante un fallo pasajero reintenta una vez. */
     private fun openLiveStream(target: String): LiveHlsStream {
