@@ -81,6 +81,7 @@ class M3uActivity : AppCompatActivity() {
     private var favs: Set<String> = emptySet()
     private var favOnly = false
     private var favNew = false   // [NUEVOS-FAV-1] con ★ Favs: ver solo los añadidos en los últimos 7 días
+    private var newUrls: Set<String> = emptySet()   // [NUEVOS-DIAS-1] favoritos nuevos (para la marca 🆕 en la tarjeta)
     private var favTop = false   // [FAV-TOP-1] con ★ Favs: ordenar por más vistos (solo la vista; el orden guardado no cambia)
     private var notes: Map<String, String> = emptyMap()   // [NOTA-CANAL-1] enlace → nota del canal
     private var favGroup: String? = null   // [FAV-GRUPOS-1] grupo de favoritos activo (null = todos; "" = los que no tienen grupo)
@@ -505,9 +506,28 @@ class M3uActivity : AppCompatActivity() {
         val on = Store.favStart
         AlertDialog.Builder(this)
             .setTitle("★ Favs")
-            .setItems(arrayOf(if (on) "✓ Canales abre en ★ Favs · tocar para quitarlo" else "Abrir Canales siempre en ★ Favs")) { _, _ ->
-                Store.favStart = !on
-                toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
+            .setItems(arrayOf(
+                if (on) "✓ Canales abre en ★ Favs · tocar para quitarlo" else "Abrir Canales siempre en ★ Favs",
+                "🆕 Días para «nuevo»: ${Store.favNewDays}…"   // [NUEVOS-DIAS-1]
+            )) { _, i ->
+                if (i == 1) favNewDaysMenu() else {
+                    Store.favStart = !on
+                    toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [NUEVOS-DIAS-1] Cuántos días cuenta un favorito como «nuevo» (mantener pulsado «Favs» o el chip «🆕 Nuevos»). */
+    private fun favNewDaysMenu() {
+        val opts = intArrayOf(3, 7, 14, 30)
+        val cur = Store.favNewDays
+        AlertDialog.Builder(this)
+            .setTitle("🆕 Días para «nuevo»")
+            .setItems(Array(opts.size) { (if (opts[it] == cur) "✓ " else "") + "${opts[it]} días" }) { _, i ->
+                Store.favNewDays = opts[i]
+                if (favOnly) applyFilter()
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -1214,8 +1234,10 @@ class M3uActivity : AppCompatActivity() {
             if (gone) favGroup = null else fgm = gm   // el grupo ya no existe (o ya no hay favoritos sin grupo)
         }
         var newMap: Map<String, Long>? = null   // [NUEVOS-FAV-1]
+        val allNew: Map<String, Long> = if (favOnly) Store.chFavNew() else emptyMap()   // [NUEVOS-DIAS-1]
+        newUrls = allNew.keys.toSet()
         if (favOnly && favNew) {
-            val nm = Store.chFavNew()
+            val nm = allNew
             if (nm.isEmpty()) favNew = false else newMap = nm   // ya no queda ninguno nuevo
         }
         val nmap: Map<String, Long>? = newMap
@@ -1253,7 +1275,7 @@ class M3uActivity : AppCompatActivity() {
             statusView.text = if (favChannels.isEmpty()) "Aún no tienes favoritos: marca ★ en un canal"
                 else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)" +
                     (if (favGroup != null) " · " + (if (favGroup == "") "sin grupo" else "«$favGroup»") else "") +
-                    (if (favNew) " · 🆕 nuevos (7 días)" else "") +   // [NUEVOS-FAV-1]
+                    (if (favNew) " · 🆕 nuevos (${Store.favNewDays} días)" else "") +   // [NUEVOS-FAV-1]
                     (if (favTop) " · 🔥 más vistos" else "")   // [FAV-TOP-1]
         } else if (channels.isNotEmpty()) {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
@@ -1359,6 +1381,7 @@ class M3uActivity : AppCompatActivity() {
             t.textSize = 14f
             t.setPadding(dp(12), dp(6), dp(12), dp(6))
             if (favNew) styleActiveChip(t)
+            t.setOnLongClickListener { favNewDaysMenu(); true }   // [NUEVOS-DIAS-1]
             moodRow.addView(t)
         }
         if (showTop) {   // [FAV-TOP-1]
@@ -2632,7 +2655,7 @@ class M3uActivity : AppCompatActivity() {
             // [PULIDO-3b/3c] nombre limpio; categorías en español y etiquetas en la línea gris
             val (shownName, badges) = splitName(c.name)
             val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
-            (box.getChildAt(0) as TextView).text = (if (failed.containsKey(c.url)) "⚠ " else "") + shownName   // [FUENTES-1]
+            (box.getChildAt(0) as TextView).text = (if (failed.containsKey(c.url)) "⚠ " else "") + (if (favOnly && !favNew && newUrls.contains(c.url)) "🆕 " else "") + shownName   // [FUENTES-1] [NUEVOS-DIAS-1]
             val line2 = Epg.nowLine(c)   // [EPG-1] con guía: «▶ programa · hasta HH:MM»; si no, categorías y etiquetas
                 ?: listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
             val note = notes[c.url]   // [NOTA-CANAL-1] la nota va primero en la línea gris

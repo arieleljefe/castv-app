@@ -315,6 +315,11 @@ object Store {
         get() = prefs.getBoolean("favstart", false)
         set(v) { prefs.edit().putBoolean("favstart", v).apply() }
 
+    /** [NUEVOS-DIAS-1] Cuántos días un favorito cuenta como «nuevo» (3, 7, 14 o 30; clave nueva "favnewdays" en castv_lib; el respaldo la incluye sola). */
+    var favNewDays: Int
+        get() = prefs.getInt("favnewdays", 7).let { if (it == 3 || it == 7 || it == 14 || it == 30) it else 7 }
+        set(v) { prefs.edit().putInt("favnewdays", v).apply() }
+
     // ------------------------------------------------- Catálogo preinstalado (CATALOGO-1)
 
     /**
@@ -455,7 +460,7 @@ object Store {
     }
 
     /** Favoritos añadidos hace menos de [days] días: enlace → fecha de alta (ms). Solo los que siguen siendo favoritos. */
-    fun chFavNew(days: Int = 7): Map<String, Long> {
+    fun chFavNew(days: Int = favNewDays): Map<String, Long> {
         val urls = chFavs()
         val since = System.currentTimeMillis() - days * 86_400_000L
         val out = LinkedHashMap<String, Long>()
