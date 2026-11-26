@@ -63,6 +63,9 @@ object Logos {
         }
     }
 
+    /** [ACCESO-3] El logo ya bajado (solo de la memoria; null si aún no está). */
+    fun cached(url: String): Bitmap? = if (url.isEmpty()) null else cache.get(url)
+
     /** [VISTA-5] Color de fondo para el logo: oscuro si el logo es claro (p. ej. blanco), claro en los demás casos o si aún no llegó. */
     fun bgFor(url: String): Int {
         val b = cache.get(url) ?: return BG_LIGHT

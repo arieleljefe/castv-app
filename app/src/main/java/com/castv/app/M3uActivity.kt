@@ -485,7 +485,7 @@ class M3uActivity : AppCompatActivity() {
             val info = ShortcutInfoCompat.Builder(this, "ch_$id")
                 .setShortLabel(c.name.take(24).ifBlank { "Canal" })
                 .setLongLabel(c.name.take(60).ifBlank { "Canal" })
-                .setIcon(IconCompat.createWithResource(this, icon))
+                .setIcon(shortcutIcon(c) ?: IconCompat.createWithResource(this, icon))   // [ACCESO-3] el logo del canal si ya está bajado
                 .setIntent(open)
                 .build()
             if (ShortcutManagerCompat.requestPinShortcut(this, info, null)) toast("📌 Confirma en la pantalla de inicio")
@@ -500,6 +500,25 @@ class M3uActivity : AppCompatActivity() {
         val c = Store.chFavChannels().firstOrNull { shortId(it.url) == id }
         if (c == null) { toast("Ese canal ya no está en favoritos"); return }
         openChannel(c)
+    }
+
+    /** [ACCESO-3] Icono del acceso directo: el logo del canal sobre su fondo, en un cuadrado redondeado. null si el logo aún no está en memoria (entonces se usa el icono de la app). */
+    private fun shortcutIcon(c: M3uChannel): IconCompat? {
+        val logo = Logos.cached(c.logo) ?: return null
+        return try {
+            val s = 192
+            val out = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
+            val cv = android.graphics.Canvas(out)
+            val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            bg.color = Logos.bgFor(c.logo)
+            cv.drawRoundRect(android.graphics.RectF(0f, 0f, s.toFloat(), s.toFloat()), 40f, 40f, bg)
+            val k = minOf(136f / logo.width, 136f / logo.height)
+            val w = logo.width * k
+            val h = logo.height * k
+            val dst = android.graphics.RectF((s - w) / 2f, (s - h) / 2f, (s + w) / 2f, (s + h) / 2f)
+            cv.drawBitmap(logo, null, dst, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+            IconCompat.createWithBitmap(out)
+        } catch (e: Exception) { null }
     }
 
     /** [ACCESO-2] Pide a la pantalla de inicio un acceso directo al grupo de favoritos [name]; el acceso directo solo guarda el nombre del grupo (nunca enlaces de canales). */
