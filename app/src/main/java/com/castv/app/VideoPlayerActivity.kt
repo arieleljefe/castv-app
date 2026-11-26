@@ -890,6 +890,15 @@ class VideoPlayerActivity : AppCompatActivity() {
         fwdSkip = skipBtn { seekBy(btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(fwdSkip)
         btnRow.addView(iconBtn(R.drawable.ic_next) { stepOrZap(+1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        backBtn = TextView(this).apply {   // [ANTERIOR-2] vuelve al canal de antes; pulsarlo otra vez regresa al de ahora
+            text = "↩"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            setOnClickListener { backToPrevChannel(); keepControls() }
+        }
+        btnRow.addView(backBtn, LinearLayout.LayoutParams(dp(40), dp(48)))
         bottomBar.addView(btnRow)
 
         root.addView(bottomBar, FrameLayout.LayoutParams(
@@ -1120,6 +1129,8 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     /** Canales de la lista desde la que se abrió este canal (vacía si es un video o un enlace suelto). */
     private var zapList: List<M3uChannel> = emptyList()
+    private var prevIdx = -1                  // [ANTERIOR-2] posición del canal que sonaba antes del actual
+    private var backBtn: TextView? = null     // [ANTERIOR-2] «↩» (solo se ve con una lista de canales y un canal anterior)
 
     // ------------------------------------------------------------ [BARRA-1] menú ⋯
 
@@ -1238,6 +1249,21 @@ class VideoPlayerActivity : AppCompatActivity() {
         toast(if (on) "★ En Favoritos: " + c.name else "☆ Quitado de Favoritos")
     }
 
+    /** [ANTERIOR-2] «↩»: pasa al canal que sonaba antes del actual (playAt anota el anterior, así que otro toque regresa). */
+    private fun backToPrevChannel() {
+        val p = prevIdx
+        if (zapList.size < 2 || p !in items.indices || p == index) return
+        playAt(p)
+        val c = zapList.getOrNull(index) ?: return
+        Store.addLink(c.url, c.name)   // queda en el Historial
+        Store.rememberRecentChannel(c)   // y en «Continuar»
+        showHud("↩ " + c.name)
+    }
+
+    private fun updateBackBtn() {
+        backBtn?.visibility = if (zapList.size > 1 && prevIdx in items.indices && prevIdx != index) View.VISIBLE else View.GONE
+    }
+
     /** ⏮ ⏭: con una lista de canales pasan al vecino (dando la vuelta); con videos normales, como siempre. */
     private fun stepOrZap(delta: Int) {
         if (zapList.size < 2) { playAt(index + delta); return }
@@ -1253,7 +1279,9 @@ class VideoPlayerActivity : AppCompatActivity() {
         if (saveCurrent) saveProgress()
         flushWatch(); watchAccMs = 0L; watchLastMs = 0L   // [TIEMPO-1] lo visto va al video que termina
         if (SubtitleGen.running) { aiCancel = true; SubtitleGen.requestCancel() }   // [IA-3] cambia de video
+        if (zapList.size > 1 && i != index) prevIdx = index   // [ANTERIOR-2]
         index = i
+        updateBackBtn()   // [ANTERIOR-2]
         val it = items[i]
         pendingStart = startAt
         subs = emptyList()
