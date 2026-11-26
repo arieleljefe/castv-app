@@ -91,6 +91,7 @@ class M3uActivity : AppCompatActivity() {
     private val reqSave = 4716   // [M3U-EXPORT-1] «Guardar…» el .m3u de favoritos
     private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
     private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
+    private lateinit var playBtn: TextView   // [PLAY-GRUPO-1] «▶ Reproducir» (solo con ★ Favs)
     private var regionName: String? = null   // [EPG-REGION-1] región abierta (null con una lista suelta)
     private var regionLists: List<M3uList> = emptyList()   // [EPG-REGION-1]
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
@@ -311,12 +312,19 @@ class M3uActivity : AppCompatActivity() {
         failBtn.textSize = 13f
         failBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         failBtn.visibility = View.GONE
+        playBtn = chip("▶ Reproducir") { playShown() }   // [PLAY-GRUPO-1]
+        playBtn.contentDescription = "Reproducir lo que se ve"
+        playBtn.textSize = 13f
+        playBtn.maxLines = 1
+        playBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
+        playBtn.visibility = View.GONE
         guideBtn = chip("📅 Guía") { guideDialog() }   // [CANALES-1] con texto   // [EPG-1]
         guideBtn.contentDescription = "Guía de programación"
         guideBtn.textSize = 13f
         guideBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         iconLabel(guideBtn, R.drawable.ic_event, "Guía")   // [ICONOS-2]
         guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE
+        statusRow.addView(playBtn)   // [PLAY-GRUPO-1]
         statusRow.addView(guideBtn)
         statusRow.addView(failBtn)
         statusRow.addView(checkBtn)
@@ -1130,6 +1138,7 @@ class M3uActivity : AppCompatActivity() {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
                 (if (fromCache) cacheNote else "")
         }
+        playBtn.visibility = if (favOnly && shown.isNotEmpty()) View.VISIBLE else View.GONE   // [PLAY-GRUPO-1]
         refreshSections()   // [ESTILO-2]
         refreshMoods()   // [ESTILO-3]
         updateFailBtn()   // [FUENTES-1]
@@ -1875,6 +1884,13 @@ class M3uActivity : AppCompatActivity() {
         if (favOnly) reloadFavChannels()   // [FAV-1]
         exportBtn.visibility = if (favOnly) View.VISIBLE else View.GONE   // [M3U-EXPORT-1]
         applyFilter()
+    }
+
+    /** [PLAY-GRUPO-1] «▶ Reproducir» (con ★ Favs): abre el primer canal de lo que se ve (un grupo, una búsqueda o todos). Pregunta TV o teléfono como siempre; ⏮ ⏭ recorren esa lista. */
+    private fun playShown() {
+        val first = shown.firstOrNull()
+        if (first == null) { toast("No hay canales para reproducir"); return }
+        openChannel(first)
     }
 
     // ------------------------------------------------------------ [M3U-EXPORT-1] Exportar ★ Favoritos como .m3u
