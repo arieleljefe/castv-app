@@ -1323,9 +1323,10 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         private val stallMs = 25_000L
 
         // [HUECOS-TS-1] si el origen no da datos, se rellena con paquetes TS nulos para que la TV no cierre la conexión
-        private val fillAfterMs = 10_000L   // entre fragmentos normales pasan hasta ~7,5 s; por debajo de esto no se rellena
+        private val fillAfterMs = 5_000L    // la TV se quita a los ~10 s sin datos (Ariel, 26 nov): hay que rellenar antes
         private val fillPackets = 64        // 64 x 188 = 12 032 bytes por segundo de hueco
         private var filling = false         // solo lo toca el vigilante
+        private var fillLogged = false      // solo se anota el hueco si pasa de 10 s (los de 5-7 s entre fragmentos normales no)
         private var fillBytes = 0L
         private var fillT0 = 0L
         private var attempts = 0
@@ -1442,23 +1443,17 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                         // [HUECOS-TS-1] sin datos del origen: relleno hasta que el atasco de 25 s reabre el origen
                         val idle = System.currentTimeMillis() - lastProduce
                         if (!braked && clients.get() > 0 && idle > fillAfterMs && idle <= stallMs) {
-                            if (fillNulls(fillPackets)) {
-                                if (!filling) {
-                                    filling = true
-                                    fillBytes = 0L
-                                    fillT0 = System.currentTimeMillis()
-                                    DebugLog.add("  HUECO: sin datos ${idle / 1000} s, se rellena con paquetes nulos (conexiones de la TV: ${clients.get()})")
-                                }
-                                fillBytes += fillPackets * 188L
-                            } else if (!filling) {
-                                filling = true
-                                fillBytes = 0L
-                                fillT0 = System.currentTimeMillis()
-                                DebugLog.add("  HUECO: sin datos ${idle / 1000} s, no se rellena (paquete a medias)")
+                            if (!filling) { filling = true; fillLogged = false; fillBytes = 0L; fillT0 = System.currentTimeMillis() }
+                            val ok = fillNulls(fillPackets)
+                            if (ok) fillBytes += fillPackets * 188L
+                            if (!fillLogged && idle > 10_000L) {
+                                fillLogged = true
+                                DebugLog.add("  HUECO: sin datos ${idle / 1000} s, " + (if (ok) "se rellena con paquetes nulos" else "no se rellena (paquete a medias)") +
+                                    " (conexiones de la TV: ${clients.get()})")
                             }
                         } else if (filling && idle <= fillAfterMs) {
                             filling = false
-                            DebugLog.add("  HUECO: fin del relleno (${fillBytes / 1000} KB en ${(System.currentTimeMillis() - fillT0) / 1000} s; conexiones de la TV: ${clients.get()})")
+                            if (fillLogged) DebugLog.add("  HUECO: fin del relleno (${fillBytes / 1000} KB en ${(System.currentTimeMillis() - fillT0) / 1000} s; conexiones de la TV: ${clients.get()})")
                         }
                         if (!braked && clients.get() > 0 && System.currentTimeMillis() - lastProduce > stallMs) {
                             MediaServer.lastLiveStallMs = System.currentTimeMillis()   // [AUTO-REENVIO-1]
