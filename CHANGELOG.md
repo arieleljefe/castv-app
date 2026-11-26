@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v445
+# CASTV: CHANGELOG (cerebro) · v446
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -21,7 +21,7 @@ Estados: ✅ confirmado por Ariel · 🧪 entregado/pendiente de probar · ⏳ e
 | Workflow | `.github/workflows/build.yml` (compila `assembleRelease` firmado; etiqueta `v*` publica APK; paso de pruebas TESTS-1 antes de compilar) |
 | **Carpeta de intercambio (Download del móvil)** | `~/storage/downloads/` |
 | Teléfono | Android + Termux · **la IP cambia** (DHCP + MAC aleatoria; el 24 nov era `192.168.100.20`, antes `.43`). La app la detecta sola; verla en Ajustes › Emisión al TV › «IP del teléfono». Nunca dar una IP fija por sentada |
-| App | puerto `8001` (rango 8000–8010) · log: `http://<IP del teléfono>:8001/log` (`?clear` para limpiar) |
+| App | puerto `8001` (rango 8000–8010) · log: `http://<IP del teléfono>:<puerto>/log` (el 26 nov el puerto era `8000`; probar 8000-8010) (`?clear` para limpiar) |
 | TV | Hisense HL1 (JVC en pantalla, Vidaa) · IP `192.168.100.14` · código de servicio `VA0250UD1`, software `V0100.06.13J.N0711` (Ariel, 24 nov) · DLNA/UPnP puerto `38400` (solo MediaRenderer; XML en `/MediaServer/rendererdevicedesc.xml`). **Ignora `SetMute`: el silencio es `SetVolume 0`**; `GetVolume` da 0 hasta el primer `SetVolume` |
 | Punto seguro | etiqueta `v2.1-estable` / commit `d7010ac` |
 | Idioma | Español. Respuestas cortas (Ariel usa el móvil). |
@@ -98,7 +98,7 @@ rm -f ~/storage/downloads/*_actual.*
   2. **COLA-LISTA-1 · 🧪** · Qué: la cola ya existía (▲▼ ✕, «Sonará después», vaciar); se añade el botón «Guardar como lista» (lista nueva o existente; la cola no se vacía; repetidas se saltan). · Archivos: `MainActivity.kt` (`saveQueueAsList`, `showQueue`) · Probar: añadir 3 pistas a la cola › Cola › Guardar como lista › Nueva lista; abrirla en Mis listas.
   3. **FAV-ORDEN-1 · 🧪** · Qué: con ★ Favs activo en Canales, mantener pulsado un canal abre «⤒ Poner el primero · ▲ Subir · ▼ Bajar · Ocultar…» (antes ocultaba directo); el orden se guarda en `chfavmeta` (sin clave nueva) y lo siguen la fila «★ Favoritos» y la exportación .m3u; los favoritos nuevos van al final. Grupos propios de favoritos: no entran por ahora (Ariel puede pedirlos). · Archivos: `Store.kt` (`moveChFavNear`, `moveChFavFirst`), `M3uActivity.kt` (`favRowMenu`) · Probar: ★ Favs › mantener pulsado el tercero › Poner el primero; salir y volver a entrar: el orden se mantiene.
   4. **ESTADO-TV-1 · ⛔ ya existe (26 nov):** el botón de salida ya cambia de color (`updateOutputButton`: cian = teléfono, blanco = TV conectada, ámbar = buscando o sin conexión). Sin parche.
-  5. **REFUERZO-1 · ⏳** sigue en pausa: necesita un caso real (el canal vuelve a quitarse) y su `/log` para afinarlo; solo `MediaServer.kt`.
+  5. **REFUERZO-1 · 🧪 (26 nov; Ariel pasó el `/log` y dijo que la imagen a veces se congela y vuelve, y a veces se congela y el canal se quita)** · Qué: el origen se reabre a los 12 s sin datos (antes 25 s) y el relleno de TS nulos sigue también mientras se reconecta (tope 40 s; antes, durante la reconexión la TV no recibía bytes y quitaba el canal). Log que lo motivó: dos atascos de 25 s (15:10:59 y 15:11:29) del origen de Pluto, cada uno con ~22 s de relleno. · Archivos: `MediaServer.kt` (`stallMs`, `fillMaxMs`, vigilante) · Probar: mandar un canal de Pluto al TV y verlo 10 min; en el `/log` los atascos deben decir «sin datos 12 s» y la imagen congelada debe durar ~15 s en vez de ~28 s · Riesgo: con un origen solo lento se reabre más veces.
   6. Subtítulos en el TV · ⛔ fuera del lote por decisión de Ariel (26 nov).
 - **Pendientes de antes:** (1) LIMPIA-1 ⬜: Ariel corre la plantilla E y dice «listo» (al tener los `*_actual.*` de hoy, correrla al terminar el lote). (2) Etiqueta `v3.14` propuesta (R12) y aún sin confirmar; con estos tres parches conviene decidir si se etiqueta ya `v3.14` o se junta todo en `v3.15`. (3) COMPAT-TV-1 ⏳ espera la TV del amigo. LIVE-FRESCO-1 ✅ (26 nov; línea en `HISTORIAL`).
 
