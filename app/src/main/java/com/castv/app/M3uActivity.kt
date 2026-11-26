@@ -76,6 +76,7 @@ class M3uActivity : AppCompatActivity() {
     private var cacheNote = " · sin conexión (copia guardada)"   // [LISTA-VAL-1] texto del pie cuando se usa la copia
     private var favs: Set<String> = emptySet()
     private var favOnly = false
+    private var notes: Map<String, String> = emptyMap()   // [NOTA-CANAL-1] enlace → nota del canal
     private var favGroup: String? = null   // [FAV-GRUPOS-1] grupo de favoritos activo (null = todos; "" = los que no tienen grupo)
     private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
     private var favNorm: List<String> = emptyList()
@@ -183,6 +184,7 @@ class M3uActivity : AppCompatActivity() {
         }, true)
         Store.init(this)
         favs = Store.chFavs()
+        notes = Store.chNotes()   // [NOTA-CANAL-1]
         hidden = Store.hiddenUrls()   // [OCULTAR-1]
         failed = Store.failedChannels()   // [FUENTES-1]
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
@@ -1106,7 +1108,9 @@ class M3uActivity : AppCompatActivity() {
             if (!favOnly && g != null && !groupKeys(c).contains(g)) continue   // [GRUPOS-1]
             if (!favOnly && mood >= 0 && (moodMask(c.group) and (1 shl mood)) == 0) continue   // [ESTILO-3]
             val n = baseNames[i]
+            val nt = if (notes.isEmpty()) null else notes[c.url]   // [NOTA-CANAL-1] también se busca en la nota
             if (toks.all { n.contains(it) }) out.add(c)
+            else if (nt != null && norm(nt).let { nn -> toks.all { nn.contains(it) } }) out.add(c)
             else if (byProg) {   // [EPG-BUSCAR-1]
                 val pt = Epg.nowTitle(c)
                 if (pt != null) {
@@ -1328,6 +1332,7 @@ class M3uActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         favs = Store.chFavs()   // [FAV-REPRO-1] la ★ pudo cambiar en el reproductor
+        notes = Store.chNotes()   // [NOTA-CANAL-1]
         failed = Store.failedChannels()   // [FUENTES-1] el reproductor pudo anotar fallos o aciertos
         if (::chAdapter.isInitialized) { if (favOnly) { reloadFavChannels(); applyFilter() } else { chAdapter.notifyDataSetChanged(); updateFailBtn() } }
         refreshSections()   // al volver del reproductor, "Continuar" ya trae el canal visto
@@ -1540,6 +1545,7 @@ class M3uActivity : AppCompatActivity() {
             opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
         }
         opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
+        opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
         opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
         opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
@@ -1565,7 +1571,36 @@ class M3uActivity : AppCompatActivity() {
         val c = shown[i]
         AlertDialog.Builder(this)
             .setTitle(c.name)
-            .setItems(arrayOf("↗ Compartir canal", "Ocultar…")) { _, which -> if (which == 0) shareChannel(c) else confirmHide(c) }
+            .setItems(arrayOf("↗ Compartir canal", noteLabel(c), "Ocultar…")) { _, which ->
+                when (which) { 0 -> shareChannel(c); 1 -> editNote(c); else -> confirmHide(c) }   // [NOTA-CANAL-1]
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun noteLabel(c: M3uChannel): String = if (notes[c.url].isNullOrEmpty()) "✎ Añadir nota…" else "✎ Editar nota…"
+
+    /** [NOTA-CANAL-1] Nota corta (hasta 60 letras) del canal; vacía la borra. Los canales de Xtream no llevan nota. */
+    private fun editNote(c: M3uChannel) {
+        if (Xtream.leakFilter(this)(c.url) || Xtream.isXtream(c.url)) { toast("Los canales de Xtream no llevan nota (tienen usuario y clave)"); return }
+        val box = LinearLayout(this)
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val noteIn = EditText(this)
+        noteIn.hint = "Ej. sin audio en HD"
+        noteIn.setSingleLine(true)
+        noteIn.filters = arrayOf(android.text.InputFilter.LengthFilter(60))
+        noteIn.setText(notes[c.url] ?: "")
+        box.addView(noteIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        AlertDialog.Builder(this)
+            .setTitle("✎ Nota de «${c.name}»")
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ ->
+                if (Store.setChNote(c.url, noteIn.text.toString())) {
+                    notes = Store.chNotes()
+                    if (favOnly) reloadFavChannels()
+                    applyFilter()
+                }
+            }
             .setNegativeButton("Cancelar", null)
             .show()
     }
@@ -2117,8 +2152,10 @@ class M3uActivity : AppCompatActivity() {
             val (shownName, badges) = splitName(c.name)
             val cats = if (c.group.isBlank()) "" else groupKeys(c).joinToString(" · ") { groupLabel(it) }
             (box.getChildAt(0) as TextView).text = (if (failed.containsKey(c.url)) "⚠ " else "") + shownName   // [FUENTES-1]
-            (box.getChildAt(1) as TextView).text = Epg.nowLine(c)   // [EPG-1] con guía: «▶ programa · hasta HH:MM»; si no, categorías y etiquetas
+            val line2 = Epg.nowLine(c)   // [EPG-1] con guía: «▶ programa · hasta HH:MM»; si no, categorías y etiquetas
                 ?: listOf(cats, badges).filter { it.isNotEmpty() }.joinToString(" · ")
+            val note = notes[c.url]   // [NOTA-CANAL-1] la nota va primero en la línea gris
+            (box.getChildAt(1) as TextView).text = if (note.isNullOrEmpty()) line2 else if (line2.isEmpty()) "✎ $note" else "✎ $note · $line2"
             return v
         }
     }

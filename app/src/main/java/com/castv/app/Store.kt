@@ -561,6 +561,41 @@ object Store {
         return true
     }
 
+    // [NOTA-CANAL-1] Nota corta por canal (máx. 60 caracteres): clave nueva "chnotes" (objeto enlace → nota) en castv_lib,
+    // así que el respaldo completo la incluye sola. Los canales de Xtream no llevan nota (sus enlaces tienen usuario y clave).
+
+    private const val MAX_NOTE = 60
+
+    fun chNotes(): Map<String, String> {
+        val out = HashMap<String, String>()
+        val raw = prefs.getString("chnotes", null) ?: return out
+        try {
+            val o = JSONObject(raw)
+            val ks = o.keys()
+            while (ks.hasNext()) {
+                val k = ks.next()
+                val v = o.optString(k, "")
+                if (v.isNotEmpty()) out[k] = v
+            }
+        } catch (e: Exception) { rescue("chnotes", raw, e) }
+        return out
+    }
+
+    /** Guarda la nota del canal [url] (vacía = borrarla). true si cambió algo. */
+    @Synchronized
+    fun setChNote(url: String, note: String): Boolean {
+        val n = note.replace(Regex("[\\r\\n]+"), " ").trim().take(MAX_NOTE)
+        val m = LinkedHashMap(chNotes())
+        if ((m[url] ?: "") == n) return false
+        if (n.isEmpty()) m.remove(url) else m[url] = n
+        try {
+            val o = JSONObject()
+            for ((k, v) in m) o.put(k, v)
+            prefs.edit().putString("chnotes", o.toString()).apply()
+        } catch (e: Exception) { return false }
+        return true
+    }
+
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
     @Synchronized
     fun backfillChFavs(list: List<M3uChannel>) {
