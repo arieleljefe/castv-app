@@ -45,6 +45,32 @@ class BackupTest {
         assertTrue(out.has("http://ok.com/a"))
     }
 
+    @Test fun scrubQuitaNotasConClave() {   // [SEGURIDAD-RESP-1]
+        val v = JSONObject().put("http://ok.com/a", "nota 1").put("http://xtream.x/b", "nota 2").toString()
+        val out = JSONObject(Backup.scrub("chnotes", v, leaks))
+        assertEquals(1, out.length())
+        assertEquals("nota 1", out.getString("http://ok.com/a"))
+    }
+
+    @Test fun scrubQuitaRespaldosConClave() {   // [SEGURIDAD-RESP-1]
+        val alt = { u: String -> JSONObject().put("n", "X").put("u", u).put("g", "").put("l", "") }
+        val v = JSONObject()
+            .put("http://ok.com/a", JSONArray().put(alt("http://ok.com/b")).put(alt("http://xtream.x/c")))
+            .put("http://xtream.x/d", JSONArray().put(alt("http://ok.com/e")))
+            .put("http://ok.com/f", JSONArray().put(alt("http://xtream.x/g"))).toString()
+        val out = JSONObject(Backup.scrub("chalts", v, leaks))
+        assertEquals(1, out.length())   // la clave con clave se va; la que se queda sin respaldos también
+        val l = out.getJSONArray("http://ok.com/a")
+        assertEquals(1, l.length())
+        assertEquals("http://ok.com/b", l.getJSONObject(0).getString("u"))
+    }
+
+    @Test fun scrubDeRespaldosRotos() {   // [SEGURIDAD-RESP-1]
+        assertEquals("{}", Backup.scrub("chalts", "roto xtream", leaks))
+        assertEquals("{}", Backup.scrub("chnotes", "roto xtream", leaks))
+        assertEquals("roto", Backup.scrub("chnotes", "roto", leaks))
+    }
+
     @Test fun scrubNoTocaOtrasClaves() {
         assertEquals("xtream", Backup.scrub("tema", "xtream", leaks))
     }

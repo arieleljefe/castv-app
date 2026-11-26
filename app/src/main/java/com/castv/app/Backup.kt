@@ -36,19 +36,29 @@ object Backup {
     }
 
     // [XTREAM-1] Claves de castv_lib con enlaces de canales: los de Xtream llevan usuario y clave, así que no viajan en respaldos
-    private val URL_KEYS = setOf("chfav", "chfavmeta", "chhidden", "links", "chrecent", "chhealth")
+    private val URL_KEYS = setOf("chfav", "chfavmeta", "chhidden", "links", "chrecent", "chhealth", "chalts", "chnotes")   // [SEGURIDAD-RESP-1] chalts y chnotes
+    private val OBJ_KEYS = setOf("chhealth", "chnotes", "chalts")   // objetos que tienen el enlace como clave
 
     /** Quita de [v] (texto JSON de la clave [k]) los enlaces con usuario y clave de Xtream. */
     internal fun scrub(k: String, v: String, leaks: (String) -> Boolean): String {
         if (k !in URL_KEYS) return v
         return try {
-            if (k == "chhealth") {
+            if (k in OBJ_KEYS) {
                 val o = JSONObject(v)
                 val out = JSONObject()
                 val ks = o.keys()
                 while (ks.hasNext()) {
                     val u = ks.next()
-                    if (!leaks(u)) out.put(u, o.get(u))
+                    if (leaks(u)) continue
+                    if (k == "chalts") {   // [SEGURIDAD-RESP-1] también se quitan los respaldos cuyo enlace lleve usuario y clave
+                        val arr = o.optJSONArray(u) ?: continue
+                        val keep = JSONArray()
+                        for (i in 0 until arr.length()) {
+                            val e = arr.optJSONObject(i) ?: continue
+                            if (!leaks(e.optString("u"))) keep.put(e)
+                        }
+                        if (keep.length() > 0) out.put(u, keep)
+                    } else out.put(u, o.get(u))
                 }
                 out.toString()
             } else {
@@ -62,7 +72,7 @@ object Backup {
                 out.toString()
             }
         } catch (ex: Exception) {
-            if (!leaks(v)) v else if (k == "chhealth") "{}" else "[]"
+            if (!leaks(v)) v else if (k in OBJ_KEYS) "{}" else "[]"
         }
     }
 
