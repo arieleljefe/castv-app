@@ -85,6 +85,7 @@ class M3uActivity : AppCompatActivity() {
     private lateinit var failBtn: TextView   // [FUENTES-1] "⚠ N": canales que fallan seguido (solo se ve si hay alguno)
     @Volatile private var failed: Map<String, Int> = emptyMap()   // [FUENTES-1] enlace → fallos seguidos (2 o más)
     private val reqPlayer = 4715
+    private val reqVoice = 4717   // [VOZ-1] dictado para el buscador de canales
     private val reqSave = 4716   // [M3U-EXPORT-1] «Guardar…» el .m3u de favoritos
     private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
     private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
@@ -271,6 +272,7 @@ class M3uActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) { applyFilter() }
         })
         row2.addView(searchBox, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row2.addView(chip("🎤") { startVoiceSearch() })   // [VOZ-1]
         groupBtn = chip("Grupo: Todos ▾") { pickGroup() }
         row2.addView(groupBtn)
         root.addView(row2)
@@ -1532,6 +1534,16 @@ class M3uActivity : AppCompatActivity() {
             .show()
     }
 
+    /** [VOZ-1] Abre el dictado de Android y pone lo que se dijo en el buscador (sin permisos propios: lo hace la app de voz del teléfono). */
+    @Suppress("DEPRECATION")
+    private fun startVoiceSearch() {
+        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Di el nombre del canal")
+        }
+        try { startActivityForResult(i, reqVoice) } catch (e: Exception) { toast("Este teléfono no tiene dictado por voz") }
+    }
+
     /** [ENVIAR-CANAL-1] Mantener pulsado un canal (fuera de ★ Favs): compartirlo u ocultarlo. */
     private fun channelMenu(i: Int) {
         if (i !in shown.indices) return
@@ -2003,6 +2015,14 @@ class M3uActivity : AppCompatActivity() {
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == reqVoice) {   // [VOZ-1]
+            val said = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
+            if (resultCode == RESULT_OK && !said.isNullOrEmpty()) {
+                searchBox.setText(said)
+                searchBox.setSelection(searchBox.text.length)
+            }
+            return
+        }
         if (requestCode == reqSave) {   // [M3U-EXPORT-1]
             val text = exportPending
             exportPending = null
