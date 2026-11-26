@@ -507,7 +507,10 @@ object Store {
         val groups = readChFavGroups()
         var n = 0
         for (k in groups.keys.toList()) if (groups[k] == old) { groups[k] = g; n++ }
-        if (n > 0) writeChFavMeta(ArrayList(chFavChannels()), groups)
+        if (n > 0) {
+            writeChFavMeta(ArrayList(chFavChannels()), groups)
+            writeChFavGroupOrder(readChFavGroupOrder().map { if (it == old) g else it }.distinct())   // [GRUPOS-ORDEN-1]
+        }
         return n
     }
 
@@ -519,6 +522,43 @@ object Store {
         for (k in groups.keys.toList()) if (groups[k] == name) { groups.remove(k); n++ }
         if (n > 0) writeChFavMeta(ArrayList(chFavChannels()), groups)
         return n
+    }
+
+    // [GRUPOS-ORDEN-1] Orden de los chips de grupos: clave nueva "chfavgrporder" (lista de nombres) en castv_lib, así que el respaldo completo la incluye sola.
+
+    private fun readChFavGroupOrder(): List<String> {
+        val raw = prefs.getString("chfavgrporder", null) ?: return emptyList()
+        return try {
+            val a = JSONArray(raw)
+            (0 until a.length()).map { a.getString(it) }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private fun writeChFavGroupOrder(l: List<String>) {
+        try {
+            val a = JSONArray()
+            for (x in l) a.put(x)
+            prefs.edit().putString("chfavgrporder", a.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Nombres de los grupos en el orden elegido; los que aún no tienen lugar van al final, por orden alfabético. */
+    fun chFavGroupNames(): List<String> {
+        val names = chFavGroupMap().values.toSet()
+        val ordered = readChFavGroupOrder().filter { names.contains(it) }.distinct()
+        return ordered + names.filter { !ordered.contains(it) }.sortedBy { it.lowercase() }
+    }
+
+    /** Mueve el grupo [name] una posición ([delta] = -1 antes, +1 después). true si cambió. */
+    @Synchronized
+    fun moveChFavGroup(name: String, delta: Int): Boolean {
+        val l = chFavGroupNames().toMutableList()
+        val i = l.indexOf(name)
+        val j = i + delta
+        if (i < 0 || j < 0 || j >= l.size) return false
+        l.add(j, l.removeAt(i))
+        writeChFavGroupOrder(l)
+        return true
     }
 
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */

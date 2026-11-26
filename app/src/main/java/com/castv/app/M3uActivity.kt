@@ -1207,7 +1207,7 @@ class M3uActivity : AppCompatActivity() {
     /** Con ★ Favs: fila de chips con los grupos (tocar = filtrar; mantener pulsado = renombrar o quitar el grupo). Sin grupos, se esconde. */
     private fun drawFavGroups() {
         val gm = Store.chFavGroupMap()
-        val names = gm.values.distinct().sortedBy { it.lowercase() }
+        val names = Store.chFavGroupNames()   // [GRUPOS-ORDEN-1]
         moodDrawn = ""   // al salir de ★ Favs se vuelve a dibujar la fila de ánimos
         moodRow.removeAllViews()
         if (names.isEmpty()) { moodScroll.visibility = View.GONE; return }
@@ -1225,32 +1225,40 @@ class M3uActivity : AppCompatActivity() {
     }
 
     private fun favGroupMenu(name: String) {
+        val names = Store.chFavGroupNames()
+        val pos = names.indexOf(name)
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        if (pos > 0) { opts.add("◀ Mover antes"); acts.add { if (Store.moveChFavGroup(name, -1)) applyFilter() } }   // [GRUPOS-ORDEN-1]
+        if (pos >= 0 && pos < names.size - 1) { opts.add("▶ Mover después"); acts.add { if (Store.moveChFavGroup(name, 1)) applyFilter() } }
+        opts.add("✏ Renombrar"); acts.add { renameFavGroup(name) }
+        opts.add("Quitar el grupo (los canales siguen en favoritos)"); acts.add {
+            val n = Store.deleteChFavGroup(name)
+            if (favGroup == name) favGroup = null
+            reloadFavChannels(); applyFilter()
+            toast("Grupo quitado ($n canales siguen en favoritos)")
+        }
         AlertDialog.Builder(this)
             .setTitle("📁 $name")
-            .setItems(arrayOf("✏ Renombrar", "Quitar el grupo (los canales siguen en favoritos)")) { _, which ->
-                if (which == 0) {
-                    val box = LinearLayout(this)
-                    box.setPadding(dp(20), dp(8), dp(20), 0)
-                    val nameIn = EditText(this)
-                    nameIn.setSingleLine(true)
-                    nameIn.setText(name)
-                    box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                    AlertDialog.Builder(this)
-                        .setTitle("Renombrar grupo")
-                        .setView(box)
-                        .setPositiveButton("Guardar") { _, _ ->
-                            if (Store.renameChFavGroup(name, nameIn.text.toString()) > 0) {
-                                if (favGroup == name) favGroup = nameIn.text.toString().trim()
-                                reloadFavChannels(); applyFilter()
-                            }
-                        }
-                        .setNegativeButton("Cancelar", null)
-                        .show()
-                } else {
-                    val n = Store.deleteChFavGroup(name)
-                    if (favGroup == name) favGroup = null
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun renameFavGroup(name: String) {
+        val box = LinearLayout(this)
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val nameIn = EditText(this)
+        nameIn.setSingleLine(true)
+        nameIn.setText(name)
+        box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        AlertDialog.Builder(this)
+            .setTitle("Renombrar grupo")
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ ->
+                if (Store.renameChFavGroup(name, nameIn.text.toString()) > 0) {
+                    if (favGroup == name) favGroup = nameIn.text.toString().trim()
                     reloadFavChannels(); applyFilter()
-                    toast("Grupo quitado ($n canales siguen en favoritos)")
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -1265,7 +1273,7 @@ class M3uActivity : AppCompatActivity() {
         val cur = Store.chFavGroup(c.url)
         val opts = ArrayList<String>()
         val acts = ArrayList<() -> Unit>()
-        for (n in Store.chFavGroupMap().values.distinct().sortedBy { it.lowercase() }) {
+        for (n in Store.chFavGroupNames()) {   // [GRUPOS-ORDEN-1]
             if (n == cur) continue
             opts.add("📁 $n"); acts.add { setFavGroup(c, n) }
         }
