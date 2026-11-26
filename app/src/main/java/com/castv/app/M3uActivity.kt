@@ -463,7 +463,7 @@ class M3uActivity : AppCompatActivity() {
         }
         // [FAV-INICIO-1] con la opción activa, Canales abre directo en ★ Favs (si hay favoritos y no se viene de una búsqueda)
         if (start != null && Store.favStart && !favOnly && Store.chFavs().isNotEmpty() && intent.getStringExtra("q").isNullOrBlank()) toggleFavOnly()
-        if (savedInstanceState == null) openShortcutChannel()   // [ACCESO-1] viene de un acceso directo del inicio
+        if (savedInstanceState == null) { openShortcutChannel(); openShortcutGroup() }   // [ACCESO-1] [ACCESO-2] viene de un acceso directo del inicio
     }
 
     // ------------------------------------------------------------ [ACCESO-1] Acceso directo a un favorito en el inicio
@@ -500,6 +500,33 @@ class M3uActivity : AppCompatActivity() {
         val c = Store.chFavChannels().firstOrNull { shortId(it.url) == id }
         if (c == null) { toast("Ese canal ya no está en favoritos"); return }
         openChannel(c)
+    }
+
+    /** [ACCESO-2] Pide a la pantalla de inicio un acceso directo al grupo de favoritos [name]; el acceso directo solo guarda el nombre del grupo (nunca enlaces de canales). */
+    private fun pinGroupShortcut(name: String) {
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) { toast("Tu pantalla de inicio no permite añadir accesos directos"); return }
+        try {
+            val open = Intent(this, M3uActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("short_group", name)
+            val icon = applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.ic_media_play
+            val info = ShortcutInfoCompat.Builder(this, "gr_${shortId(name)}")
+                .setShortLabel(name.take(24).ifBlank { "Grupo" })
+                .setLongLabel("★ " + name.take(58).ifBlank { "Grupo" })
+                .setIcon(IconCompat.createWithResource(this, icon))
+                .setIntent(open)
+                .build()
+            if (ShortcutManagerCompat.requestPinShortcut(this, info, null)) toast("📌 Confirma en la pantalla de inicio")
+            else toast("No se pudo añadir el acceso directo")
+        } catch (e: Exception) { toast("No se pudo añadir el acceso directo") }
+    }
+
+    /** [ACCESO-2] Abre ★ Favs ya filtrado en el grupo de un acceso directo (el intent solo trae el nombre del grupo). */
+    private fun openShortcutGroup() {
+        val g = intent.getStringExtra("short_group") ?: return
+        intent.removeExtra("short_group")
+        if (Store.chFavs().isEmpty()) { toast("Aún no tienes favoritos"); return }
+        if (!favOnly) toggleFavOnly()
+        if (Store.chFavGroupNames().contains(g)) { favGroup = g; applyFilter() }
+        else toast("Ese grupo ya no existe")
     }
 
     /** [FAV-INICIO-1] Mantener pulsado «Favs»: elegir si Canales abre directo en ★ Favs. */
@@ -1438,6 +1465,7 @@ class M3uActivity : AppCompatActivity() {
         if (pos > 0) { opts.add("◀ Mover antes"); acts.add { if (Store.moveChFavGroup(name, -1)) applyFilter() } }   // [GRUPOS-ORDEN-1]
         if (pos >= 0 && pos < names.size - 1) { opts.add("▶ Mover después"); acts.add { if (Store.moveChFavGroup(name, 1)) applyFilter() } }
         opts.add("✏ Renombrar"); acts.add { renameFavGroup(name) }
+        opts.add("📌 Añadir al inicio"); acts.add { pinGroupShortcut(name) }   // [ACCESO-2]
         opts.add("Quitar el grupo (los canales siguen en favoritos)"); acts.add {
             val n = Store.deleteChFavGroup(name)
             if (favGroup == name) favGroup = null
