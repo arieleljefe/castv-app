@@ -81,6 +81,7 @@ class M3uActivity : AppCompatActivity() {
     private var favs: Set<String> = emptySet()
     private var favOnly = false
     private var favNew = false   // [NUEVOS-FAV-1] con ★ Favs: ver solo los añadidos en los últimos 7 días
+    private var favTop = false   // [FAV-TOP-1] con ★ Favs: ordenar por más vistos (solo la vista; el orden guardado no cambia)
     private var notes: Map<String, String> = emptyMap()   // [NOTA-CANAL-1] enlace → nota del canal
     private var favGroup: String? = null   // [FAV-GRUPOS-1] grupo de favoritos activo (null = todos; "" = los que no tienen grupo)
     private var favChannels: List<M3uChannel> = emptyList()   // [FAV-1] favoritos de todas las listas
@@ -1218,6 +1219,12 @@ class M3uActivity : AppCompatActivity() {
             if (nm.isEmpty()) favNew = false else newMap = nm   // ya no queda ninguno nuevo
         }
         val nmap: Map<String, Long>? = newMap
+        var viewMap: Map<String, Int>? = null   // [FAV-TOP-1]
+        if (favOnly && favTop) {
+            val vm = Store.chViews()
+            if (vm.isEmpty()) favTop = false else viewMap = vm   // el contador se reinició
+        }
+        val vmap: Map<String, Int>? = viewMap
         for (i in base.indices) {
             val c = base[i]
             if (hidden.isNotEmpty() && hidden.contains(c.url)) continue   // [OCULTAR-1]
@@ -1239,13 +1246,15 @@ class M3uActivity : AppCompatActivity() {
         }
         // Favoritos primero (el orden es estable: el resto conserva su orden)
         shown = if (nmap != null) out.sortedByDescending { nmap[it.url] ?: 0L }   // [NUEVOS-FAV-1] el más reciente primero
+            else if (vmap != null) out.sortedByDescending { vmap[it.url] ?: 0 }   // [FAV-TOP-1] estable: los empates conservan tu orden
             else if (favs.isEmpty()) out else out.sortedByDescending { favs.contains(it.url) }
         chAdapter.notifyDataSetChanged()
         if (favOnly) {
             statusView.text = if (favChannels.isEmpty()) "Aún no tienes favoritos: marca ★ en un canal"
                 else "${shown.size} de ${favChannels.size} favoritos (de todas las listas)" +
                     (if (favGroup != null) " · " + (if (favGroup == "") "sin grupo" else "«$favGroup»") else "") +
-                    (if (favNew) " · 🆕 nuevos (7 días)" else "")   // [NUEVOS-FAV-1]
+                    (if (favNew) " · 🆕 nuevos (7 días)" else "") +   // [NUEVOS-FAV-1]
+                    (if (favTop) " · 🔥 más vistos" else "")   // [FAV-TOP-1]
         } else if (channels.isNotEmpty()) {
             statusView.text = "${shown.size} de ${visibleCount(channels)} canales" +
                 (if (fromCache) cacheNote else "")
@@ -1342,12 +1351,21 @@ class M3uActivity : AppCompatActivity() {
         moodDrawn = ""   // al salir de ★ Favs se vuelve a dibujar la fila de ánimos
         moodRow.removeAllViews()
         val newCount = Store.chFavNew().size   // [NUEVOS-FAV-1]
-        if (names.isEmpty() && newCount == 0) { moodScroll.visibility = View.GONE; return }
+        val views = Store.chViews()   // [FAV-TOP-1] el chip se ofrece con 2 o más favoritos con vistas (o si ya está activo)
+        val showTop = favTop || favChannels.count { (views[it.url] ?: 0) > 0 } >= 2
+        if (names.isEmpty() && newCount == 0 && !showTop) { moodScroll.visibility = View.GONE; return }
         if (newCount > 0) {
-            val t = chip("🆕 Nuevos · $newCount") { favNew = !favNew; if (favNew) favGroup = null; applyFilter() }
+            val t = chip("🆕 Nuevos · $newCount") { favNew = !favNew; if (favNew) { favGroup = null; favTop = false }; applyFilter() }
             t.textSize = 14f
             t.setPadding(dp(12), dp(6), dp(12), dp(6))
             if (favNew) styleActiveChip(t)
+            moodRow.addView(t)
+        }
+        if (showTop) {   // [FAV-TOP-1]
+            val t = chip("🔥 Más vistos") { favTop = !favTop; if (favTop) favNew = false; applyFilter() }
+            t.textSize = 14f
+            t.setPadding(dp(12), dp(6), dp(12), dp(6))
+            if (favTop) styleActiveChip(t)
             moodRow.addView(t)
         }
         fun add(label: String, value: String, long: (() -> Unit)?) {
@@ -1680,12 +1698,12 @@ class M3uActivity : AppCompatActivity() {
         val opts = ArrayList<String>()
         val acts = ArrayList<() -> Unit>()
         fun moved(done: Boolean) { if (done) { reloadFavChannels(); applyFilter() } }
-        if (i > 0) {
+        if (i > 0 && !favTop) {   // [FAV-TOP-1] con «Más vistos» el orden mostrado no es el guardado: no se mueve
             val prev = shown[i - 1].url
             opts.add("⤒ Poner el primero"); acts.add { moved(Store.moveChFavFirst(c.url)) }
             opts.add("▲ Subir"); acts.add { moved(Store.moveChFavNear(c.url, prev, false)) }
         }
-        if (i < shown.size - 1) {
+        if (i < shown.size - 1 && !favTop) {
             val next = shown[i + 1].url
             opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
         }
@@ -2159,6 +2177,7 @@ class M3uActivity : AppCompatActivity() {
         favOnly = !favOnly
         favGroup = null   // [FAV-GRUPOS-1]
         favNew = false   // [NUEVOS-FAV-1]
+        favTop = false   // [FAV-TOP-1]
         if (favOnly) iconLabel(favBtn, R.drawable.ic_star, "Favs", accent()) else iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         if (favOnly) reloadFavChannels()   // [FAV-1]
         exportBtn.visibility = if (favOnly) View.VISIBLE else View.GONE   // [M3U-EXPORT-1]

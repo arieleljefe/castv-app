@@ -836,6 +836,20 @@ object Store {
             .take(limit).map { Pair(it.first, it.second) }
     }
 
+    /** [FAV-TOP-1] Cuántas veces se abrió cada canal (enlace → veces; solo los que tienen 1 o más). Lo usa el orden «Más vistos» de ★ Favs. */
+    @Synchronized
+    fun chViews(): Map<String, Int> {
+        val o = readTopCh()
+        val out = HashMap<String, Int>()
+        val ks = o.keys()
+        while (ks.hasNext()) {
+            val u = ks.next()
+            val n = o.optJSONObject(u)?.optInt("c", 0) ?: 0
+            if (n > 0) out[u] = n
+        }
+        return out
+    }
+
     /** Reinicia solo el contador de «Más vistos». */
     @Synchronized
     fun clearTopChannels() {
