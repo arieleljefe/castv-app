@@ -1518,6 +1518,7 @@ class M3uActivity : AppCompatActivity() {
         if (pos >= 0 && pos < names.size - 1) { opts.add("▶ Mover después"); acts.add { if (Store.moveChFavGroup(name, 1)) applyFilter() } }
         opts.add("✏ Renombrar"); acts.add { renameFavGroup(name) }
         opts.add("📌 Añadir al inicio"); acts.add { pinGroupShortcut(name) }   // [ACCESO-2]
+        opts.add("📤 Exportar este grupo (.m3u)"); acts.add { exportFavsDialog(name) }   // [EXPORTA-GRUPO-1]
         opts.add("Quitar el grupo (los canales siguen en favoritos)"); acts.add {
             val n = Store.deleteChFavGroup(name)
             if (favGroup == name) favGroup = null
@@ -2460,12 +2461,13 @@ class M3uActivity : AppCompatActivity() {
     // ------------------------------------------------------------ [M3U-EXPORT-1] Exportar ★ Favoritos como .m3u
 
     /** Arma el .m3u con los favoritos de todas las listas. Los canales con usuario y clave (Xtream) y los que no son http(s) se omiten; devuelve el texto y cuántos se omitieron. */
-    private fun favM3u(): Pair<String, Int> {
+    private fun favM3u(group: String? = null): Pair<String, Int> {   // [EXPORTA-GRUPO-1] con [group], solo los favoritos de ese grupo
         val leak = Xtream.leakFilter(this)
         val sb = StringBuilder("#EXTM3U\n")
         var skipped = 0
         val fgm = Store.chFavGroupMap()   // [FAV-GRUPOS-1] el grupo propio manda sobre el de la lista
         for (c in Store.chFavChannels()) {
+            if (group != null && fgm[c.url] != group) continue   // [EXPORTA-GRUPO-1]
             val low = c.url.lowercase()
             if (!(low.startsWith("http://") || low.startsWith("https://")) || leak(c.url)) { skipped++; continue }
             val name = c.name.replace(Regex("[\\r\\n]+"), " ").trim().ifEmpty { "Canal" }
@@ -2478,28 +2480,29 @@ class M3uActivity : AppCompatActivity() {
         return Pair(sb.toString(), skipped)
     }
 
-    private fun exportFavsDialog() {
-        val (text, skipped) = favM3u()
+    private fun exportFavsDialog(group: String? = null) {   // [EXPORTA-GRUPO-1]
+        val (text, skipped) = favM3u(group)
+        val fileName = if (group == null) "castv-favoritos.m3u" else "castv-" + norm(group).replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "grupo" } + ".m3u"
         val n = text.lineSequence().count { it.startsWith("#EXTINF") }
         if (n == 0) {
-            toast(if (skipped > 0) "Tus favoritos son de Xtream (llevan usuario y clave): no se exportan" else "Aún no tienes favoritos")
+            toast(if (skipped > 0) "Esos favoritos son de Xtream (llevan usuario y clave): no se exportan" else if (group != null) "Ese grupo no tiene canales" else "Aún no tienes favoritos")
             return
         }
         val extra = if (skipped > 0) "\n\n$skipped canal(es) no se incluyen (Xtream: llevan usuario y clave)." else ""
         AlertDialog.Builder(this)
-            .setTitle("📤 Exportar favoritos")
+            .setTitle(if (group == null) "📤 Exportar favoritos" else "📤 Exportar «$group»")
             .setMessage("$n canales en un archivo .m3u.$extra")
-            .setPositiveButton("Compartir") { _, _ -> shareFavM3u(text) }
-            .setNeutralButton("Guardar…") { _, _ -> saveFavM3u(text) }
+            .setPositiveButton("Compartir") { _, _ -> shareFavM3u(text, fileName) }
+            .setNeutralButton("Guardar…") { _, _ -> saveFavM3u(text, fileName) }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun shareFavM3u(text: String) {
+    private fun shareFavM3u(text: String, fileName: String = "castv-favoritos.m3u") {
         try {
             val dir = File(cacheDir, "share")
             dir.mkdirs()
-            val f = File(dir, "castv-favoritos.m3u")
+            val f = File(dir, fileName)
             f.writeText(text, Charsets.UTF_8)
             val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.shareprovider", f)
             val i = Intent(Intent.ACTION_SEND).apply {
@@ -2515,12 +2518,12 @@ class M3uActivity : AppCompatActivity() {
     }
 
     @Suppress("DEPRECATION")
-    private fun saveFavM3u(text: String) {
+    private fun saveFavM3u(text: String, fileName: String = "castv-favoritos.m3u") {
         exportPending = text
         val i = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "audio/x-mpegurl"
-            putExtra(Intent.EXTRA_TITLE, "castv-favoritos.m3u")
+            putExtra(Intent.EXTRA_TITLE, fileName)
         }
         try {
             startActivityForResult(i, reqSave)
