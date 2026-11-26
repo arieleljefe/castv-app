@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v480
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v482
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -183,3 +183,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FAV-INICIO-1 · 26 nov · mantener pulsado «Favs» en Canales → «Abrir Canales siempre en ★ Favs» (y quitarlo); con la opción activa Canales abre directo en ★ Favs si hay favoritos y no se viene del buscador; clave `favstart` en `castv_lib` · `Store.kt` (`favStart`), `M3uActivity.kt` (`favStartMenu`)
 - SEGURIDAD-RESP-1 · 26 nov · `Backup.scrub` limpia `chalts` y `chnotes`: el respaldo completo (también el automático y «Enviar respaldo a otro móvil») ya no lleva enlaces con usuario y clave de favoritos Xtream; las notas y respaldos de favoritos Xtream no viajan en el respaldo (límite aceptado) · `Backup.kt`, `BackupTest.kt`
 - TAG-3.18 · 26 nov · etiqueta `v3.18` publicada e instalada; incluye el lote Fuentes (AUTO-FUENTE-1, REVISION-SEMANAL-1, FUENTES-FAV-1) y lo anterior a SEGURIDAD-RESP-1; SEGURIDAD-RESP-1, FAV-INICIO-1, ACCESO-1, FAV-TOP-1 y NUEVOS-DIAS-1 quedan para la `v3.19`
+- NUEVOS-DIAS-1 · 26 nov · con ★ Favs, los favoritos nuevos llevan «🆕» delante del nombre; los días para «nuevo» se eligen (3, 7, 14 o 30) con «Favs» mantenido o el chip «🆕 Nuevos» mantenido; clave `favnewdays` en `castv_lib` · `Store.kt` (`favNewDays`, `chFavNew`), `M3uActivity.kt` (`newUrls`, `favNewDaysMenu`, `favStartMenu`)
+- FAV-AZ-1 · 26 nov · con ★ Favs, chip «🔤 A–Z» (con 3 o más favoritos): ordena por el nombre que se ve, solo la vista; excluye a «🆕 Nuevos» y «🔥 Más vistos», esconde Subir/Bajar mientras está activo · `M3uActivity.kt` (`favAz`, `applyFilter`, `drawFavGroups`, `favRowMenu`)
+- ACCESO-2 · 26 nov · mantener pulsado un chip 📁 de grupo → «📌 Añadir al inicio»: el acceso directo abre ★ Favs filtrado en ese grupo; guarda solo el nombre del grupo (`short_group`); avisa si el grupo ya no existe · `M3uActivity.kt` (`pinGroupShortcut`, `openShortcutGroup`, `favGroupMenu`)
