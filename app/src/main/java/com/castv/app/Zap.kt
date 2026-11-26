@@ -17,6 +17,12 @@ object Zap {
     // [CANAL-MINI-1] el canal que está en el TV ahora (lo lee Canales para su barra de abajo). null = ninguno.
     @Volatile var nowTitle: String? = null
     @Volatile var nowUrl: String? = null
+        set(v) {   // [ANTERIOR-1] al cambiar de canal en el TV, el que estaba queda como «anterior»
+            val old = field
+            if (old != null && v != null && old != v) prevUrl = old
+            field = v
+        }
+    @Volatile var prevUrl: String? = null   // [ANTERIOR-1] enlace del canal que estaba en el TV antes del actual (solo en memoria)
 
     // ------------------------------------------------- [ZAP-2] ⏮ ⏭ cuando el canal suena en el teléfono
     // La lista va por memoria (no por Intent: una lista grande pasaría el límite de ~1 MB) y se entrega una sola vez.

@@ -51,6 +51,7 @@ class M3uActivity : AppCompatActivity() {
     // [CANAL-MINI-1] barra de abajo con el canal que está en el TV (⏮ ⏯ ⏭ ★ ✕)
     private lateinit var nowBar: LinearLayout
     private lateinit var nowTitle: TextView
+    private lateinit var nowBack: TextView   // [ANTERIOR-1] «↩» vuelve al canal de antes
     private lateinit var nowFav: TextView
     private var nowDismissed: String? = null
     private var nowRecv: BroadcastReceiver? = null
@@ -362,7 +363,9 @@ class M3uActivity : AppCompatActivity() {
         nowBar.addView(iconBtn(R.drawable.ic_prev, "Canal anterior") { tvCmd(MainActivity.ACT_PREV) })
         nowBar.addView(iconBtn(R.drawable.ic_pause, "Pausar o continuar") { tvCmd(MainActivity.ACT_TOGGLE) })
         nowBar.addView(iconBtn(R.drawable.ic_next, "Canal siguiente") { tvCmd(MainActivity.ACT_NEXT) })
-        for (b in listOf(nowFav, chip("✕") { nowDismissed = Zap.nowTitle; updateNowBar() })) {
+        nowBack = chip("↩") { backToPrevChannel() }   // [ANTERIOR-1]
+        nowBack.visibility = View.GONE
+        for (b in listOf(nowBack, nowFav, chip("✕") { nowDismissed = Zap.nowTitle; updateNowBar() })) {
             b.textSize = 16f
             b.setPadding(dp(10), dp(6), dp(10), dp(6))
             nowBar.addView(b)
@@ -1332,6 +1335,16 @@ class M3uActivity : AppCompatActivity() {
         updateNowBar()   // [CANAL-MINI-1]
     }
 
+    /** [ANTERIOR-1] «↩»: vuelve al canal que estaba en el TV antes del actual; pulsarlo otra vez regresa al de ahora. */
+    private fun backToPrevChannel() {
+        val u = Zap.prevUrl ?: return
+        val c = Store.recentChannels().firstOrNull { it.url == u }
+            ?: Store.chFavChannels().firstOrNull { it.url == u }
+            ?: channels.firstOrNull { it.url == u }
+            ?: M3uChannel("Canal anterior", u, "")
+        playChannel(c, true)
+    }
+
     /** [CANAL-MINI-1] Muestra u oculta la barra del canal que está en el TV. */
     private fun updateNowBar() {
         if (!::nowBar.isInitialized) return
@@ -1339,6 +1352,8 @@ class M3uActivity : AppCompatActivity() {
         if (t == null || t == nowDismissed) { nowBar.visibility = View.GONE; return }
         nowTitle.text = "📺 $t"
         nowFav.text = if (Zap.nowUrl?.let { favs.contains(it) } == true) "★" else "☆"
+        val pu = Zap.prevUrl   // [ANTERIOR-1]
+        nowBack.visibility = if (pu != null && pu != Zap.nowUrl) View.VISIBLE else View.GONE
         nowBar.visibility = View.VISIBLE
     }
 
