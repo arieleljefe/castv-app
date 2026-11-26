@@ -1420,6 +1420,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 21, 11, "Lo más visto")   // [TOP-1]
         menu.add(0, 22, 11, "Favoritos: " + allItems.count { Store.isFav(it) })   // [TABS-1]
         menu.add(0, 23, 11, "Continuar: " + allItems.count { Store.resumeAt(it) >= 10 })   // [TABS-1]
+        menu.add(0, 24, 11, "Informe de diagnóstico")   // [DIAG-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
     }
 
@@ -1463,6 +1464,7 @@ class MainActivity : AppCompatActivity() {
             21 -> showTop()   // [TOP-1]
             22 -> { groupReturn = null; viewMode = ViewMode.FAVS; applyFilters() }   // [TABS-1]
             23 -> { groupReturn = null; viewMode = ViewMode.RESUME; applyFilters() }   // [TABS-1]
+            24 -> showDiagReport()   // [DIAG-1]
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
                 else { onlyUnseen = !onlyUnseen; applyFilters() }
@@ -1587,6 +1589,59 @@ class MainActivity : AppCompatActivity() {
         }
         sheet.show()
     }
+
+    // ------------------------------------------- [DIAG-1] Informe de diagnóstico
+
+    /** [DIAG-1] Más › «Informe de diagnóstico»: junta versión, teléfono, TV y las últimas líneas del /log en un texto
+     *  que se comparte o se copia. Tapa las claves más comunes de los enlaces. No cambia nada de lo que se envía. */
+    private fun showDiagReport() {
+        val rep = buildDiagReport()
+        AlertDialog.Builder(this)
+            .setTitle("Informe de diagnóstico")
+            .setMessage("Incluye la versión, el teléfono, el TV y las últimas líneas del registro. Se tapan las claves más comunes de los enlaces, pero revísalo antes de compartirlo.")
+            .setPositiveButton("Compartir") { _, _ ->
+                try {
+                    startActivity(Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, rep), "Compartir informe"))
+                } catch (e: Exception) { toast("No se pudo abrir el selector para compartir") }
+            }
+            .setNeutralButton("Copiar") { _, _ ->
+                try {
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("CASTV informe", rep))
+                    toast("📋 Informe copiado")
+                } catch (e: Exception) { toast("No se pudo copiar") }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun buildDiagReport(): String {
+        val ver = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
+        val phoneIp = try { getLocalIpAddress() } catch (e: Exception) { null }
+        val sb = StringBuilder()
+        sb.append("CASTV ").append(ver).append('\n')
+        sb.append("Android ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(") · ")
+            .append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n')
+        sb.append("Teléfono IP: ").append(phoneIp ?: "no detectada").append('\n')
+        sb.append("Salida: ").append(if (outPhone) "Teléfono" else "TV").append('\n')
+        sb.append("TV: ").append(TvController.tvName.ifEmpty { "(sin elegir)" })
+            .append(" · IP ").append(TvController.tvIp ?: "no encontrada")
+            .append(":").append(TvController.tvPort)
+            .append(" · ").append(if (tvOnline) "conectada" else "sin conexión").append('\n')
+        sb.append("Control: ").append(TvController.controlPath)
+            .append(" · render: ").append(TvController.renderPath ?: "-").append('\n')
+        sb.append("Calidad en vivo: ").append(MediaServer.liveQuality).append('\n')
+        sb.append("Incógnito: ").append(if (Store.incognito) "sí" else "no").append("\n\n")
+        sb.append("--- Registro (últimas líneas) ---\n")
+        sb.append(diagMask(DebugLog.dump().lines().takeLast(150).joinToString("\n")))
+        return sb.toString()
+    }
+
+    /** [DIAG-1] Tapa claves en el texto: parámetros como token=, key=, password= y los usuario/clave de rutas Xtream. */
+    private fun diagMask(t: String): String =
+        t.replace(Regex("(?i)([?&;](?:token|key|apikey|api_key|password|pass|pwd|auth|sig|signature|user|username)=)[^&\\s]+"), "\$1•••")
+            .replace(Regex("(?i)(/(?:live|movie|series)/)[^/\\s]+/[^/\\s]+/"), "\$1•••/•••/")
 
     // ------------------------------------------- [TOP-1] Lo más visto
 
