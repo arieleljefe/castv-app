@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v473
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v474
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -178,3 +178,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - LIMPIA-1 · 26 nov · Download sin `*_actual.*` (plantilla E)
 - AUTO-FUENTE-1, REVISION-SEMANAL-1 y FUENTES-FAV-1 · 26 nov · (lote Fuentes) otra fuente si el canal no se prepara para el TV; revisión semanal de favoritos con notificación; hasta 2 respaldos por favorito (clave `chalts`) · `AltSource.kt`, `WeeklyCheck.kt`, `Zap.kt`, `M3uActivity.kt`, `MainActivity.kt`, `Store.kt`
 - NUEVOS-FAV-1 · 26 nov · con ★ Favs, chip «🆕 Nuevos · N» (añadidos en los últimos 7 días, el más reciente primero); la fecha va en el campo `d` de `chfavmeta` (sin clave nueva; los favoritos de antes no salen como nuevos) · `Store.kt` (`chFavNew`, `rememberChFav`), `M3uActivity.kt` (`drawFavGroups`, `applyFilter`)
+- ACCESO-1 · 26 nov · mantener pulsado un favorito → «📌 Añadir al inicio»: acceso directo en la pantalla de inicio que abre ese canal (pregunta TV o teléfono); guarda solo un identificador (hash), nunca el enlace; no disponible para canales Xtream ni enlaces con usuario y clave · `M3uActivity.kt` (`shortId`, `pinShortcut`, `openShortcutChannel`)
