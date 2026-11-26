@@ -1321,6 +1321,13 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         // [RECUP-1] reconexión automática y detector de atascos
         private val maxRetry = 6
         private val stallMs = 25_000L
+
+        // [HUECOS-TS-1] si el origen no da datos, se rellena con paquetes TS nulos para que la TV no cierre la conexión
+        private val fillAfterMs = 10_000L   // entre fragmentos normales pasan hasta ~7,5 s; por debajo de esto no se rellena
+        private val fillPackets = 64        // 64 x 188 = 12 032 bytes por segundo de hueco
+        private var filling = false         // solo lo toca el vigilante
+        private var fillBytes = 0L
+        private var fillT0 = 0L
         private var attempts = 0
         private var goodSince = 0L
         private var recovering = false
@@ -1365,6 +1372,24 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                     }
                     cond.signalAll()
                 }
+            } finally { lock.unlock() }
+        }
+
+        /** [HUECOS-TS-1] Escribe [packets] paquetes TS nulos (PID 0x1FFF, sin reloj) al final del buffer, para que la TV
+         *  reciba bytes durante un hueco del origen. Solo si el buffer termina en un paquete completo; si no, false. */
+        private fun fillNulls(packets: Int): Boolean {
+            lock.lock()
+            try {
+                if (closed || head % 188L != 0L) return false
+                var left = packets * 188
+                while (left > 0) {
+                    val v = when ((head % 188L).toInt()) { 0 -> 0x47; 1 -> 0x1F; 3 -> 0x10; else -> 0xFF }
+                    ring[(head % cap).toInt()] = v.toByte()
+                    head++
+                    left--
+                }
+                cond.signalAll()
+                return true
             } finally { lock.unlock() }
         }
 
@@ -1413,6 +1438,27 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                         val braked = run {
                             lock.lock()
                             try { head - served >= look } finally { lock.unlock() }
+                        }
+                        // [HUECOS-TS-1] sin datos del origen: relleno hasta que el atasco de 25 s reabre el origen
+                        val idle = System.currentTimeMillis() - lastProduce
+                        if (!braked && clients.get() > 0 && idle > fillAfterMs && idle <= stallMs) {
+                            if (fillNulls(fillPackets)) {
+                                if (!filling) {
+                                    filling = true
+                                    fillBytes = 0L
+                                    fillT0 = System.currentTimeMillis()
+                                    DebugLog.add("  HUECO: sin datos ${idle / 1000} s, se rellena con paquetes nulos (conexiones de la TV: ${clients.get()})")
+                                }
+                                fillBytes += fillPackets * 188L
+                            } else if (!filling) {
+                                filling = true
+                                fillBytes = 0L
+                                fillT0 = System.currentTimeMillis()
+                                DebugLog.add("  HUECO: sin datos ${idle / 1000} s, no se rellena (paquete a medias)")
+                            }
+                        } else if (filling && idle <= fillAfterMs) {
+                            filling = false
+                            DebugLog.add("  HUECO: fin del relleno (${fillBytes / 1000} KB en ${(System.currentTimeMillis() - fillT0) / 1000} s; conexiones de la TV: ${clients.get()})")
                         }
                         if (!braked && clients.get() > 0 && System.currentTimeMillis() - lastProduce > stallMs) {
                             MediaServer.lastLiveStallMs = System.currentTimeMillis()   // [AUTO-REENVIO-1]
