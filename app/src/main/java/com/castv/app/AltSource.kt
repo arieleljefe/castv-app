@@ -24,12 +24,16 @@ object AltSource {
         return if (t.isNotEmpty()) t else s.trim()
     }
 
-    /** Otras fuentes de [name] (hasta [max]), distintas de [url]: salen de las listas guardadas; sin Xtream ni ocultos. */
+    /** Otras fuentes de [name] (hasta [max]), distintas de [url]: primero los respaldos guardados del favorito [url] y luego las listas guardadas; sin Xtream ni ocultos. */
     fun find(ctx: Context, name: String, url: String, max: Int = 6): List<M3uChannel> {
         val out = ArrayList<M3uChannel>()
         val seen = HashSet<String>()
         seen.add(url)
         val hid = Store.hiddenUrls()
+        for (b in Store.chAlts(url)) {   // [FUENTES-FAV-1] primero los respaldos que Ariel guardó
+            if (out.size >= max) break
+            if (!hid.contains(b.url) && seen.add(b.url)) out.add(b)
+        }
         val want = base(name)
         if (want.isEmpty()) return out
         val leak = Xtream.leakFilter(ctx)

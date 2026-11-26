@@ -1617,6 +1617,7 @@ class M3uActivity : AppCompatActivity() {
         opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
         opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
         opts.add("🔁 Buscar otra fuente…"); acts.add { findAltSource(c) }   // [FUENTE-ALT-1]
+        opts.add("🛟 Respaldos (${Store.chAlts(c.url).size})…"); acts.add { showAlts(c) }   // [FUENTES-FAV-1]
         opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
         opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
@@ -1720,9 +1721,62 @@ class M3uActivity : AppCompatActivity() {
                 } else toast("No se pudo reemplazar")
             }
         }
+        if (favs.contains(c.url)) {   // [FUENTES-FAV-1]
+            opts.add("🛟 Guardar como respaldo"); acts.add {
+                if (Xtream.leakFilter(this)(alt.url) || Xtream.isXtream(alt.url)) toast("Los canales de Xtream no se guardan como respaldo (llevan usuario y clave)")
+                else if (Store.addChAlt(c.url, alt)) toast("✅ Respaldo guardado (${Store.chAlts(c.url).size} de 2)")
+                else toast("No se pudo guardar: ya está o ya hay 2 respaldos")
+            }
+        }
         AlertDialog.Builder(this)
             .setTitle(alt.name)
             .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [FUENTES-FAV-1] Respaldos guardados de un favorito: tocar uno para verlo, usarlo como principal o quitarlo. */
+    private fun showAlts(c: M3uChannel) {
+        val l = Store.chAlts(c.url)
+        if (l.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("🛟 Respaldos de «${c.name}»")
+                .setMessage("Aún no tiene respaldos. Mantén pulsado el canal › 🔁 Buscar otra fuente… › elige una › 🛟 Guardar como respaldo (hasta 2). Si el canal falla al mandarlo al TV, se prueban primero sus respaldos.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val labels = l.map { it.name + " · " + (android.net.Uri.parse(it.url).host ?: "") }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("🛟 Respaldos de «${c.name}»")
+            .setItems(labels) { _, which -> if (which in l.indices) backupMenu(c, l[which]) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun backupMenu(c: M3uChannel, alt: M3uChannel) {
+        val opts = arrayOf("▶ Reproducir", "⭐ Usar como principal", "🗑 Quitar respaldo")
+        AlertDialog.Builder(this)
+            .setTitle(alt.name)
+            .setItems(opts) { _, which ->
+                when (which) {
+                    0 -> openChannel(alt)
+                    1 -> {
+                        if (Store.replaceChFav(c.url, alt)) {
+                            Store.addChAlt(alt.url, c)   // el principal anterior queda como respaldo
+                            favs = Store.chFavs()
+                            notes = Store.chNotes()
+                            reloadFavChannels()
+                            applyFilter()
+                            toast("✅ Ahora es el principal (el anterior quedó de respaldo)")
+                        } else toast("No se pudo cambiar (esa fuente ya está en tus favoritos)")
+                    }
+                    else -> {
+                        Store.removeChAlt(c.url, alt.url)
+                        toast("Respaldo quitado")
+                    }
+                }
+            }
             .setNegativeButton("Cancelar", null)
             .show()
     }

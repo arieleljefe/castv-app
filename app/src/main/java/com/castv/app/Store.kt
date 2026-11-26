@@ -620,7 +620,80 @@ object Store {
         } catch (e: Exception) { return false }
         val note = chNotes()[oldUrl]
         if (!note.isNullOrEmpty()) { setChNote(alt.url, note); setChNote(oldUrl, "") }
+        val al = readAlts()   // [FUENTES-FAV-1] los respaldos del favorito viejo pasan al nuevo
+        val moved = al.remove(oldUrl)
+        if (moved != null) {
+            val rest = moved.filter { it.url != alt.url }
+            if (rest.isNotEmpty()) al[alt.url] = ArrayList(rest)
+            writeAlts(al)
+        }
         return true
+    }
+
+    // [FUENTES-FAV-1] Hasta 2 fuentes de respaldo por favorito: clave nueva "chalts" (objeto enlace del favorito → lista de
+    // {n, u, g, l}) en castv_lib. Los canales de Xtream no se guardan como respaldo (sus enlaces llevan usuario y clave).
+
+    private const val MAX_ALTS = 2
+
+    private fun readAlts(): MutableMap<String, MutableList<M3uChannel>> {
+        val out = LinkedHashMap<String, MutableList<M3uChannel>>()
+        val raw = prefs.getString("chalts", null) ?: return out
+        try {
+            val o = JSONObject(raw)
+            val ks = o.keys()
+            while (ks.hasNext()) {
+                val k = ks.next()
+                val arr = o.optJSONArray(k) ?: continue
+                val l = ArrayList<M3uChannel>()
+                for (i in 0 until arr.length()) {
+                    val e = arr.optJSONObject(i) ?: continue
+                    val u = e.optString("u", "")
+                    if (u.isNotEmpty()) l.add(M3uChannel(e.optString("n", ""), u, e.optString("g", ""), e.optString("l", "")))
+                }
+                if (l.isNotEmpty()) out[k] = l
+            }
+        } catch (e: Exception) { rescue("chalts", raw, e) }
+        return out
+    }
+
+    private fun writeAlts(m: Map<String, List<M3uChannel>>): Boolean {
+        return try {
+            val favsNow = chFavs()
+            val o = JSONObject()
+            for ((k, l) in m) {
+                if (l.isEmpty() || !favsNow.contains(k)) continue
+                val arr = JSONArray()
+                for (c in l) arr.put(JSONObject().put("n", c.name).put("u", c.url).put("g", c.group).put("l", c.logo))
+                o.put(k, arr)
+            }
+            prefs.edit().putString("chalts", o.toString()).apply()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    /** Respaldos guardados del favorito [url] (hasta 2), en el orden en que se guardaron. */
+    @Synchronized
+    fun chAlts(url: String): List<M3uChannel> = readAlts()[url] ?: emptyList()
+
+    /** Guarda [alt] como respaldo del favorito [url]. false si [url] no es favorito, si ya está o si ya hay 2. */
+    @Synchronized
+    fun addChAlt(url: String, alt: M3uChannel): Boolean {
+        if (url == alt.url || !chFavs().contains(url)) return false
+        val m = readAlts()
+        val l = m.getOrPut(url) { ArrayList() }
+        if (l.size >= MAX_ALTS || l.any { it.url == alt.url }) return false
+        l.add(alt)
+        return writeAlts(m)
+    }
+
+    /** Quita el respaldo [altUrl] del favorito [url]. true si estaba. */
+    @Synchronized
+    fun removeChAlt(url: String, altUrl: String): Boolean {
+        val m = readAlts()
+        val l = m[url] ?: return false
+        if (!l.removeAll { it.url == altUrl }) return false
+        if (l.isEmpty()) m.remove(url)
+        return writeAlts(m)
     }
 
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
