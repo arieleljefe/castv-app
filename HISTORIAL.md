@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v440
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v443
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -24,6 +24,14 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 
 - FIRMA-1 · 23 nov · firma estable del APK: clave propia `castv` (RSA 4096) guardada en GitHub Secrets, `assembleRelease` firmado, huella SHA-256 impresa en el build (`4dd1f018…dc558e`); instalado una sola vez desinstalando; las siguientes versiones se instalan encima · `app/build.gradle`, `.github/workflows/build.yml`.
 - RECUP-1 · 23 nov · los canales en vivo se recuperan solos: reintento de la lista con espera creciente, fragmentos que fallan se saltan, detector de atascos (25 s) y reapertura del origen (6 intentos) con el flujo continuo hacia la TV · `MediaServer.kt`.
+- HUECOS-TS-1 (+1b) · 26 nov · canal en vivo al TV sin que la TV lo quite en los huecos del origen: si el origen lleva más de 5 s sin datos (y hasta que el vigilante lo reabre a los 25 s) se escriben cada segundo 64 paquetes TS nulos al buffer (`fillNulls`, solo con el buffer en paquete completo); el `/log` anota «HUECO: …» solo si el hueco pasa de 10 s; sin relleno la TV quitaba el canal a los ~10 s · `MediaServer.kt`
+- SEGUNDO-PLANO-1 · 26 nov · el canal en vivo al TV sigue con la pantalla apagada o la app en segundo plano: segundo candado Wi-Fi `FULL_HIGH_PERF` (Android 10+) y diagnóstico en el `/log` («SEGUNDO PLANO (motivo): …», pantalla apagada/encendida, el servicio se detiene); probado ~15 min con la pantalla apagada sin cortes propios · `CastvService.kt`
+- LOG-2 · 26 nov · el `/log` oculta también `jwt`, `sid` y `deviceId` (enlaces de Pluto) además de lo de LOG-1; pruebas nuevas en `DebugLogRedactTest` · `DebugLog.kt`, `DebugLogRedactTest.kt`
+- PAUSA-LIVE-1 · 26 nov · con la TV en pausa el canal sigue abierto 3 min sin clientes (antes 30 s) y al abrir otro canal se cierran los demás sin clientes; al reanudar la TV encuentra su posición sin esperar · `MediaServer.kt`
+- AUTO-REENVIO-1 · 26 nov · si un canal en vivo de lista que sonaba en el TV se detiene (STOPPED ≥ 3 s, tras estar en PLAYING) cerca de un atasco del origen (`MediaServer.lastLiveStallMs`), la app lo reenvía sola con «🔄 Reconectando el canal…»; tope de 2 reenvíos cada 10 min por canal; el `/log` anota «AUTO-REENVIO: …» · `MainActivity.kt` (`checkAutoResend`), `MediaServer.kt`
+- VOLUMEN-TV-1 · 26 nov · los botones de volumen del teléfono suben/bajan el TV también con canales y enlaces en el TV y en la pantalla Canales (pasos de 5; `TvController.lastVol`) · `MainActivity.kt`, `M3uActivity.kt`, `TvController.kt`
+- AVISO-TV-1 · 26 nov · al tocar el aviso de EPG-RECORDA-1, con la salida en TV y el TV respondiendo, el canal se manda al TV; si no, se abre en el teléfono (espera hasta 6 s al TV); `Zap.sendUrl()` nuevo · `ReminderReceiver.kt`, `MainActivity.kt`, `Zap.kt`
+- FUNDIDO-1 · 26 nov · el temporizador de dormir baja el volumen en ~10 s antes de pausar (música del teléfono, música sin pantalla, TV y video) y lo restaura si se cancela; «Al terminar la pista/video» no cambia · `MainActivity.kt`, `PlayerCore.kt`, `VideoPlayerActivity.kt`
 
 ## Canales y catálogo
 - 13-B.1 / 13-B.2 · 17 nov · Listas M3U, favoritos de canales · `M3uParser.kt`, `M3uActivity.kt`, `Store.kt`.
