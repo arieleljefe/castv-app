@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v468
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v471
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -176,3 +176,5 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - SINGRUPO-1 · 26 nov · el chip «Sin grupo · N» lleva número; mantenerlo pulsado marca todos esos favoritos y abre «Mover N canales a…» (grupo existente, nuevo o ninguno) · `M3uActivity.kt` (`drawFavGroups`, `moveUngrouped`)
 - TAG-3.17 · 26 nov · etiqueta `v3.17` publicada e instalada; incluye ENVIAR-CANAL-1, GRUPOS-ORDEN-1, VOZ-1, ANTERIOR-1/2, NOTA-CANAL-1, PLAY-GRUPO-1, FUENTE-ALT-1, MULTI-FAV-1, ALEATORIO-1, CAIDOS-ALT-1 y SINGRUPO-1 (la `v3.16` nunca se subió)
 - LIMPIA-1 · 26 nov · Download sin `*_actual.*` (plantilla E)
+- AUTO-FUENTE-1, REVISION-SEMANAL-1 y FUENTES-FAV-1 · 26 nov · (lote Fuentes) otra fuente si el canal no se prepara para el TV; revisión semanal de favoritos con notificación; hasta 2 respaldos por favorito (clave `chalts`) · `AltSource.kt`, `WeeklyCheck.kt`, `Zap.kt`, `M3uActivity.kt`, `MainActivity.kt`, `Store.kt`
+- NUEVOS-FAV-1 · 26 nov · con ★ Favs, chip «🆕 Nuevos · N» (añadidos en los últimos 7 días, el más reciente primero); la fecha va en el campo `d` de `chfavmeta` (sin clave nueva; los favoritos de antes no salen como nuevos) · `Store.kt` (`chFavNew`, `rememberChFav`), `M3uActivity.kt` (`drawFavGroups`, `applyFilter`)
