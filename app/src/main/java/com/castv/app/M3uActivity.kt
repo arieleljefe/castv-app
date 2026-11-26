@@ -1555,6 +1555,7 @@ class M3uActivity : AppCompatActivity() {
         }
         opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
         opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
+        opts.add("🔁 Buscar otra fuente…"); acts.add { findAltSource(c) }   // [FUENTE-ALT-1]
         opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
         opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
@@ -1580,9 +1581,87 @@ class M3uActivity : AppCompatActivity() {
         val c = shown[i]
         AlertDialog.Builder(this)
             .setTitle(c.name)
-            .setItems(arrayOf("↗ Compartir canal", noteLabel(c), "Ocultar…")) { _, which ->
-                when (which) { 0 -> shareChannel(c); 1 -> editNote(c); else -> confirmHide(c) }   // [NOTA-CANAL-1]
+            .setItems(arrayOf("↗ Compartir canal", noteLabel(c), "🔁 Buscar otra fuente…", "Ocultar…")) { _, which ->
+                when (which) { 0 -> shareChannel(c); 1 -> editNote(c); 2 -> findAltSource(c); else -> confirmHide(c) }   // [NOTA-CANAL-1] [FUENTE-ALT-1]
             }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    // ------------------------------------------------------------ [FUENTE-ALT-1] Buscar otra fuente de un canal
+
+    /** [FUENTE-ALT-1] Nombre sin etiquetas de calidad (HD, FHD, 4K, 1080p…) ni paréntesis, para reconocer el mismo canal en otra lista. */
+    private fun altBase(name: String): String {
+        val tags = setOf("hd", "fhd", "uhd", "sd", "4k", "hevc", "h265", "h264", "1080p", "720p", "576p", "480p", "360p")
+        val s = norm(name).replace(Regex("\\(.*?\\)|\\[.*?\\]"), " ").replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        val t = s.split(' ').filter { it.isNotEmpty() && !tags.contains(it) }.joinToString(" ")
+        return if (t.isNotEmpty()) t else s.trim()
+    }
+
+    /** [FUENTE-ALT-1] Busca el mismo nombre (sin etiquetas de calidad) en las listas ya guardadas en `cacheDir`; no descarga nada. Hasta 8 opciones. */
+    private fun findAltSource(c: M3uChannel) {
+        val base = altBase(c.name)
+        if (base.isEmpty()) { toast("Este canal no tiene un nombre que comparar"); return }
+        toast("🔁 Buscando en tus listas guardadas…")
+        val lists = Store.m3uLists().filter { !Xtream.isXtream(it.url) }
+        val leak = Xtream.leakFilter(this)
+        val hid = hidden
+        thread {
+            val found = ArrayList<Pair<M3uChannel, String>>()
+            val seen = HashSet<String>()
+            seen.add(c.url)
+            for (l in lists) {
+                if (found.size >= 8) break
+                val f = File(cacheDir, "m3u_" + l.url.hashCode() + ".txt")
+                if (!f.exists()) continue
+                try {
+                    for (x in M3uParser.parse(f.readText())) {
+                        if (found.size >= 8) break
+                        if (hid.contains(x.url) || leak(x.url) || !seen.add(x.url)) continue
+                        if (altBase(x.name) == base) found.add(Pair(x, l.name))
+                    }
+                } catch (e: Exception) { }
+            }
+            runOnUiThread { if (!isFinishing) showAltSources(c, found) }
+        }
+    }
+
+    private fun showAltSources(c: M3uChannel, found: List<Pair<M3uChannel, String>>) {
+        if (found.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle(c.name)
+                .setMessage("No encontré otra fuente con el mismo nombre. Solo se buscan las listas que ya abriste antes (no se descarga nada).")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val labels = found.map { it.first.name + " · " + it.second }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("🔁 Otras fuentes de «${c.name}»")
+            .setItems(labels) { _, which -> if (which in found.indices) altSourceMenu(c, found[which].first) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun altSourceMenu(c: M3uChannel, alt: M3uChannel) {
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        opts.add("▶ Reproducir"); acts.add { openChannel(alt) }
+        if (favs.contains(c.url)) {
+            opts.add("⭐ Reemplazar en favoritos"); acts.add {
+                if (favs.contains(alt.url)) toast("Esa fuente ya está en tus favoritos")
+                else if (Store.replaceChFav(c.url, alt)) {
+                    favs = Store.chFavs()
+                    notes = Store.chNotes()
+                    reloadFavChannels()
+                    applyFilter()
+                    toast("✅ Favorito reemplazado (mismo lugar, grupo y nota)")
+                } else toast("No se pudo reemplazar")
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(alt.name)
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
             .setNegativeButton("Cancelar", null)
             .show()
     }

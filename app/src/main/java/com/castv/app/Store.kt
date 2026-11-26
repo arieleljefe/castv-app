@@ -596,6 +596,33 @@ object Store {
         return true
     }
 
+    // [FUENTE-ALT-1] Cambia un favorito por otra fuente del mismo canal: la nueva ocupa el mismo lugar y hereda el grupo ("fg") y la nota.
+    /** Reemplaza el favorito [oldUrl] por [alt]. false si [oldUrl] no es favorito, si es el mismo enlace o si [alt] ya es favorito. */
+    @Synchronized
+    fun replaceChFav(oldUrl: String, alt: M3uChannel): Boolean {
+        if (oldUrl == alt.url) return false
+        val urls = chFavs().toMutableSet()
+        if (!urls.contains(oldUrl) || urls.contains(alt.url)) return false
+        val groups = readChFavGroups()
+        val fg = groups.remove(oldUrl)
+        if (!fg.isNullOrEmpty()) groups[alt.url] = fg
+        val meta = ArrayList(chFavChannels())
+        val i = meta.indexOfFirst { it.url == oldUrl }
+        if (i < 0) return false
+        meta[i] = alt
+        writeChFavMeta(meta, groups)
+        urls.remove(oldUrl)
+        urls.add(alt.url)
+        try {
+            val arr = JSONArray()
+            for (x in urls) arr.put(x)
+            prefs.edit().putString("chfav", arr.toString()).apply()
+        } catch (e: Exception) { return false }
+        val note = chNotes()[oldUrl]
+        if (!note.isNullOrEmpty()) { setChNote(alt.url, note); setChNote(oldUrl, "") }
+        return true
+    }
+
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
     @Synchronized
     fun backfillChFavs(list: List<M3uChannel>) {
