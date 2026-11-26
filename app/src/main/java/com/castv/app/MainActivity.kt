@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity() {
                     val t = intent?.getStringExtra("title") ?: "Canal"
                     Zap.confirm(t)   // [ZAP-1]
                     linkOnTv = true; linkDurSec = 0; linkGen++
+                    reSeenPlaying = false; reStopAt = 0L   // [AUTO-REENVIO-1] canal nuevo (o reenviado): se empieza a vigilar de cero
                     linkTitleNow = t
                     linkUrlNow = intent?.getStringExtra("url")   // [FAV-REPRO-3]
                     Zap.nowTitle = t; Zap.nowUrl = linkUrlNow   // [CANAL-MINI-1]
@@ -255,6 +256,11 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var manualStop = false
     @Volatile private var wasPlaying = false
     @Volatile private var playStartedAt = 0L
+    // [AUTO-REENVIO-1] reenvío automático de un canal en vivo que la TV cortó tras un atasco
+    @Volatile private var reSeenPlaying = false   // el canal actual ya llegó a sonar en la TV
+    @Volatile private var reStopAt = 0L           // desde cuándo (ms) la TV lo muestra detenido; 0 = no
+    @Volatile private var reBusy = false
+    private val reTimes = ArrayList<Long>()       // cuándo se reenvió (solo lo toca el hilo del monitor)
     @Volatile private var monitoring = false
 
     private val requiredPermissions by lazy {
@@ -2486,6 +2492,7 @@ class MainActivity : AppCompatActivity() {
         val state = TvController.getTransportState()
         tvPlaying = state == "PLAYING"
         refreshNotification()
+        checkAutoResend(state)   // [AUTO-REENVIO-1]
 
         // Retomar donde se dejó: en cuanto el TV ya está reproduciendo, salta al segundo guardado
         val resume = pendingResume
@@ -2509,6 +2516,54 @@ class MainActivity : AppCompatActivity() {
                     advanceAfterEnd()
                 }
             }
+        }
+    }
+
+    /** [AUTO-REENVIO-1] Si un canal en vivo que sonaba en el TV se detiene justo después de un atasco del canal en el
+     *  teléfono (corte de red, pantalla bloqueada…), se reenvía solo, una vez por corte (tope: 2 cada 10 min).
+     *  No actúa si la TV se detuvo por otra razón (control remoto, cambio de entrada), si hay pausa, o si tú detuviste
+     *  el canal. Se llama desde poll(), cada 2 s, en el hilo del monitor. */
+    private fun checkAutoResend(state: String) {
+        val url = linkUrlNow
+        val title = linkTitleNow
+        if (!linkOnTv || !linkIsLive || url.isNullOrEmpty() || title == null || outPhone || localActive) {
+            reSeenPlaying = false; reStopAt = 0L
+            return
+        }
+        if (state == "PLAYING") { reSeenPlaying = true; reStopAt = 0L; return }
+        if (state != "STOPPED") { if (state != "UNKNOWN") reStopAt = 0L; return }   // pausa u otro estado: no se toca
+        if (!reSeenPlaying || reBusy) return
+        val nowMs = System.currentTimeMillis()
+        if (reStopAt == 0L) reStopAt = nowMs
+        if (nowMs - reStopAt < 3000L) return   // el instante entre Stop y Play de un cambio de canal no cuenta
+        val stall = MediaServer.lastLiveStallMs
+        if (stall == 0L || stall < reStopAt - 60_000L) {
+            // sin atasco a la vista: se espera un poco por si el aviso llega después; pasado ese tiempo, se deja en paz
+            if (nowMs - reStopAt > 45_000L) {
+                DebugLog.add("AUTO-REENVIO: la TV se detuvo sin atasco del canal; no se reenvía")
+                reSeenPlaying = false; reStopAt = 0L
+            }
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        reTimes.removeAll { now - it > 600_000L }
+        if (reTimes.size >= 2) {
+            DebugLog.add("AUTO-REENVIO: ya se reenvió 2 veces en 10 min; no se insiste")
+            reSeenPlaying = false; reStopAt = 0L
+            return
+        }
+        reTimes.add(now)
+        reBusy = true; reSeenPlaying = false; reStopAt = 0L
+        DebugLog.add("AUTO-REENVIO: la TV cortó '$title' tras un atasco del canal; se reenvía")
+        runOnUiThread { setStatus("🔄 Reconectando el canal…") }
+        thread {
+            try {
+                val why = Zap.sendUrl(this, title, url)
+                if (why != null) {
+                    DebugLog.add("AUTO-REENVIO: falló: $why")
+                    runOnUiThread { setStatus("⚠️ No pude reconectar el canal: $why") }
+                }
+            } finally { reBusy = false }
         }
     }
 

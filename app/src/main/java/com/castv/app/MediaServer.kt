@@ -25,6 +25,9 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         /** [CALIDAD-1] Calidad de los canales en vivo al TV: 0 = Baja (la de siempre), 1 = Media, 2 = Alta. Se lee de Ajustes al abrir cada canal. */
         @Volatile var liveQuality: Int = 0
 
+        /** [AUTO-REENVIO-1] Última vez (ms) que un canal en vivo se atascó o tuvo que reconectar el origen. 0 = nunca. */
+        @Volatile var lastLiveStallMs: Long = 0L
+
         /** [AVISO-HLS] Revisa, antes de mandar un canal HLS al TV, si se puede preparar (misma lectura de lista que
          *  usa /live). Devuelve null si todo va bien, o el motivo en español. No abre fragmentos ni deja nada abierto. */
         fun probeLive(url: String): String? {
@@ -1369,6 +1372,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
          *  false = no se pudo o se cerró: el flujo termina como antes. */
         private fun reconnect(): Boolean {
             reconnecting = true
+            MediaServer.lastLiveStallMs = System.currentTimeMillis()   // [AUTO-REENVIO-1]
             try {
                 while (!closed && attempts < maxRetry) {
                     attempts++
@@ -1411,6 +1415,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                             try { head - served >= look } finally { lock.unlock() }
                         }
                         if (!braked && clients.get() > 0 && System.currentTimeMillis() - lastProduce > stallMs) {
+                            MediaServer.lastLiveStallMs = System.currentTimeMillis()   // [AUTO-REENVIO-1]
                             DebugLog.add("  LIVE2 atasco: sin datos ${stallMs / 1000} s, se reabre el canal")
                             lastProduce = System.currentTimeMillis()
                             src.close()
