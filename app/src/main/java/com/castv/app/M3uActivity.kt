@@ -536,12 +536,64 @@ class M3uActivity : AppCompatActivity() {
             .setTitle("★ Favs")
             .setItems(arrayOf(
                 if (on) "✓ Canales abre en ★ Favs · tocar para quitarlo" else "Abrir Canales siempre en ★ Favs",
-                "🆕 Días para «nuevo»: ${Store.favNewDays}…"   // [NUEVOS-DIAS-1]
+                "🆕 Días para «nuevo»: ${Store.favNewDays}…",   // [NUEVOS-DIAS-1]
+                "🔗 Unir repetidos (${dupFavGroups().size})…"   // [FAV-UNIR-1]
             )) { _, i ->
-                if (i == 1) favNewDaysMenu() else {
-                    Store.favStart = !on
-                    toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
+                when (i) {
+                    1 -> favNewDaysMenu()
+                    2 -> mergeDupFavs()
+                    else -> {
+                        Store.favStart = !on
+                        toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
+                    }
                 }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [FAV-UNIR-1] Grupos de favoritos con el mismo nombre (sin acentos ni mayúsculas, sin etiquetas) y distinto enlace. Los de Xtream no entran (llevan usuario y clave). */
+    private fun dupFavGroups(): List<List<M3uChannel>> {
+        val leak = Xtream.leakFilter(this)
+        val by = LinkedHashMap<String, MutableList<M3uChannel>>()
+        for (c in Store.chFavChannels()) {
+            if (Xtream.isXtream(c.url) || leak(c.url)) continue
+            val k = norm(splitName(c.name).first)
+            if (k.isEmpty()) continue
+            by.getOrPut(k) { ArrayList() }.add(c)
+        }
+        return by.values.filter { it.size >= 2 }
+    }
+
+    /** [FAV-UNIR-1] Mantener pulsado «Favs» › «Unir repetidos»: de cada grupo elegido queda el de arriba y los demás pasan a ser sus respaldos (máx. 2). */
+    private fun mergeDupFavs() {
+        val groups = dupFavGroups()
+        if (groups.isEmpty()) { toast("No hay favoritos repetidos"); return }
+        val labels = Array(groups.size) { splitName(groups[it][0].name).first + " · " + groups[it].size + " fuentes" }
+        val checked = BooleanArray(groups.size) { true }
+        AlertDialog.Builder(this)
+            .setTitle("🔗 Unir: queda el de arriba y los demás pasan a respaldo")
+            .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
+            .setPositiveButton("Unir") { _, _ ->
+                var merged = 0
+                var left = 0
+                for (gi in groups.indices) {
+                    if (!checked[gi]) continue
+                    val keep = groups[gi][0]
+                    for (d in groups[gi].drop(1)) {
+                        val had = Store.chAlts(keep.url).any { it.url == d.url }
+                        if (!had && !Store.addChAlt(keep.url, d)) { left++; continue }   // ya tiene 2 respaldos: este sigue como favorito
+                        for (a in Store.chAlts(d.url)) Store.addChAlt(keep.url, a)   // sus propios respaldos pasan también si caben
+                        Store.toggleChFav(d.url)
+                        Store.forgetChFav(d.url)
+                        merged++
+                    }
+                }
+                favs = Store.chFavs()
+                notes = Store.chNotes()
+                reloadFavChannels()
+                applyFilter()
+                toast("🔗 Unidos: $merged" + (if (left > 0) " · $left no cupieron (ya hay 2 respaldos)" else ""))
             }
             .setNegativeButton("Cancelar", null)
             .show()
