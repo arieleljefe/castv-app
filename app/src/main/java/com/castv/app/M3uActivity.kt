@@ -31,6 +31,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.text.Normalizer
@@ -457,6 +460,43 @@ class M3uActivity : AppCompatActivity() {
         }
         // [FAV-INICIO-1] con la opción activa, Canales abre directo en ★ Favs (si hay favoritos y no se viene de una búsqueda)
         if (start != null && Store.favStart && !favOnly && Store.chFavs().isNotEmpty() && intent.getStringExtra("q").isNullOrBlank()) toggleFavOnly()
+        if (savedInstanceState == null) openShortcutChannel()   // [ACCESO-1] viene de un acceso directo del inicio
+    }
+
+    // ------------------------------------------------------------ [ACCESO-1] Acceso directo a un favorito en el inicio
+
+    /** Identificador opaco del canal: el acceso directo lo guarda el sistema, así que NO lleva el enlace. */
+    private fun shortId(url: String): String {
+        val d = java.security.MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
+        return d.take(8).joinToString("") { "%02x".format(it) }
+    }
+
+    /** Pide a la pantalla de inicio un acceso directo al favorito [c]; no se ofrece para enlaces con usuario y clave (Xtream). */
+    private fun pinShortcut(c: M3uChannel) {
+        if (Xtream.isXtream(c.url) || Xtream.leakFilter(this)(c.url)) { toast("No disponible para canales con usuario y clave (por seguridad)"); return }
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) { toast("Tu pantalla de inicio no permite añadir accesos directos"); return }
+        try {
+            val id = shortId(c.url)
+            val open = Intent(this, M3uActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("short_id", id)
+            val icon = applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.ic_media_play
+            val info = ShortcutInfoCompat.Builder(this, "ch_$id")
+                .setShortLabel(c.name.take(24).ifBlank { "Canal" })
+                .setLongLabel(c.name.take(60).ifBlank { "Canal" })
+                .setIcon(IconCompat.createWithResource(this, icon))
+                .setIntent(open)
+                .build()
+            if (ShortcutManagerCompat.requestPinShortcut(this, info, null)) toast("📌 Confirma en la pantalla de inicio")
+            else toast("No se pudo añadir el acceso directo")
+        } catch (e: Exception) { toast("No se pudo añadir el acceso directo") }
+    }
+
+    /** Abre el favorito de un acceso directo (el intent solo trae el identificador); pregunta TV o teléfono como siempre. */
+    private fun openShortcutChannel() {
+        val id = intent.getStringExtra("short_id") ?: return
+        intent.removeExtra("short_id")
+        val c = Store.chFavChannels().firstOrNull { shortId(it.url) == id }
+        if (c == null) { toast("Ese canal ya no está en favoritos"); return }
+        openChannel(c)
     }
 
     /** [FAV-INICIO-1] Mantener pulsado «Favs»: elegir si Canales abre directo en ★ Favs. */
@@ -1650,6 +1690,7 @@ class M3uActivity : AppCompatActivity() {
             opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
         }
         opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
+        opts.add("📌 Añadir al inicio"); acts.add { pinShortcut(c) }   // [ACCESO-1]
         opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
         opts.add("🔁 Buscar otra fuente…"); acts.add { findAltSource(c) }   // [FUENTE-ALT-1]
         opts.add("🛟 Respaldos (${Store.chAlts(c.url).size})…"); acts.add { showAlts(c) }   // [FUENTES-FAV-1]
