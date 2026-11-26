@@ -1270,7 +1270,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         val iter = hubs.entries.iterator()
         while (iter.hasNext()) {
             val h = iter.next().value
-            if (h.closed || (h.clients.get() == 0 && now - h.lastUse > 30_000L)) { h.close(); iter.remove() }
+            if (h.closed || (h.clients.get() == 0 && now - h.lastUse > 180_000L)) { h.close(); iter.remove() }   // [PAUSA-LIVE-1] 3 min (antes 30 s)
         }
         var h = hubs[token]
         // un pedido desde el principio, con el flujo viejo o ya reciclado: se empieza de nuevo (si no, la TV vería lo de hace rato)
@@ -1282,6 +1282,12 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         }
         if (h == null) {
             if (start > LIVE_REACH) return null
+            // [PAUSA-LIVE-1] al abrir otro canal, los demás sin clientes ya no se usan (cada uno guarda 16 MB)
+            val others = hubs.entries.iterator()
+            while (others.hasNext()) {
+                val ent = others.next()
+                if (ent.key != token && ent.value.clients.get() == 0) { ent.value.close(); others.remove() }
+            }
             h = LiveHub(openLiveStream(target)) { openLiveStream(target) }   // [RECUP-1] el 2.º es para reabrir
             h.start()
             hubs[token] = h
@@ -1318,7 +1324,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         @Volatile private var reconnecting = false
         @Volatile private var lastProduce = System.currentTimeMillis()
 
-        private fun idleTooLong(): Boolean = clients.get() == 0 && System.currentTimeMillis() - lastUse > 30_000L
+        // [PAUSA-LIVE-1] 3 min sin clientes (antes 30 s): con la TV en pausa el canal sigue abierto y al reanudar la TV encuentra su posición
+        private fun idleTooLong(): Boolean = clients.get() == 0 && System.currentTimeMillis() - lastUse > 180_000L
 
         fun hasFrom0(): Boolean {
             lock.lock()
@@ -1423,7 +1430,7 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 try {
                     while (!closed) {
                         if (idleTooLong()) {
-                            DebugLog.add("  LIVE2 canal sin clientes por 30 s: se cierra")
+                            DebugLog.add("  LIVE2 canal sin clientes por 3 min: se cierra")
                             close()
                             break
                         }
