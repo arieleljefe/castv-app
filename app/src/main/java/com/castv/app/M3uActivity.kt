@@ -1285,8 +1285,22 @@ class M3uActivity : AppCompatActivity() {
             moodRow.addView(t)
         }
         for (n in names) add("📁 $n", n) { favGroupMenu(n) }
-        if (favChannels.any { !gm.containsKey(it.url) }) add("Sin grupo", "", null)
+        val loose = favChannels.count { !gm.containsKey(it.url) }   // [SINGRUPO-1]
+        if (loose > 0) add("Sin grupo · $loose", "") { moveUngrouped() }
         moodScroll.visibility = View.VISIBLE
+    }
+
+    /** [SINGRUPO-1] Mantener pulsado «Sin grupo · N»: deja solo esos favoritos, los marca todos y abre «Mover a…»; con Cancelar quedan marcados para desmarcar a mano y usar 📁. */
+    private fun moveUngrouped() {
+        favGroup = ""
+        applyFilter()
+        if (shown.isEmpty()) { toast("No hay favoritos sin grupo"); return }
+        if (!selecting) startSelect()
+        picked.clear()
+        for (c in shown) picked[c.url] = c
+        updateSelUi()
+        chAdapter.notifyDataSetChanged()
+        pickedGroup()
     }
 
     private fun favGroupMenu(name: String) {
