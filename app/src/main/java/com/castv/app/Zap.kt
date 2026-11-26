@@ -97,14 +97,26 @@ object Zap {
 
     /** [AVISO-TV-1] Manda un canal suelto (nombre y enlace) al TV, sin lista para ⏮ ⏭. null = listo; si no, el motivo.
      *  Debe llamarse desde un hilo de fondo. */
-    fun sendUrl(ctx: Context, name: String, url: String): String? {
+    fun sendUrl(ctx: Context, name: String, url: String, tryAlt: Boolean = true): String? {
         if (TvController.tvIp == null) return "TV no encontrado todavía"
         val hls = url.substringBefore('?').lowercase().endsWith(".m3u8")
         val phoneIp = CastvNet.localIpAddress(TvController.tvIp)
         val live = hls && phoneIp != null
         if (live) {
             val why = MediaServer.probeLive(url)
-            if (why != null) { Store.markChFail(url); return why }   // [FUENTES-1]
+            if (why != null) {
+                Store.markChFail(url)   // [FUENTES-1]
+                // [AUTO-FUENTE-1] si este canal no se prepara, se prueba otra fuente del mismo nombre antes de rendirse
+                if (tryAlt) {
+                    val alt = AltSource.firstWorking(ctx, name, url)
+                    if (alt != null) {
+                        DebugLog.add("AUTO-FUENTE: $name: uso otra fuente (${alt.name})")
+                        val r = sendUrl(ctx, name, alt.url, false)
+                        if (r == null) return null
+                    }
+                }
+                return why
+            }
         }
         ctx.sendBroadcast(Intent(MainActivity.ACT_STOP_LOCAL).setPackage(ctx.packageName))   // [LOCAL-1]
         val mime = if (live) "video/mp2t" else if (hls) "application/vnd.apple.mpegurl" else "video/mp4"

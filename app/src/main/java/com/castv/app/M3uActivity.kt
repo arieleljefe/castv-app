@@ -2361,6 +2361,13 @@ class M3uActivity : AppCompatActivity() {
                 if (why != null) {
                     Store.markChFail(url)   // [FUENTES-1]
                     DebugLog.add("AVISO-HLS: $title: $why")
+                    // [AUTO-FUENTE-1] antes de avisar, se prueba otra fuente del mismo canal (listas ya guardadas)
+                    val alt = AltSource.firstWorking(this, title, url)
+                    if (alt != null) {
+                        DebugLog.add("AUTO-FUENTE: $title: uso otra fuente (${alt.name})")
+                        runOnUiThread { if (!isFinishing) { toast("🔁 «$title» no respondía: envío otra fuente"); sendToTv(alt.url, title, true) } }
+                        return@thread
+                    }
                     runOnUiThread { if (!isFinishing) warnChannel(url, title, why) }
                     return@thread
                 }
