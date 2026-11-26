@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v477
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v478
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -182,3 +182,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FAV-TOP-1 · 26 nov · con ★ Favs, chip «🔥 Más vistos» (con 2 o más favoritos con vistas): ordena por veces abiertas (datos de `castv_top`), empates y nunca abiertos conservan tu orden; solo la vista (no cambia el orden guardado), se excluye con «🆕 Nuevos», se combina con los grupos y esconde Subir/Bajar mientras está activo · `Store.kt` (`chViews`), `M3uActivity.kt` (`favTop`, `applyFilter`, `drawFavGroups`, `favRowMenu`)
 - FAV-INICIO-1 · 26 nov · mantener pulsado «Favs» en Canales → «Abrir Canales siempre en ★ Favs» (y quitarlo); con la opción activa Canales abre directo en ★ Favs si hay favoritos y no se viene del buscador; clave `favstart` en `castv_lib` · `Store.kt` (`favStart`), `M3uActivity.kt` (`favStartMenu`)
 - SEGURIDAD-RESP-1 · 26 nov · `Backup.scrub` limpia `chalts` y `chnotes`: el respaldo completo (también el automático y «Enviar respaldo a otro móvil») ya no lleva enlaces con usuario y clave de favoritos Xtream; las notas y respaldos de favoritos Xtream no viajan en el respaldo (límite aceptado) · `Backup.kt`, `BackupTest.kt`
+- TAG-3.18 · 26 nov · etiqueta `v3.18` publicada e instalada; incluye el lote Fuentes (AUTO-FUENTE-1, REVISION-SEMANAL-1, FUENTES-FAV-1) y lo anterior a SEGURIDAD-RESP-1; SEGURIDAD-RESP-1, FAV-INICIO-1, ACCESO-1, FAV-TOP-1 y NUEVOS-DIAS-1 quedan para la `v3.19`
