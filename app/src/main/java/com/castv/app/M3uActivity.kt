@@ -1839,8 +1839,8 @@ class M3uActivity : AppCompatActivity() {
         }
         val labels = Array(fl.size) { i -> "${fl[i].name} · falló ${failed[fl[i].url] ?: 2} veces seguidas" }
         val checked = BooleanArray(fl.size)
-        AlertDialog.Builder(this)
-            .setTitle("⚠ Fallan seguido (${fl.size}) · marca los que quieras ocultar")
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("⚠ Fallan seguido (${fl.size})\nMarca para ocultar · mantén pulsado uno para buscar otra fuente")
             .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
             .setPositiveButton("Ocultar marcados") { _, _ ->
                 val sel = ArrayList<M3uChannel>()
@@ -1857,6 +1857,10 @@ class M3uActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cerrar", null)
             .show()
+        dlg.listView.setOnItemLongClickListener { _, _, i, _ ->   // [CAIDOS-ALT-1] reutiliza FUENTE-ALT-1
+            if (i in fl.indices) { dlg.dismiss(); findAltSource(fl[i]) }
+            true
+        }
     }
 
     // ------------------------------------------------------------ Revisar canales [CHECK-1]
@@ -1970,8 +1974,8 @@ class M3uActivity : AppCompatActivity() {
     private fun pickFailed(fails: List<CheckFail>) {
         val labels = Array(fails.size) { i -> "${fails[i].ch.name} · ${fails[i].why}" }
         val checked = BooleanArray(fails.size) { true }
-        AlertDialog.Builder(this)
-            .setTitle("Sin respuesta (${fails.size})")
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Sin respuesta (${fails.size})\nMantén pulsado uno para buscar otra fuente")
             .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
             .setPositiveButton("Ocultar marcados") { _, _ ->
                 val sel = ArrayList<M3uChannel>()
@@ -1980,6 +1984,10 @@ class M3uActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+        dlg.listView.setOnItemLongClickListener { _, _, i, _ ->   // [CAIDOS-ALT-1]
+            if (i in fails.indices) { dlg.dismiss(); findAltSource(fails[i].ch) }
+            true
+        }
     }
 
     private fun hideFailed(cs: List<M3uChannel>) {
