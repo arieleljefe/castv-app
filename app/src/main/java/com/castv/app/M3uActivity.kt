@@ -27,6 +27,7 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -92,6 +93,16 @@ class M3uActivity : AppCompatActivity() {
     private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
     private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
     private lateinit var playBtn: TextView   // [PLAY-GRUPO-1] «▶ Reproducir» (solo con ★ Favs)
+    // [MULTI-FAV-1] selección múltiple: «☑» activa; un toque marca en vez de abrir; barra «N elegidos · ★ · 📁 · Ocultar»
+    private var selecting = false
+    private val picked = LinkedHashMap<String, M3uChannel>()   // enlace → canal elegido
+    private lateinit var pickBtn: TextView
+    private lateinit var selBar: LinearLayout
+    private lateinit var selCount: TextView
+    private lateinit var selFav: TextView
+    private lateinit var selGrp: TextView
+    private lateinit var selHide: TextView
+    private lateinit var selBack: OnBackPressedCallback
     private var regionName: String? = null   // [EPG-REGION-1] región abierta (null con una lista suelta)
     private var regionLists: List<M3uList> = emptyList()   // [EPG-REGION-1]
     private val regionMax = 40000   // [REGIONES-1b] tope de canales al unir una región
@@ -312,6 +323,11 @@ class M3uActivity : AppCompatActivity() {
         failBtn.textSize = 13f
         failBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         failBtn.visibility = View.GONE
+        pickBtn = chip("☑") { if (selecting) endSelect() else startSelect() }   // [MULTI-FAV-1]
+        pickBtn.contentDescription = "Elegir varios canales"
+        pickBtn.textSize = 13f
+        pickBtn.maxLines = 1
+        pickBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         playBtn = chip("▶ Reproducir") { playShown() }   // [PLAY-GRUPO-1]
         playBtn.contentDescription = "Reproducir lo que se ve"
         playBtn.textSize = 13f
@@ -324,6 +340,7 @@ class M3uActivity : AppCompatActivity() {
         guideBtn.setPadding(dp(10), dp(4), dp(10), dp(4))
         iconLabel(guideBtn, R.drawable.ic_event, "Guía")   // [ICONOS-2]
         guideBtn.visibility = if (Epg.enabled(this)) View.VISIBLE else View.GONE
+        statusRow.addView(pickBtn)   // [MULTI-FAV-1]
         statusRow.addView(playBtn)   // [PLAY-GRUPO-1]
         statusRow.addView(guideBtn)
         statusRow.addView(failBtn)
@@ -341,16 +358,39 @@ class M3uActivity : AppCompatActivity() {
         channelList.divider = null
         channelList.setOnItemClickListener { _, _, pos, _ ->
             val i = pos - channelList.headerViewsCount   // [ESTILO-2]
-            if (i in shown.indices) openChannel(shown[i])
+            if (i in shown.indices) { if (selecting) togglePick(shown[i]) else openChannel(shown[i]) }   // [MULTI-FAV-1]
         }
         channelList.setOnItemLongClickListener { _, _, pos, _ ->   // [OCULTAR-1] mantener pulsado el canal = quitarlo
             val i = pos - channelList.headerViewsCount   // [ESTILO-2]
-            if (i in shown.indices) { if (favOnly) favRowMenu(i) else channelMenu(i) }   // [FAV-ORDEN-1] [ENVIAR-CANAL-1]
+            if (i in shown.indices) { if (selecting) togglePick(shown[i]) else if (favOnly) favRowMenu(i) else channelMenu(i) }   // [FAV-ORDEN-1] [ENVIAR-CANAL-1] [MULTI-FAV-1]
             true
         }
         root.addView(
             channelList,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // [MULTI-FAV-1] barra de selección múltiple (solo se ve con «☑» activo)
+        selBar = LinearLayout(this)
+        selBar.gravity = Gravity.CENTER_VERTICAL
+        selBar.setPadding(dp(12), dp(8), dp(4), dp(8))
+        selBar.background = ContextCompat.getDrawable(this, R.drawable.bg_mini_player)
+        selBar.visibility = View.GONE
+        selCount = TextView(this)
+        selCount.setTextColor(txtColor)
+        selCount.textSize = 13f
+        selCount.setTypeface(null, android.graphics.Typeface.BOLD)
+        selCount.maxLines = 1
+        selCount.ellipsize = TextUtils.TruncateAt.END
+        selBar.addView(selCount, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        selFav = chip("★ Favs") { pickedFav() }
+        selGrp = chip("📁 Grupo") { pickedGroup() }
+        selHide = chip("Ocultar") { pickedHide() }
+        for (b in listOf(selFav, selGrp, selHide)) {
+            b.textSize = 13f
+            b.maxLines = 1
+            b.setPadding(dp(8), dp(6), dp(8), dp(6))
+            selBar.addView(b)
+        }
+        root.addView(selBar)
         // [CANAL-MINI-1] los botones mandan las mismas órdenes que la notificación; las atiende la pantalla principal
         nowBar = LinearLayout(this)
         nowBar.gravity = Gravity.CENTER_VERTICAL
@@ -382,6 +422,10 @@ class M3uActivity : AppCompatActivity() {
         }
         root.addView(nowBar)
         setContentView(root)
+        selBack = object : OnBackPressedCallback(false) {   // [MULTI-FAV-1] «atrás» sale de la selección antes de cerrar Canales
+            override fun handleOnBackPressed() { endSelect() }
+        }
+        onBackPressedDispatcher.addCallback(this, selBack)
         nowRecv = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
                 nowDismissed = null
@@ -1139,6 +1183,7 @@ class M3uActivity : AppCompatActivity() {
                 (if (fromCache) cacheNote else "")
         }
         playBtn.visibility = if (favOnly && shown.isNotEmpty()) View.VISIBLE else View.GONE   // [PLAY-GRUPO-1]
+        if (selecting) updateSelUi()   // [MULTI-FAV-1] 📁 solo se ofrece con ★ Favs
         refreshSections()   // [ESTILO-2]
         refreshMoods()   // [ESTILO-3]
         updateFailBtn()   // [FUENTES-1]
@@ -1972,6 +2017,142 @@ class M3uActivity : AppCompatActivity() {
         openChannel(first)
     }
 
+    // ------------------------------------------------------------ [MULTI-FAV-1] Elegir varios canales
+
+    private fun startSelect() {
+        selecting = true
+        selBack.isEnabled = true
+        updateSelUi()
+        chAdapter.notifyDataSetChanged()
+    }
+
+    private fun endSelect() {
+        selecting = false
+        picked.clear()
+        selBack.isEnabled = false
+        updateSelUi()
+        chAdapter.notifyDataSetChanged()
+    }
+
+    private fun togglePick(c: M3uChannel) {
+        if (picked.remove(c.url) == null) picked[c.url] = c
+        updateSelUi()
+        chAdapter.notifyDataSetChanged()
+    }
+
+    private fun updateSelUi() {
+        selBar.visibility = if (selecting) View.VISIBLE else View.GONE
+        pickBtn.text = if (selecting) "✕" else "☑"
+        if (!selecting) return
+        selCount.text = if (picked.isEmpty()) "Toca canales" else "${picked.size} elegidos"
+        val allFav = picked.isNotEmpty() && picked.keys.all { favs.contains(it) }
+        selFav.text = if (allFav) "☆ Quitar" else "★ Favs"
+        selGrp.visibility = if (favOnly) View.VISIBLE else View.GONE
+        val a = if (picked.isEmpty()) 0.4f else 1f
+        selFav.alpha = a
+        selGrp.alpha = a
+        selHide.alpha = a
+    }
+
+    /** ★ Favs de la barra: si todos los elegidos ya son favoritos los quita; si no, añade los que faltan. */
+    private fun pickedFav() {
+        if (picked.isEmpty()) { toast("Elige al menos un canal"); return }
+        val cur = Store.chFavs()
+        val cs = ArrayList(picked.values)
+        val remove = cs.all { cur.contains(it.url) }
+        var n = 0
+        for (c in cs) {
+            val isFav = cur.contains(c.url)
+            if (remove) { Store.toggleChFav(c.url); Store.forgetChFav(c.url); n++ }
+            else if (!isFav) { Store.toggleChFav(c.url); Store.rememberChFav(c); n++ }
+        }
+        favs = Store.chFavs()
+        if (favOnly) reloadFavChannels()
+        endSelect()
+        applyFilter()
+        toast(if (remove) "☆ $n canales quitados de favoritos" else "★ $n canales añadidos a favoritos")
+    }
+
+    /** 📁 Grupo de la barra (solo con ★ Favs): mueve los favoritos elegidos a un grupo (o los saca de su grupo). */
+    private fun pickedGroup() {
+        if (picked.isEmpty()) { toast("Elige al menos un canal"); return }
+        val cur = Store.chFavs()
+        val cs = picked.values.filter { cur.contains(it.url) }
+        if (cs.isEmpty()) { toast("Los canales elegidos no son favoritos"); return }
+        fun moveTo(name: String) {
+            var n = 0
+            for (c in cs) if (Store.setChFavGroup(c.url, name)) n++
+            reloadFavChannels()
+            endSelect()
+            applyFilter()
+            toast(if (n == 0) "Sin cambios" else if (name.isEmpty()) "📁 $n canales sin grupo" else "📁 $n canales en «$name»")
+        }
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        for (n in Store.chFavGroupNames()) { opts.add("📁 $n"); acts.add { moveTo(n) } }
+        opts.add("＋ Grupo nuevo…"); acts.add {
+            val box = LinearLayout(this)
+            box.setPadding(dp(20), dp(8), dp(20), 0)
+            val nameIn = EditText(this)
+            nameIn.hint = "Nombre (ej. Noticias)"
+            nameIn.setSingleLine(true)
+            box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            AlertDialog.Builder(this)
+                .setTitle("Grupo nuevo")
+                .setView(box)
+                .setPositiveButton("Crear") { _, _ ->
+                    val g = nameIn.text.toString().trim()
+                    if (g.isEmpty()) toast("Escribe un nombre") else moveTo(g)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+        opts.add("✕ Quitar de su grupo"); acts.add { moveTo("") }
+        AlertDialog.Builder(this)
+            .setTitle("Mover ${cs.size} canales a…")
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** Ocultar de la barra: oculta los elegidos (los favoritos también pierden la ★) con DESHACER. */
+    private fun pickedHide() {
+        if (picked.isEmpty()) { toast("Elige al menos un canal"); return }
+        val cs = ArrayList(picked.values)
+        val wasFav = cs.filter { favs.contains(it.url) }
+        AlertDialog.Builder(this)
+            .setTitle("Ocultar ${cs.size} canales")
+            .setMessage("Se quitan de la pantalla (y de favoritos si lo eran). Los recuperas con 👁.")
+            .setPositiveButton("Ocultar") { _, _ ->
+                Store.hideChannels(cs)
+                hidden = Store.hiddenUrls()
+                favs = Store.chFavs()
+                if (favOnly) reloadFavChannels()
+                endSelect()
+                applyFilter()
+                updateHiddenBtn()
+                Snackbar.make(findViewById<View>(android.R.id.content), "🗑 ${cs.size} canales ocultos", Snackbar.LENGTH_LONG)
+                    .setAction("DESHACER") { undoHideMany(cs, wasFav) }
+                    .show()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun undoHideMany(cs: List<M3uChannel>, wasFav: List<M3uChannel>) {
+        Store.unhideChannels(cs.map { it.url })
+        val cur = Store.chFavs()
+        for (c in wasFav) if (!cur.contains(c.url)) {
+            Store.toggleChFav(c.url)   // vuelve la ★ que se quitó al ocultarlo
+            Store.rememberChFav(c)
+        }
+        hidden = Store.hiddenUrls()
+        favs = Store.chFavs()
+        if (favOnly) reloadFavChannels()
+        applyFilter()
+        updateHiddenBtn()
+    }
+
     // ------------------------------------------------------------ [M3U-EXPORT-1] Exportar ★ Favoritos como .m3u
 
     /** Arma el .m3u con los favoritos de todas las listas. Los canales con usuario y clave (Xtream) y los que no son http(s) se omiten; devuelve el texto y cuántos se omitieron. */
@@ -2231,9 +2412,17 @@ class M3uActivity : AppCompatActivity() {
             val logo = v.getChildAt(1) as ImageView
             val box = v.getChildAt(2) as LinearLayout
             val on = favs.contains(c.url)
-            star.text = if (on) "★" else "☆"
-            star.setTextColor(if (on) accent() else mutedColor)
-            star.setOnClickListener { toggleFav(c) }
+            val sel = selecting && picked.containsKey(c.url)   // [MULTI-FAV-1]
+            if (selecting) {
+                star.text = if (sel) "☑" else "☐"
+                star.setTextColor(if (sel) accent() else mutedColor)
+                star.setOnClickListener { togglePick(c) }
+            } else {
+                star.text = if (on) "★" else "☆"
+                star.setTextColor(if (on) accent() else mutedColor)
+                star.setOnClickListener { toggleFav(c) }
+            }
+            v.setBackgroundColor(if (sel) ((accent() and 0x00FFFFFF) or 0x33000000) else Color.TRANSPARENT)
             logo.visibility = View.VISIBLE
             Logos.load(logo, c.logo)
             if (c.logo.isEmpty()) {   // [PULIDO-3d] sin logo: icono genérico de TV en gris
