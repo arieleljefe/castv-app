@@ -391,13 +391,15 @@ object Store {
         return out
     }
 
-    private fun writeChFavMeta(l: List<M3uChannel>, groups: Map<String, String> = readChFavGroups()) {   // [FAV-GRUPOS-1] "fg" se conserva
+    private fun writeChFavMeta(l: List<M3uChannel>, groups: Map<String, String> = readChFavGroups(), dates: Map<String, Long> = readChFavDates()) {   // [FAV-GRUPOS-1] "fg" se conserva; [NUEVOS-FAV-1] "d" también
         try {
             val arr = JSONArray()
             for (c in l) {
                 val o = JSONObject().put("u", c.url).put("n", c.name).put("g", c.group).put("l", c.logo)
                 val fg = groups[c.url]
                 if (!fg.isNullOrEmpty()) o.put("fg", fg)
+                val d = dates[c.url]
+                if (d != null && d > 0L) o.put("d", d)
                 arr.put(o)
             }
             prefs.edit().putString("chfavmeta", arr.toString()).apply()
@@ -422,8 +424,38 @@ object Store {
     fun rememberChFav(c: M3uChannel) {
         val l = readChFavMeta()
         val i = l.indexOfFirst { it.url == c.url }
-        if (i >= 0) { if (l[i] == c) return; l[i] = c } else l.add(c)
-        writeChFavMeta(l)
+        if (i >= 0) { if (l[i] == c) return; l[i] = c; writeChFavMeta(l); return }
+        l.add(c)
+        val dates = readChFavDates()   // [NUEVOS-FAV-1] favorito nuevo: se anota cuándo se añadió
+        dates[c.url] = System.currentTimeMillis()
+        writeChFavMeta(l, readChFavGroups(), dates)
+    }
+
+    // [NUEVOS-FAV-1] Fecha (milisegundos) en que se añadió cada favorito: campo "d" dentro de "chfavmeta" (igual que "fg": no hay
+    // clave nueva, así que el respaldo, compartir favoritos y el filtro de claves Xtream siguen igual). Los favoritos de antes no
+    // tienen fecha y nunca salen como nuevos.
+
+    private fun readChFavDates(): MutableMap<String, Long> {
+        val out = LinkedHashMap<String, Long>()
+        val raw = prefs.getString("chfavmeta", null) ?: return out
+        try {
+            val arr = JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val d = o.optLong("d", 0L)
+                if (d > 0L) out[o.getString("u")] = d
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
+    /** Favoritos añadidos hace menos de [days] días: enlace → fecha de alta (ms). Solo los que siguen siendo favoritos. */
+    fun chFavNew(days: Int = 7): Map<String, Long> {
+        val urls = chFavs()
+        val since = System.currentTimeMillis() - days * 86_400_000L
+        val out = LinkedHashMap<String, Long>()
+        for ((u, d) in readChFavDates()) if (d >= since && urls.contains(u)) out[u] = d
+        return out
     }
 
     /** Borra el nombre guardado de un canal que ya no es favorito. */
@@ -610,7 +642,10 @@ object Store {
         val i = meta.indexOfFirst { it.url == oldUrl }
         if (i < 0) return false
         meta[i] = alt
-        writeChFavMeta(meta, groups)
+        val dates = readChFavDates()   // [NUEVOS-FAV-1] la nueva fuente hereda la fecha de alta
+        val fd = dates.remove(oldUrl)
+        if (fd != null) dates[alt.url] = fd
+        writeChFavMeta(meta, groups, dates)
         urls.remove(oldUrl)
         urls.add(alt.url)
         try {
