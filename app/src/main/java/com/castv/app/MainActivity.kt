@@ -862,6 +862,7 @@ class MainActivity : AppCompatActivity() {
         monitoring = true
         applyPendingShortcut()   // [ATAJOS-1]
         thread { autoBackupNow() }   // [AUTORESPALDO-1]
+        thread { try { WeeklyCheck.runIfNeeded(applicationContext) } catch (e: Exception) { } }   // [REVISION-SEMANAL-1]
         thread { monitorLoop() }
         window.decorView.postDelayed({ warnIfPortBusy() }, 2000)
         window.decorView.postDelayed({ showWhatsNewOnce() }, 2600)   // [NOVEDADES-1]
