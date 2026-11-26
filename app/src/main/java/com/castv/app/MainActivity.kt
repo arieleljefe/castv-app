@@ -3870,6 +3870,7 @@ class MainActivity : AppCompatActivity() {
             .setView(lv)
             .setPositiveButton("Cerrar", null)
             .setNeutralButton("Vaciar") { _, _ -> queue.clear(); updateQueueBadge() }
+            .setNegativeButton("Guardar como lista") { _, _ -> saveQueueAsList() }   // [COLA-LISTA-1]
             .create()
         lv.setOnItemClickListener { _, _, position, _ ->
             if (position in queue.indices) {
@@ -3882,6 +3883,31 @@ class MainActivity : AppCompatActivity() {
         }
         dialog.setOnDismissListener { updateQueueBadge() }
         dialog.show()
+    }
+
+    /** [COLA-LISTA-1] Guarda lo que hay en la cola en una lista (nueva o existente). La cola no se vacía. */
+    private fun saveQueueAsList() {
+        if (queue.isEmpty()) { toast("La cola está vacía"); return }
+        val snap = ArrayList(queue)
+        fun addAllTo(listName: String) {
+            var added = 0
+            for (m in snap) if (Store.addToList(listName, m)) added++
+            val skipped = snap.size - added
+            toast("➕ " + countText(added, "añadida", "añadidas") + " a «$listName»" +
+                (if (skipped > 0) " · $skipped ya estaban" else ""))
+        }
+        val names = Store.listNames()
+        val labels = ArrayList<CharSequence>()
+        labels.addAll(names)
+        labels.add("＋ Nueva lista…")
+        AlertDialog.Builder(this)
+            .setTitle("Guardar ${snap.size} de la cola en una lista")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == names.size) promptNewList { n -> addAllTo(n) }
+                else addAllTo(names[which])
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------- Temporizador de apagado
