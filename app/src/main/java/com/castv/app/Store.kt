@@ -310,6 +310,11 @@ object Store {
         get() = prefs.getString("m3uLast", null)
         set(v) { prefs.edit().putString("m3uLast", v).apply() }
 
+    /** [FAV-INICIO-1] Si Canales abre directo en ★ Favs (clave nueva "favstart" en castv_lib; el respaldo la incluye sola). */
+    var favStart: Boolean
+        get() = prefs.getBoolean("favstart", false)
+        set(v) { prefs.edit().putBoolean("favstart", v).apply() }
+
     // ------------------------------------------------- Catálogo preinstalado (CATALOGO-1)
 
     /**

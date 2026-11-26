@@ -257,6 +257,7 @@ class M3uActivity : AppCompatActivity() {
         }
         (favBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0
         iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
+        favBtn.setOnLongClickListener { favStartMenu(); true }   // [FAV-INICIO-1]
         iconLabel(addBtn, R.drawable.ic_add, "Lista")
         iconLabel(delBtn, R.drawable.ic_delete, "Quitar")
         // [M3U-EXPORT-1] solo se ve con ★ Favs activo: exporta los favoritos como .m3u
@@ -454,6 +455,21 @@ class M3uActivity : AppCompatActivity() {
             statusView.text = "Toca ＋ para añadir una lista M3U (enlace)."
             addListDialog()
         }
+        // [FAV-INICIO-1] con la opción activa, Canales abre directo en ★ Favs (si hay favoritos y no se viene de una búsqueda)
+        if (start != null && Store.favStart && !favOnly && Store.chFavs().isNotEmpty() && intent.getStringExtra("q").isNullOrBlank()) toggleFavOnly()
+    }
+
+    /** [FAV-INICIO-1] Mantener pulsado «Favs»: elegir si Canales abre directo en ★ Favs. */
+    private fun favStartMenu() {
+        val on = Store.favStart
+        AlertDialog.Builder(this)
+            .setTitle("★ Favs")
+            .setItems(arrayOf(if (on) "✓ Canales abre en ★ Favs · tocar para quitarlo" else "Abrir Canales siempre en ★ Favs")) { _, _ ->
+                Store.favStart = !on
+                toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     // ------------------------------------------------------------ Listas
