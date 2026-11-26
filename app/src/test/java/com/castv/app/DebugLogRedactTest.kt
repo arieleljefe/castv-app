@@ -62,8 +62,19 @@ class DebugLogRedactTest {
         val a = "error HTTP 403 en 192.168.100.14:38400 canal=Telemundo"
         val b = "design=ok keyboard=1 monkey=2"
         val c = "linea normal sin nada raro"
+        val d = "residual=1 inside=2 deviceMake=chrome appName=web"   // [LOG-2] nombres que solo se parecen
         assertEquals(a, DebugLog.redact(a))
         assertEquals(b, DebugLog.redact(b))
         assertEquals(c, DebugLog.redact(c))
+        assertEquals(d, DebugLog.redact(d))
+    }
+
+    /** [LOG-2] Los enlaces de Pluto llevan jwt (con IP y ubicación), sid y deviceId: se tapan. */
+    @Test
+    fun jwt_sid_y_deviceid() {
+        assertEquals(
+            "LIVE variante elegida (calidad 0) -> https://h.tv/p.m3u8?sid=[OCULTO]&deviceId=[OCULTO]&appName=web&deviceMake=chrome&jwt=[OCULTO]",
+            DebugLog.redact("LIVE variante elegida (calidad 0) -> https://h.tv/p.m3u8?sid=2cb38f88-e930&deviceId=7058e901-6bd0&appName=web&deviceMake=chrome&jwt=eyJhbGciOi.eyJzZXNz.pkJGjSP-x_y")
+        )
     }
 }

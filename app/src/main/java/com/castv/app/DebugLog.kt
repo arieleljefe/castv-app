@@ -13,7 +13,7 @@ object DebugLog {
     // [LOG-1] Ocultar claves antes de guardar cada línea.
     private const val OCULTO = "[OCULTO]"
     private const val NAMES =
-        "token|key|apikey|pass|password|secret|auth|sig|session|user|usuario|username"
+        "token|key|apikey|pass|password|secret|auth|sig|session|user|usuario|username|jwt|sid|deviceid"   // [LOG-2] jwt, sid y deviceId (Pluto)
 
     // usuario:clave@ dentro de un enlace (normal y codificado)
     private val RE_USERINFO = Regex("""(://)[^/\s@:]+:[^/\s@]+@""")
