@@ -332,7 +332,7 @@ class M3uActivity : AppCompatActivity() {
         }
         channelList.setOnItemLongClickListener { _, _, pos, _ ->   // [OCULTAR-1] mantener pulsado el canal = quitarlo
             val i = pos - channelList.headerViewsCount   // [ESTILO-2]
-            if (i in shown.indices) { if (favOnly) favRowMenu(i) else confirmHide(shown[i]) }   // [FAV-ORDEN-1]
+            if (i in shown.indices) { if (favOnly) favRowMenu(i) else channelMenu(i) }   // [FAV-ORDEN-1] [ENVIAR-CANAL-1]
             true
         }
         root.addView(
@@ -1514,6 +1514,7 @@ class M3uActivity : AppCompatActivity() {
             val next = shown[i + 1].url
             opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
         }
+        opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
         opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
         opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
@@ -1521,6 +1522,31 @@ class M3uActivity : AppCompatActivity() {
             .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    /** [ENVIAR-CANAL-1] Mantener pulsado un canal (fuera de ★ Favs): compartirlo u ocultarlo. */
+    private fun channelMenu(i: Int) {
+        if (i !in shown.indices) return
+        val c = shown[i]
+        AlertDialog.Builder(this)
+            .setTitle(c.name)
+            .setItems(arrayOf("↗ Compartir canal", "Ocultar…")) { _, which -> if (which == 0) shareChannel(c) else confirmHide(c) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [ENVIAR-CANAL-1] Manda el nombre y el enlace del canal por el menú de compartir de Android. Los de Xtream (llevan usuario y clave) no se comparten. */
+    private fun shareChannel(c: M3uChannel) {
+        val low = c.url.lowercase()
+        if (!(low.startsWith("http://") || low.startsWith("https://"))) { toast("Este canal no tiene un enlace http(s) que compartir"); return }
+        if (Xtream.leakFilter(this)(c.url)) { toast("Es un canal de Xtream (lleva usuario y clave): no se comparte"); return }
+        val name = c.name.replace(Regex("[\\r\\n]+"), " ").trim().ifEmpty { "Canal" }
+        val i = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, name)
+            putExtra(Intent.EXTRA_TEXT, name + "\n" + c.url)
+        }
+        try { startActivity(Intent.createChooser(i, "Compartir canal")) } catch (e: Exception) { toast("No se pudo compartir") }
     }
 
     private fun confirmHide(c: M3uChannel) {
