@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v443
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v445
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -32,6 +32,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VOLUMEN-TV-1 · 26 nov · los botones de volumen del teléfono suben/bajan el TV también con canales y enlaces en el TV y en la pantalla Canales (pasos de 5; `TvController.lastVol`) · `MainActivity.kt`, `M3uActivity.kt`, `TvController.kt`
 - AVISO-TV-1 · 26 nov · al tocar el aviso de EPG-RECORDA-1, con la salida en TV y el TV respondiendo, el canal se manda al TV; si no, se abre en el teléfono (espera hasta 6 s al TV); `Zap.sendUrl()` nuevo · `ReminderReceiver.kt`, `MainActivity.kt`, `Zap.kt`
 - FUNDIDO-1 · 26 nov · el temporizador de dormir baja el volumen en ~10 s antes de pausar (música del teléfono, música sin pantalla, TV y video) y lo restaura si se cancela; «Al terminar la pista/video» no cambia · `MainActivity.kt`, `PlayerCore.kt`, `VideoPlayerActivity.kt`
+- LIVE-FRESCO-1 · 26 nov · al mandar un canal en vivo al TV se cierra el flujo guardado de ese canal para que la TV reciba uno nuevo en directo (el TV mostraba otra cosa que el teléfono); el `/log` dice «LIVE-FRESCO: flujo anterior cerrado» · `MediaServer.kt` (`dropLive`), `TvController.kt` (`setUriAndPlay`)
 
 ## Canales y catálogo
 - 13-B.1 / 13-B.2 · 17 nov · Listas M3U, favoritos de canales · `M3uParser.kt`, `M3uActivity.kt`, `Store.kt`.
