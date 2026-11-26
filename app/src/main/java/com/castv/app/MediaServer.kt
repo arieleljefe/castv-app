@@ -1342,7 +1342,8 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
         // [RECUP-1] reconexión automática y detector de atascos
         private val maxRetry = 6
-        private val stallMs = 25_000L
+        private val stallMs = 12_000L      // [REFUERZO-1] antes 25 s: el origen se reabre antes y el congelamiento dura la mitad
+        private val fillMaxMs = 40_000L    // [REFUERZO-1] tope del relleno (también mientras se reconecta); pasado esto ya no se rellena
 
         // [HUECOS-TS-1] si el origen no da datos, se rellena con paquetes TS nulos para que la TV no cierre la conexión
         private val fillAfterMs = 5_000L    // la TV se quita a los ~10 s sin datos (Ariel, 26 nov): hay que rellenar antes
@@ -1457,12 +1458,20 @@ class MediaServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 try {
                     while (!closed && !ended) {
                         try { Thread.sleep(1000) } catch (_: InterruptedException) {}
-                        if (closed || ended || reconnecting) continue
+                        if (closed || ended) continue
+                        if (reconnecting) {   // [REFUERZO-1] mientras se reconecta el origen también se rellena (antes la TV se quedaba sin bytes y quitaba el canal)
+                            val idleR = System.currentTimeMillis() - lastProduce
+                            if (clients.get() > 0 && idleR > fillAfterMs && idleR <= fillMaxMs) {
+                                if (!filling) { filling = true; fillLogged = false; fillBytes = 0L; fillT0 = System.currentTimeMillis() }
+                                if (fillNulls(fillPackets)) fillBytes += fillPackets * 188L
+                            }
+                            continue
+                        }
                         val braked = run {
                             lock.lock()
                             try { head - served >= look } finally { lock.unlock() }
                         }
-                        // [HUECOS-TS-1] sin datos del origen: relleno hasta que el atasco de 25 s reabre el origen
+                        // [HUECOS-TS-1] sin datos del origen: relleno hasta que el atasco ([REFUERZO-1] 12 s) reabre el origen
                         val idle = System.currentTimeMillis() - lastProduce
                         if (!braked && clients.get() > 0 && idle > fillAfterMs && idle <= stallMs) {
                             if (!filling) { filling = true; fillLogged = false; fillBytes = 0L; fillT0 = System.currentTimeMillis() }
