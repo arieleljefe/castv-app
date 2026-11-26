@@ -428,6 +428,34 @@ object Store {
         if (l.removeAll { it.url == url }) writeChFavMeta(l)
     }
 
+    // [FAV-ORDEN-1] El orden de los favoritos es el de la lista guardada en "chfavmeta" (la clave no cambia).
+
+    /** Pone el canal favorito [url] justo antes (o después, con [after]) del favorito [neighborUrl]. true si el orden cambió. */
+    @Synchronized
+    fun moveChFavNear(url: String, neighborUrl: String, after: Boolean): Boolean {
+        if (url == neighborUrl) return false
+        val l = ArrayList(chFavChannels())
+        val i = l.indexOfFirst { it.url == url }
+        if (i < 0) return false
+        val c = l.removeAt(i)
+        val n = l.indexOfFirst { it.url == neighborUrl }
+        if (n < 0) return false
+        l.add(if (after) n + 1 else n, c)
+        writeChFavMeta(l)
+        return true
+    }
+
+    /** Pone el canal favorito [url] el primero. true si el orden cambió. */
+    @Synchronized
+    fun moveChFavFirst(url: String): Boolean {
+        val l = ArrayList(chFavChannels())
+        val i = l.indexOfFirst { it.url == url }
+        if (i <= 0) return false
+        l.add(0, l.removeAt(i))
+        writeChFavMeta(l)
+        return true
+    }
+
     /** Al cargar una lista: completa el nombre de los favoritos que salgan en ella (una sola escritura, solo si cambió algo). */
     @Synchronized
     fun backfillChFavs(list: List<M3uChannel>) {

@@ -331,7 +331,7 @@ class M3uActivity : AppCompatActivity() {
         }
         channelList.setOnItemLongClickListener { _, _, pos, _ ->   // [OCULTAR-1] mantener pulsado el canal = quitarlo
             val i = pos - channelList.headerViewsCount   // [ESTILO-2]
-            if (i in shown.indices) confirmHide(shown[i])
+            if (i in shown.indices) { if (favOnly) favRowMenu(i) else confirmHide(shown[i]) }   // [FAV-ORDEN-1]
             true
         }
         root.addView(
@@ -1387,6 +1387,30 @@ class M3uActivity : AppCompatActivity() {
     }
 
     /** [DESHACER-1] Ya no pregunta: quita el canal al momento y ofrece DESHACER unos segundos (también sigue el 👁). */
+    /** [FAV-ORDEN-1] Con ★ Favs activo, mantener pulsado un canal ofrece ponerlo primero, subirlo, bajarlo u ocultarlo. */
+    private fun favRowMenu(i: Int) {
+        if (i !in shown.indices) return
+        val c = shown[i]
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        fun moved(done: Boolean) { if (done) { reloadFavChannels(); applyFilter() } }
+        if (i > 0) {
+            val prev = shown[i - 1].url
+            opts.add("⤒ Poner el primero"); acts.add { moved(Store.moveChFavFirst(c.url)) }
+            opts.add("▲ Subir"); acts.add { moved(Store.moveChFavNear(c.url, prev, false)) }
+        }
+        if (i < shown.size - 1) {
+            val next = shown[i + 1].url
+            opts.add("▼ Bajar"); acts.add { moved(Store.moveChFavNear(c.url, next, true)) }
+        }
+        opts.add("Ocultar…"); acts.add { confirmHide(c) }
+        AlertDialog.Builder(this)
+            .setTitle(c.name)
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     private fun confirmHide(c: M3uChannel) {
         val wasFav = favs.contains(c.url)
         hideChannel(c)
