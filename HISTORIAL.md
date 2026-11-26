@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v484
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v486
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -187,3 +187,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - FAV-AZ-1 · 26 nov · con ★ Favs, chip «🔤 A–Z» (con 3 o más favoritos): ordena por el nombre que se ve, solo la vista; excluye a «🆕 Nuevos» y «🔥 Más vistos», esconde Subir/Bajar mientras está activo · `M3uActivity.kt` (`favAz`, `applyFilter`, `drawFavGroups`, `favRowMenu`)
 - ACCESO-2 · 26 nov · mantener pulsado un chip 📁 de grupo → «📌 Añadir al inicio»: el acceso directo abre ★ Favs filtrado en ese grupo; guarda solo el nombre del grupo (`short_group`); avisa si el grupo ya no existe · `M3uActivity.kt` (`pinGroupShortcut`, `openShortcutGroup`, `favGroupMenu`)
 - FAV-UNIR-1 · 26 nov · mantener pulsado «Favs» › «🔗 Unir repetidos (N)…»: favoritos con el mismo nombre y distinto enlace (sin Xtream); lista con casillas; queda el de arriba y los demás pasan a respaldo (máx. 2; sus propios respaldos también si caben); sin «deshacer» · `M3uActivity.kt` (`dupFavGroups`, `mergeDupFavs`, `favStartMenu`)
+- EXPORTA-GRUPO-1 · 26 nov · mantener pulsado un chip 📁 de grupo en ★ Favs → «📤 Exportar este grupo (.m3u)»: mismo diálogo de M3U-EXPORT-1 (Compartir o Guardar…) solo con los canales del grupo, archivo `castv-<grupo>.m3u`; omite Xtream y lo que no es http(s) y avisa; el 📤 de siempre exporta todos · `M3uActivity.kt` (`favM3u`, `exportFavsDialog`, `shareFavM3u`, `saveFavM3u`, `favGroupMenu`)
+- ACCESO-3 · 26 nov · el acceso directo «📌 Añadir al inicio» de un favorito lleva el logo del canal (cuadrado redondeado de 192 px) sacado de la caché de Logos; sin logo en memoria o sin logo, icono de la app; el de un grupo y los de Xtream sin cambio · `Logos.kt` (`cached`), `M3uActivity.kt` (`shortcutIcon`, `pinShortcut`)
+- TAG-3.20 · 26 nov · etiqueta `v3.20` publicada e instalada (Acerca de: 3.20); incluye todo lo de la `v3.19` más EXPORTA-GRUPO-1 y ACCESO-3
