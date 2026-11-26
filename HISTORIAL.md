@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v482
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v483
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -186,3 +186,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - NUEVOS-DIAS-1 · 26 nov · con ★ Favs, los favoritos nuevos llevan «🆕» delante del nombre; los días para «nuevo» se eligen (3, 7, 14 o 30) con «Favs» mantenido o el chip «🆕 Nuevos» mantenido; clave `favnewdays` en `castv_lib` · `Store.kt` (`favNewDays`, `chFavNew`), `M3uActivity.kt` (`newUrls`, `favNewDaysMenu`, `favStartMenu`)
 - FAV-AZ-1 · 26 nov · con ★ Favs, chip «🔤 A–Z» (con 3 o más favoritos): ordena por el nombre que se ve, solo la vista; excluye a «🆕 Nuevos» y «🔥 Más vistos», esconde Subir/Bajar mientras está activo · `M3uActivity.kt` (`favAz`, `applyFilter`, `drawFavGroups`, `favRowMenu`)
 - ACCESO-2 · 26 nov · mantener pulsado un chip 📁 de grupo → «📌 Añadir al inicio»: el acceso directo abre ★ Favs filtrado en ese grupo; guarda solo el nombre del grupo (`short_group`); avisa si el grupo ya no existe · `M3uActivity.kt` (`pinGroupShortcut`, `openShortcutGroup`, `favGroupMenu`)
+- FAV-UNIR-1 · 26 nov · mantener pulsado «Favs» › «🔗 Unir repetidos (N)…»: favoritos con el mismo nombre y distinto enlace (sin Xtream); lista con casillas; queda el de arriba y los demás pasan a respaldo (máx. 2; sus propios respaldos también si caben); sin «deshacer» · `M3uActivity.kt` (`dupFavGroups`, `mergeDupFavs`, `favStartMenu`)
