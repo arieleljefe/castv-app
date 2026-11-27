@@ -1689,6 +1689,11 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         return super.onKeyDown(keyCode, event)
     }
 
+    override fun onPause() {   // [FAV-WIDGET-1] las ★ pudieron cambiar: se repinta el widget de favoritos
+        super.onPause()
+        CastvFavsWidget.refresh(this)
+    }
+
     override fun onResume() {
         super.onResume()
         favs = Store.chFavs()   // [FAV-REPRO-1] la ★ pudo cambiar en el reproductor
