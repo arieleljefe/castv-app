@@ -98,6 +98,7 @@ class M3uActivity : AppCompatActivity() {
     private val reqVoice = 4717   // [VOZ-1] dictado para el buscador de canales
     private val reqSave = 4716   // [M3U-EXPORT-1] «Guardar…» el .m3u de favoritos
     private var exportPending: String? = null   // [M3U-EXPORT-1] texto del .m3u mientras se elige dónde guardarlo
+    private val reqImport = 4718   // [IMPORTAR-GRUPO-1] «Importar .m3u como grupo…»
     private lateinit var exportBtn: TextView   // [M3U-EXPORT-1]
     private lateinit var playBtn: TextView   // [PLAY-GRUPO-1] «▶ Reproducir» (solo con ★ Favs)
     private var pendingQueue: List<M3uChannel>? = null   // [ALEATORIO-1] lista mezclada para ⏮ ⏭ (solo si se abrió con «al azar»)
@@ -551,11 +552,13 @@ class M3uActivity : AppCompatActivity() {
             .setItems(arrayOf(
                 if (on) "✓ Canales abre en ★ Favs · tocar para quitarlo" else "Abrir Canales siempre en ★ Favs",
                 "🆕 Días para «nuevo»: ${Store.favNewDays}…",   // [NUEVOS-DIAS-1]
-                "🔗 Unir repetidos (${dupFavGroups().size})…"   // [FAV-UNIR-1]
+                "🔗 Unir repetidos (${dupFavGroups().size})…",   // [FAV-UNIR-1]
+                "📥 Importar .m3u como grupo…"   // [IMPORTAR-GRUPO-1]
             )) { _, i ->
                 when (i) {
                     1 -> favNewDaysMenu()
                     2 -> mergeDupFavs()
+                    3 -> pickImportFile()   // [IMPORTAR-GRUPO-1]
                     else -> {
                         Store.favStart = !on
                         toast(if (!on) "Canales abrirá en ★ Favs" else "Canales abrirá en la lista completa")
@@ -2563,6 +2566,119 @@ class M3uActivity : AppCompatActivity() {
         }
     }
 
+    // ------------------------------------------------------------ [IMPORTAR-GRUPO-1] Importar un .m3u como grupo de favoritos
+
+    private val importMax = 500   // [IMPORTAR-GRUPO-1] tope de canales nuevos por importación
+
+    @Suppress("DEPRECATION")
+    private fun pickImportFile() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        try {
+            startActivityForResult(i, reqImport)
+        } catch (e: Exception) {
+            toast("No se pudo abrir el selector de archivos")
+        }
+    }
+
+    /** Lee el archivo elegido (máx. 5 MB) fuera del hilo principal y sigue en [importGroupDialog]. */
+    private fun readImportFile(uri: android.net.Uri) {
+        thread {
+            var text: String? = null
+            var tooBig = false
+            try {
+                contentResolver.openInputStream(uri)?.use { ins ->
+                    val bos = java.io.ByteArrayOutputStream()
+                    val buf = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val n = ins.read(buf)
+                        if (n < 0) break
+                        total += n
+                        if (total > 5 * 1024 * 1024) { tooBig = true; break }
+                        bos.write(buf, 0, n)
+                    }
+                    if (!tooBig) text = bos.toString("UTF-8")
+                }
+            } catch (e: Exception) { text = null }
+            var name = ""
+            try {
+                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cur ->
+                    if (cur.moveToFirst()) name = cur.getString(0) ?: ""
+                }
+            } catch (e: Exception) { }
+            val t = text
+            val big = tooBig
+            val fname = name
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                when {
+                    big -> toast("El archivo es demasiado grande (máximo 5 MB)")
+                    t == null -> toast("No se pudo leer el archivo")
+                    else -> importGroupDialog(t, fname)
+                }
+            }
+        }
+    }
+
+    /** Muestra cuántos canales entran y pide el nombre del grupo; solo http(s) sin usuario ni clave. Los que ya eran favoritos no se tocan. */
+    private fun importGroupDialog(text: String, fileName: String) {
+        val leak = Xtream.leakFilter(this)
+        val seen = HashSet<String>()
+        val ok = ArrayList<M3uChannel>()
+        var skipped = 0
+        for (c in M3uParser.parse(text.removePrefix("\uFEFF"))) {
+            if (!seen.add(c.url)) continue
+            if (Xtream.isXtream(c.url) || leak(c.url)) { skipped++; continue }
+            ok.add(c)
+        }
+        if (ok.isEmpty()) {
+            toast(if (skipped > 0) "Esos canales llevan usuario y clave: no se importan" else "No encontré canales en ese archivo")
+            return
+        }
+        val have = Store.chFavs()
+        val fresh = ok.filter { !have.contains(it.url) }
+        if (fresh.isEmpty()) { toast("Todos esos canales ya son favoritos"); return }
+        val toAdd = if (fresh.size > importMax) fresh.subList(0, importMax) else fresh
+        val already = ok.size - fresh.size
+        val info = StringBuilder("${toAdd.size} canales nuevos")
+        if (fresh.size > importMax) info.append(" (de ${fresh.size}; se importan los primeros $importMax)")
+        if (already > 0) info.append("\n$already ya eran favoritos (siguen en su grupo)")
+        if (skipped > 0) info.append("\n$skipped omitidos (llevan usuario y clave)")
+        val base = fileName.substringBeforeLast('.').removePrefix("castv-").replace('-', ' ').replace('_', ' ')
+            .replace(Regex("[\\r\\n\"]+"), " ").trim().take(30).ifEmpty { "Importados" }
+        val box = LinearLayout(this)
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        val nameIn = EditText(this)
+        nameIn.setSingleLine(true)
+        nameIn.setText(base)
+        nameIn.setSelection(nameIn.text.length)
+        box.addView(nameIn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        AlertDialog.Builder(this)
+            .setTitle("📥 Importar como grupo")
+            .setMessage(info.toString())
+            .setView(box)
+            .setPositiveButton("Importar") { _, _ ->
+                val g = nameIn.text.toString().replace(Regex("[\\r\\n\"]+"), " ").trim().take(30)
+                if (g.isEmpty()) { toast("Escribe un nombre para el grupo"); return@setPositiveButton }
+                val n = Store.addChFavsToGroup(toAdd, g)
+                if (n == 0) { toast("No se agregó ningún canal"); return@setPositiveButton }
+                favs = Store.chFavs()
+                reloadFavChannels()
+                if (!favOnly) toggleFavOnly()
+                favNew = false
+                favTop = false
+                favAz = false
+                favGroup = if (Store.chFavGroupNames().contains(g)) g else null
+                applyFilter()
+                toast("✅ $n canales en «$g»")
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     /** [FAV-1] Vuelve a leer los favoritos de todas las listas (con su nombre). */
     private fun reloadFavChannels() {
         favChannels = Store.chFavChannels()
@@ -2692,6 +2808,11 @@ class M3uActivity : AppCompatActivity() {
                 searchBox.setText(said)
                 searchBox.setSelection(searchBox.text.length)
             }
+            return
+        }
+        if (requestCode == reqImport) {   // [IMPORTAR-GRUPO-1]
+            val uri = data?.data
+            if (resultCode == RESULT_OK && uri != null) readImportFile(uri)
             return
         }
         if (requestCode == reqSave) {   // [M3U-EXPORT-1]

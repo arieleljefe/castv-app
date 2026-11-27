@@ -441,6 +441,35 @@ object Store {
         writeChFavMeta(l, readChFavGroups(), dates)
     }
 
+    /** [IMPORTAR-GRUPO-1] Agrega de una sola vez [list] a favoritos y los pone en el grupo [group] (una sola escritura). Los que ya eran favoritos no cambian ni de grupo. Devuelve cuántos eran nuevos. */
+    @Synchronized
+    fun addChFavsToGroup(list: List<M3uChannel>, group: String): Int {
+        val g = cleanGroupName(group)
+        val urls = chFavs().toMutableSet()
+        val meta = readChFavMeta()
+        val groups = readChFavGroups()
+        val dates = readChFavDates()
+        val now = System.currentTimeMillis()
+        var added = 0
+        for (c in list) {
+            if (urls.contains(c.url)) continue
+            urls.add(c.url)
+            val i = meta.indexOfFirst { it.url == c.url }
+            if (i >= 0) meta[i] = c else meta.add(c)
+            if (g.isNotEmpty()) groups[c.url] = g
+            dates[c.url] = now
+            added++
+        }
+        if (added == 0) return 0
+        try {
+            val arr = JSONArray()
+            for (x in urls) arr.put(x)
+            prefs.edit().putString("chfav", arr.toString()).apply()
+        } catch (e: Exception) { return 0 }
+        writeChFavMeta(meta, groups, dates)
+        return added
+    }
+
     // [NUEVOS-FAV-1] Fecha (milisegundos) en que se añadió cada favorito: campo "d" dentro de "chfavmeta" (igual que "fg": no hay
     // clave nueva, así que el respaldo, compartir favoritos y el filtro de claves Xtream siguen igual). Los favoritos de antes no
     // tienen fecha y nunca salen como nuevos.
