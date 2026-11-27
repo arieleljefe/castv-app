@@ -4248,11 +4248,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         } else {   // [CORTAR-1b] un video: audio a MP3 o el tramo de video en .mp4
             AlertDialog.Builder(this)
                 .setTitle("✂️ Cortar")
-                .setItems(arrayOf<CharSequence>("🎵 Solo el audio → MP3", "🎬 El video → MP4 (sin recodificar)", "📦 Dividir por tamaño (partes de X MB)", "📉 Reducir peso (recodifica a X MB)")) { _, which ->
+                .setItems(arrayOf<CharSequence>("🎵 Solo el audio → MP3", "🎬 El video → MP4 (sin recodificar)", "📦 Dividir por tamaño (partes de X MB)", "📉 Reducir peso (recodifica a X MB)", "🔇 Quitar el audio (copia sin sonido)")) { _, which ->
                     if (which == 2) {   // [DIVIDIR-1]
                         VideoSplit.show(this, uri, item.name)
                     } else if (which == 3) {   // [REDUCIR-1]
                         VideoReduce.show(this, uri, item.name)
+                    } else if (which == 4) {   // [QUITAR-AUDIO-1]
+                        VideoMute.show(this, uri, item.name)
                     } else {
                         CutAudio.pauseHook = { pauseAll() }   // [CORTAR-2]
                         CutAudio.show(this, uri, item.name, durMs, which == 1, pos)
