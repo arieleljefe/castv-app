@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v497
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v498
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -198,3 +198,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TAG-3.20 · 26 nov · etiqueta `v3.20` publicada e instalada (Acerca de: 3.20); incluye todo lo de la `v3.19` más EXPORTA-GRUPO-1 y ACCESO-3
 - TAG-3.21 · 26 nov · etiqueta `v3.21` publicada e instalada (mismo código que la `v3.20`; se cortó porque la app de Ariel quedó en 3.8 con código 355 y el APK de la `v3.20` tenía 354)
 - TAG-3.22 · 27 nov · etiqueta `v3.22` publicada e instalada (Acerca de: 3.22); incluye TEMAS-1, TEMAS-2, VERSION-4, VERSION-5, LISTAS-1 y DESHACER-UNIR-1
+- IMPORTAR-GRUPO-1 · 27 nov · mantener pulsado «Favs» › «📥 Importar .m3u como grupo…»: se elige un .m3u (máx. 5 MB), muestra nuevos / ya favoritos / omitidos y pide el nombre del grupo (por defecto el del archivo); solo http(s) sin usuario ni clave; los que ya eran favoritos conservan su grupo; tope 500 nuevos; una sola escritura · `M3uActivity.kt` (`pickImportFile`, `readImportFile`, `importGroupDialog`), `Store.kt` (`addChFavsToGroup`)
+- ACCESO-4 · 27 nov · «📌 Añadir al inicio» de un grupo lleva un mosaico con los logos de sus primeros 4 favoritos (1 centrado, 2 mitades, 3-4 cuadrícula 2×2; solo logos ya en memoria; sin logos, icono de la app) · `M3uActivity.kt` (`groupIcon`, `pinGroupShortcut`)
+- FAV-ARRASTRAR-1 · 27 nov · asa «≡» en cada fila de ★ Favs: se arrastra y al soltar el favorito queda antes (si sube) o después (si baja) de la fila destino; autodesplazamiento en los bordes; solo sin selección, búsqueda ni 🆕 / 🔥 / A–Z · `M3uActivity.kt` (`dragEnabled`, `onHandleTouch`, `updateDragTarget`, `finishDrag`, `ChannelAdapter`)
