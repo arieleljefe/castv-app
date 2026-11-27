@@ -151,23 +151,38 @@ class SettingsActivity : AppCompatActivity() {
         search.textSize = 15f
         search.setTextColor(txtColor)
         search.setHintTextColor(mutedColor)
-        search.setPadding(dp(16), dp(10), dp(16), dp(10))
+        search.setPadding(dp(16), dp(10), dp(44), dp(10))   // [BUSCAR-X-1] deja sitio para la ✕
         val boxBg = GradientDrawable()
         boxBg.setColor(Themes.color(this, R.attr.castvSurface))   // [TEMAS-2]
         boxBg.cornerRadius = dp(10).toFloat()
         search.background = boxBg
+        // [BUSCAR-X-1] ✕ para borrar lo escrito en un toque (solo se ve si hay texto)
+        val clearBtn = TextView(this)
+        clearBtn.text = "✕"
+        clearBtn.textSize = 16f
+        clearBtn.setTextColor(mutedColor)
+        clearBtn.gravity = Gravity.CENTER
+        clearBtn.contentDescription = "Borrar búsqueda"
+        clearBtn.visibility = View.GONE
+        clearBtn.setOnClickListener { search.setText("") }
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 query = s?.toString().orEmpty()
+                clearBtn.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE   // [BUSCAR-X-1]
                 render()
             }
         })
         val searchLp = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         searchLp.setMargins(dp(16), 0, dp(16), dp(4))
-        root.addView(search, searchLp)
+        val searchBox = android.widget.FrameLayout(this)   // [BUSCAR-X-1] buscador + ✕ a la derecha
+        searchBox.addView(search, android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        searchBox.addView(clearBtn, android.widget.FrameLayout.LayoutParams(
+            dp(44), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
+        root.addView(searchBox, searchLp)
 
         content = LinearLayout(this)
         content.orientation = LinearLayout.VERTICAL
