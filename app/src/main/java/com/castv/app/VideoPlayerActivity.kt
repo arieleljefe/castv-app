@@ -1140,6 +1140,9 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
             if (sl.isEmpty()) CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador de apagado") else CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador · $sl"),
             CastvIcons.item(ic, R.drawable.ic_vp_build, "Herramientas"),
             CastvIcons.item(ic, R.drawable.ic_vp_subs, "Subtítulos"))
+        // [VIDEO-MP3-1] «Convertir a MP3» solo en videos del teléfono (no en canales ni enlaces)
+        val mp3Idx = if (items.getOrNull(index)?.let { it.id != 0L } == true) labels.size else -1
+        if (mp3Idx >= 0) labels.add(CastvIcons.item(ic, R.drawable.ic_vp_mp3, "Convertir a MP3"))
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
         if (ch != null && Epg.nowNext(ch) != null) labels.add(CastvIcons.item(ic, R.drawable.ic_event, "Guía: ahora y lo que sigue"))
         b
@@ -1150,11 +1153,62 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     2 -> showSleepMenu()
                     3 -> showToolsMenu()
                     4 -> showSubtitleMenu()
-                    else -> showGuideNow()   // [EPG-1]
+                    else -> if (which == mp3Idx) startMp3() else showGuideNow()   // [VIDEO-MP3-1] / [EPG-1]
                 }
             }
             .show()
         keepControls()
+    }
+
+    // ------------------------------------------------------------ [VIDEO-MP3-1] Convertir a MP3
+
+    @Volatile private var mp3Cancel = false
+    private var mp3Dialog: AlertDialog? = null
+
+    /** Convierte el audio del video actual a MP3 y lo guarda en Descargas (la conversión sigue aunque cambies de video). */
+    private fun startMp3() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
+        if (Mp3Converter.running.get()) { toast("Ya hay una conversión en curso"); return }
+        val app = applicationContext
+        mp3Cancel = false
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("🎵 Convertir a MP3")
+            .setMessage("Preparando… No cierres el reproductor.")
+            .setCancelable(false)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            mp3Cancel = true
+            dlg.setMessage("Cancelando…")
+        }
+        mp3Dialog = dlg
+        val uri = Uri.parse(cur.uriString)
+        val name = cur.name
+        thread {
+            val res = try {
+                Mp3Converter.convert(app, uri, name, { pct ->
+                    runOnUiThread { if (!isFinishing && mp3Dialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
+                }, { mp3Cancel })
+            } catch (e: Throwable) {
+                Mp3Converter.Result(false, "Error: ${e.javaClass.simpleName}: ${e.message}")
+            }
+            Handler(Looper.getMainLooper()).post {
+                try { if (mp3Dialog === dlg) dlg.dismiss() } catch (e: Exception) { }
+                if (mp3Dialog === dlg) mp3Dialog = null
+                when {
+                    res.cancelled -> Toast.makeText(app, "Conversión cancelada", Toast.LENGTH_SHORT).show()
+                    res.ok -> Toast.makeText(app, "🎵 Guardado en Descargas: " + res.savedAs, Toast.LENGTH_LONG).show()
+                    !isFinishing && !isDestroyed -> AlertDialog.Builder(this)
+                        .setTitle("🎵 Convertir a MP3")
+                        .setMessage("No se pudo convertir: " + res.message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                    else -> Toast.makeText(app, "No se pudo convertir: " + res.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     /** [EPG-1] Qué dan ahora y qué viene después en el canal que se ve. */
@@ -2105,6 +2159,7 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (SubtitleGen.running) { aiCancel = true; SubtitleGen.requestCancel() }   // [IA-3]
         try { aiDialog?.dismiss() } catch (e: Exception) { }
         aiDialog = null
+        if (mp3Dialog != null) { mp3Cancel = true; try { mp3Dialog?.dismiss() } catch (e: Exception) { }; mp3Dialog = null }   // [VIDEO-MP3-1]
         handler.removeCallbacks(tick)
         handler.removeCallbacks(hideHud)
         handler.removeCallbacks(hidePreview)

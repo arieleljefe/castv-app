@@ -24,3 +24,15 @@ add_library(castv_whisper SHARED jni_whisper.cpp)
 target_include_directories(castv_whisper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp/include)
 find_library(log-lib log)
 target_link_libraries(castv_whisper whisper ${log-lib})
+
+# [VIDEO-MP3-1] LAME 3.100 (LGPL) compilado aquí mismo (código en cpp/lame/, sin librerías de terceros)
+file(GLOB LAME_SRC ${CMAKE_CURRENT_SOURCE_DIR}/lame/libmp3lame/*.c)
+add_library(lame_static STATIC ${LAME_SRC})
+target_include_directories(lame_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lame/include
+                                       PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lame/libmp3lame)
+target_compile_definitions(lame_static PRIVATE STDC_HEADERS=1 HAVE_STDINT_H=1 HAVE_LIMITS_H=1
+                           HAVE_STRCHR=1 HAVE_MEMCPY=1 LAME_LIBRARY_BUILD=1)
+target_compile_options(lame_static PRIVATE -fPIC -w -Wno-implicit-function-declaration
+                       -Wno-int-conversion -Wno-incompatible-pointer-types)
+add_library(castv_lame SHARED jni_lame.cpp)
+target_link_libraries(castv_lame lame_static ${log-lib})
