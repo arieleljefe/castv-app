@@ -517,6 +517,55 @@ class M3uActivity : AppCompatActivity() {
         } catch (e: Exception) { null }
     }
 
+    /** [ACCESO-4] Icono del acceso directo de un grupo: mosaico con los logos de sus primeros 4 canales (los que ya están en memoria; 1 logo = centrado, 2 = mitades, 3-4 = cuadrícula 2×2). null si ninguno está listo (entonces se usa el icono de la app). */
+    private fun groupIcon(name: String): IconCompat? {
+        val gm = Store.chFavGroupMap()
+        val logos = ArrayList<Pair<String, android.graphics.Bitmap>>()
+        for (c in Store.chFavChannels()) {
+            if (gm[c.url] != name || c.logo.isEmpty()) continue
+            val b = Logos.cached(c.logo) ?: continue
+            logos.add(Pair(c.logo, b))
+            if (logos.size == 4) break
+        }
+        if (logos.isEmpty()) return null
+        return try {
+            val s = 192
+            val sf = s.toFloat()
+            val h = sf / 2f
+            val mos = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
+            val cv = android.graphics.Canvas(mos)
+            val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            fill.color = 0xFF37474F.toInt()
+            cv.drawRect(0f, 0f, sf, sf, fill)
+            val cells: List<android.graphics.RectF> = when (logos.size) {
+                1 -> listOf(android.graphics.RectF(0f, 0f, sf, sf))
+                2 -> listOf(android.graphics.RectF(0f, 0f, h - 2f, sf), android.graphics.RectF(h + 2f, 0f, sf, sf))
+                else -> listOf(
+                    android.graphics.RectF(0f, 0f, h - 2f, h - 2f), android.graphics.RectF(h + 2f, 0f, sf, h - 2f),
+                    android.graphics.RectF(0f, h + 2f, h - 2f, sf), android.graphics.RectF(h + 2f, h + 2f, sf, sf))
+            }
+            val bmpPaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+            for (i in logos.indices) {
+                val url = logos[i].first
+                val logo = logos[i].second
+                val r = cells[i]
+                fill.color = Logos.bgFor(url)
+                cv.drawRect(r, fill)
+                val pad = minOf(r.width(), r.height()) * 0.14f
+                val k = minOf((r.width() - 2 * pad) / logo.width, (r.height() - 2 * pad) / logo.height)
+                val w = logo.width * k
+                val lh = logo.height * k
+                val dst = android.graphics.RectF(r.centerX() - w / 2f, r.centerY() - lh / 2f, r.centerX() + w / 2f, r.centerY() + lh / 2f)
+                cv.drawBitmap(logo, null, dst, bmpPaint)
+            }
+            val out = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888)
+            val shape = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            shape.shader = android.graphics.BitmapShader(mos, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+            android.graphics.Canvas(out).drawRoundRect(android.graphics.RectF(0f, 0f, sf, sf), 40f, 40f, shape)   // esquinas redondeadas con borde suave
+            IconCompat.createWithBitmap(out)
+        } catch (e: Exception) { null }
+    }
+
     /** [ACCESO-2] Pide a la pantalla de inicio un acceso directo al grupo de favoritos [name]; el acceso directo solo guarda el nombre del grupo (nunca enlaces de canales). */
     private fun pinGroupShortcut(name: String) {
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) { toast("Tu pantalla de inicio no permite añadir accesos directos"); return }
@@ -526,7 +575,7 @@ class M3uActivity : AppCompatActivity() {
             val info = ShortcutInfoCompat.Builder(this, "gr_${shortId(name)}")
                 .setShortLabel(name.take(24).ifBlank { "Grupo" })
                 .setLongLabel("★ " + name.take(58).ifBlank { "Grupo" })
-                .setIcon(IconCompat.createWithResource(this, icon))
+                .setIcon(groupIcon(name) ?: IconCompat.createWithResource(this, icon))   // [ACCESO-4] mosaico con los logos del grupo si ya están bajados
                 .setIntent(open)
                 .build()
             if (ShortcutManagerCompat.requestPinShortcut(this, info, null)) toast("📌 Confirma en la pantalla de inicio")
