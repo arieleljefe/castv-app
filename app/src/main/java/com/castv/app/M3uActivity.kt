@@ -589,6 +589,7 @@ class M3uActivity : AppCompatActivity() {
             .setTitle("🔗 Unir: queda el de arriba y los demás pasan a respaldo")
             .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
             .setPositiveButton("Unir") { _, _ ->
+                val snap = Store.snapshotChFavs()   // [DESHACER-UNIR-1]
                 var merged = 0
                 var left = 0
                 for (gi in groups.indices) {
@@ -607,7 +608,22 @@ class M3uActivity : AppCompatActivity() {
                 notes = Store.chNotes()
                 reloadFavChannels()
                 applyFilter()
-                toast("🔗 Unidos: $merged" + (if (left > 0) " · $left no cupieron (ya hay 2 respaldos)" else ""))
+                val msg = "🔗 Unidos: $merged" + (if (left > 0) " · $left no cupieron (ya hay 2 respaldos)" else "")
+                if (merged == 0) {
+                    toast(msg)
+                } else {
+                    // [DESHACER-UNIR-1] 10 segundos para volver atrás (devuelve favoritos, notas y respaldos como estaban)
+                    Snackbar.make(findViewById<View>(android.R.id.content), msg, 10000)
+                        .setAction("DESHACER") {
+                            Store.restoreChFavs(snap)
+                            favs = Store.chFavs()
+                            notes = Store.chNotes()
+                            reloadFavChannels()
+                            applyFilter()
+                            toast("↩ Unión deshecha")
+                        }
+                        .show()
+                }
             }
             .setNegativeButton("Cancelar", null)
             .show()

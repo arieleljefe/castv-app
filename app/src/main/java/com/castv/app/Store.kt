@@ -468,6 +468,27 @@ object Store {
         return out
     }
 
+    // [DESHACER-UNIR-1] Foto de los favoritos de canales (enlaces, nombres, grupos, fechas, orden, notas y respaldos)
+    // para devolverlos tal cual tras «Unir repetidos». Guarda los textos tal como están, sin interpretarlos.
+    private val FAV_SNAP_KEYS = arrayOf("chfav", "chfavmeta", "chnotes", "chalts")
+
+    @Synchronized
+    fun snapshotChFavs(): Map<String, String?> {
+        val m = LinkedHashMap<String, String?>()
+        for (k in FAV_SNAP_KEYS) m[k] = prefs.getString(k, null)
+        return m
+    }
+
+    @Synchronized
+    fun restoreChFavs(snap: Map<String, String?>) {
+        val e = prefs.edit()
+        for (k in FAV_SNAP_KEYS) {
+            val v = snap[k]
+            if (v == null) e.remove(k) else e.putString(k, v)
+        }
+        e.apply()
+    }
+
     /** Borra el nombre guardado de un canal que ya no es favorito. */
     @Synchronized
     fun forgetChFav(url: String) {
