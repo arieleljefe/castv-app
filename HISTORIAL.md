@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v515
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v518
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -213,3 +213,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TITULO-BAL-1 · 27 nov · títulos largos de Pistas y «Reproduciendo» repartidos en líneas parejas (`BREAK_STRATEGY_BALANCED`) · `MainActivity.kt`
 - MINI-GESTOS-1 · 27 nov · en el mini reproductor, ← siguiente, → anterior, ↑ abre el panel, ↓ lo cierra · `MainActivity.kt`
 - UI-ART-1 · 27 nov · «Reproduciendo»: fondo y barras toman el color dominante de la carátula · `MainActivity.kt`
+- VIDEO-MP3-1 · 27 nov · «🎵 Convertir a MP3» en el ⋯ del reproductor (solo videos del teléfono): Android decodifica y LAME 3.100 propio codifica (192 kbps, 128 si es mono, título ID3), guardado en Descargas por MediaStore, con % y Cancelar; arreglos de build `lame-fix1` (tipo `ieee754_float32_t` y cabeceras `vector/`) · `Mp3Converter.kt`, `LameEncoder.kt`, `cpp/jni_lame.cpp`, `cpp/lame/`, `CMakeLists.txt`, `VideoPlayerActivity.kt`
