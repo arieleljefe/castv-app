@@ -53,7 +53,7 @@ object CutAudio {
     }
 
     /** Recuadro para elegir inicio y fin. [posMs] da la posición actual de lo que suena (botones «Aquí»). */
-    fun show(act: Activity, uri: Uri, name: String, durationMs: Long, posMs: () -> Long) {
+    fun show(act: Activity, uri: Uri, name: String, durationMs: Long, video: Boolean = false, posMs: () -> Long) {   // [CORTAR-1b] video = corte de video (.mp4)
         if (act.isFinishing || act.isDestroyed) return
         if (durationMs < 2000L) {
             Toast.makeText(act.applicationContext, "No sé cuánto dura este archivo", Toast.LENGTH_SHORT).show()
@@ -73,7 +73,8 @@ object CutAudio {
         box.setPadding(dp(20), dp(8), dp(20), dp(4))
 
         val info = TextView(act)
-        info.text = "Duración total: " + fmt(durationMs) + "\nEscribe los tiempos como m:ss, o toca «Aquí» para usar donde va ahora."
+        info.text = "Duración total: " + fmt(durationMs) + "\nEscribe los tiempos como m:ss, o toca «Aquí» para usar donde va ahora." +
+            (if (video) "\nSin recodificar: el inicio puede adelantarse hasta el fotograma clave anterior." else "")
         info.textSize = 14f
         box.addView(info, LinearLayout.LayoutParams(match, wrap))
 
@@ -128,7 +129,7 @@ object CutAudio {
         val scroll = ScrollView(act)
         scroll.addView(box, ViewGroup.LayoutParams(match, wrap))
         val dlg = AlertDialog.Builder(act)
-            .setTitle("✂️ Cortar audio → MP3")
+            .setTitle(if (video) "✂️ Cortar video → MP4" else "✂️ Cortar audio → MP3")
             .setView(scroll)
             .setPositiveButton("Cortar", null)
             .setNegativeButton("Cancelar", null)
@@ -140,19 +141,19 @@ object CutAudio {
                 refresh()
             } else {
                 dlg.dismiss()
-                start(act, uri, name, r.first, r.second)
+                start(act, uri, name, r.first, r.second, video)
             }
         }
     }
 
     /** Corta [startMs]..[endMs] y lo guarda en Descargas; avance y Cancelar por notificación (o recuadro si están apagadas). */
-    fun start(act: Activity, uri: Uri, name: String, startMs: Long, endMs: Long) {
+    fun start(act: Activity, uri: Uri, name: String, startMs: Long, endMs: Long, video: Boolean = false) {   // [CORTAR-1b]
         if (Mp3Converter.running.get() || LinkDownload.running.get()) {
             Toast.makeText(act.applicationContext, "Ya hay una conversión o descarga en curso", Toast.LENGTH_SHORT).show()
             return
         }
         val app = act.applicationContext
-        val title = "✂️ Cortar audio"
+        val title = if (video) "✂️ Cortar video" else "✂️ Cortar audio"   // [CORTAR-1b]
         cancelFlag.set(false)
         LinkJobNotifier.cancel = false
         val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(act)
@@ -173,10 +174,13 @@ object CutAudio {
         }
         thread {
             val res = try {
-                Mp3Converter.convert(app, uri, name, { pct ->
+                val prog = { pct: Int ->
                     if (dlg == null) LinkJobNotifier.progress(app, title, "Cortando… $pct %", pct)
                     else act.runOnUiThread { if (!act.isFinishing && !act.isDestroyed) dlg.setMessage("Cortando… $pct %") }
-                }, { cancelFlag.get() || LinkJobNotifier.cancel }, startMs * 1000L, endMs * 1000L, " (corte)")
+                }
+                val stop = { cancelFlag.get() || LinkJobNotifier.cancel }
+                if (video) VideoCut.cut(app, uri, name, startMs * 1000L, endMs * 1000L, prog, stop)   // [CORTAR-1b]
+                else Mp3Converter.convert(app, uri, name, prog, stop, startMs * 1000L, endMs * 1000L, " (corte)")
             } catch (e: Throwable) {
                 Mp3Converter.Result(false, "Error: " + e.javaClass.simpleName)
             }

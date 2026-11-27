@@ -4046,10 +4046,23 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun cutPlaying() {
         val item = playingItem
         if (item == null) { toast("No hay nada reproduciéndose"); return }
-        CutAudio.show(this, uriOf(item), item.name, item.durationSec * 1000L) {
+        val uri = uriOf(item)
+        val durMs = item.durationSec * 1000L
+        val pos: () -> Long = {
             var p = seekBar.progress * 1000L
             withLocal { mp -> p = mp.currentPosition.toLong() }
             p
+        }
+        if (item.isMusic) {
+            CutAudio.show(this, uri, item.name, durMs, false, pos)
+        } else {   // [CORTAR-1b] un video: audio a MP3 o el tramo de video en .mp4
+            AlertDialog.Builder(this)
+                .setTitle("✂️ Cortar")
+                .setItems(arrayOf<CharSequence>("🎵 Solo el audio → MP3", "🎬 El video → MP4 (sin recodificar)")) { _, which ->
+                    CutAudio.show(this, uri, item.name, durMs, which == 1, pos)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
         }
     }
 
