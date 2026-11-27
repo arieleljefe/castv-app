@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v492
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v494
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -61,6 +61,10 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TAG-3.4 · 23 nov · etiqueta `v3.4` publicada (cambio grande: ESTILO-2, UPDATE-2, TV-2, ESTILO-3); Release firmado `CASTV-v3.4.apk` (código 216) · `build.yml`.
 - SEL-1/SEL-2 · 18-19 nov · acciones en selección múltiple.
 - RONDA-2/3/4 · 19-20 nov · incógnito, visto, PiP, presets EQ, No vistos, marcadores, confirmar antes de continuar, tiempo visto · `VideoPlayerActivity.kt`, `Store.kt`, `MainActivity.kt`.
+- TEMAS-1 · 27 nov · 10 colores de acento (Cian, Verde, Naranja, Morado + Rosa, Rojo Quisqueya, Azul, Dorado, Menta, Índigo) con selector de bolitas; el código de acento pasa a `Themes.kt` (clave `accent` en `castv`) · `Themes.kt`, `MainActivity.kt`, `SettingsActivity.kt`, `M3uActivity.kt`, `colors.xml`, `styles.xml`
+- VERSION-4 · 27 nov · los builds de `main` se llaman «última etiqueta (build N)» (ej. `3.21 (build 363)`; con etiqueta, solo el número); el código de versión sigue siendo el número de ejecución · `.github/workflows/build.yml`
+- VERSION-5 · 27 nov · la cabecera de Principal muestra solo el número (`3.21`); Acerca de y Ajustes › Actualizaciones siguen con `(build N)` · `MainActivity.kt`
+- TEMAS-2 · 27 nov · fondos del modo oscuro: Medianoche (el de siempre), AMOLED, Pizarra, Bosque y Vino en Ajustes › Interfaz › «Fondo oscuro» (clave `bgstyle`; en modo claro no se aplica); atributos `castvBg/Surface/Surface2/Nav/Stroke` y estilos `BgOverlay*`; arregla que Acerca de y el reproductor de video solo conocían 4 acentos · `Themes.kt`, `styles.xml`, `attrs.xml`, `colors.xml`, 8 drawables, `activity_main.xml`, 6 Kotlin (commit `d05b3f6`)
 
 ## Reproductor de video
 - Gestos (17 nov), GESTO-1/GESTO-2/NOVEDADES-1, GESTOS-AJ-1 · 19 nov · deslizar para adelantar, mantener pulsado (velocidad rápida), doble toque al centro, zoom con pellizco, guardar brillo, temporizador de apagado, "Qué hay de nuevo" · `VideoPlayerActivity.kt`.
