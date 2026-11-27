@@ -3121,6 +3121,7 @@ class MainActivity : AppCompatActivity() {
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 2
             ellipsize = android.text.TextUtils.TruncateAt.END
+            if (Build.VERSION.SDK_INT >= 23) breakStrategy = android.text.Layout.BREAK_STRATEGY_BALANCED   // [TITULO-BAL-1]
             setTextColor(col(R.color.vlc_text))
         }
         root.addView(title, android.widget.LinearLayout.LayoutParams(lin, wrap))
@@ -4591,7 +4592,11 @@ class MainActivity : AppCompatActivity() {
             val item = items[position]
             val isPlaying = item.id == playingId && item.isMusic == playingMusic
             val sel = selecting && item.id in selectedIds
-            v.findViewById<TextView>(R.id.itemName).text = (if (sel) "✓ " else "") + prettyTitle(item)
+            v.findViewById<TextView>(R.id.itemName).apply {
+                text = (if (sel) "✓ " else "") + prettyTitle(item)
+                // [TITULO-BAL-1] reparte el título entre las líneas: no queda una palabra suelta en la segunda
+                if (Build.VERSION.SDK_INT >= 23) breakStrategy = android.text.Layout.BREAK_STRATEGY_BALANCED
+            }
             val section = v.findViewById<TextView>(R.id.itemSection)
             val byName = sortMode == Sort.NAME_ASC || sortMode == Sort.NAME_DESC
             val letter = sectionLetter(item.name)
