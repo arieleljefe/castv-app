@@ -3551,6 +3551,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             visibility = View.GONE
         }
         row2.addView(lyrBtn)
+        val cutBtn = txtBtn("✂️") { }.apply {   // [CORTAR-1a] los toques se ponen más abajo; solo se ve con algo sonando
+            textSize = 20f
+            visibility = View.GONE
+        }
+        row2.addView(cutBtn)
         root.addView(row2, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
 
         // [REMOTO-1a] Fila 3: silencio + volumen (reflejan y mandan lo mismo que el mini reproductor)
@@ -3696,6 +3701,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         lyrBtn.setOnClickListener { haptic(it); onLyrTap() }
         lyrBtn.setOnLongClickListener { onLyrMenu(); true }
+        cutBtn.setOnClickListener { haptic(it); cutPlaying() }   // [CORTAR-1a]
         art.setOnClickListener { if (lyrDoc != null) showLyrics(true) }
         lyrScroll.setOnClickListener { showLyrics(false) }
 
@@ -3732,6 +3738,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     if (lyrDoc != null && lrcShowNext) { lrcShowNext = false; showLyrics(true) }
                 }
                 lyrBtn.visibility = if (lk != null) View.VISIBLE else View.GONE
+                cutBtn.visibility = if (curLy != null) View.VISIBLE else View.GONE   // [CORTAR-1a]
                 if (lyrDoc != null && lyrScroll.visibility == View.VISIBLE) {
                     var posMs = seekBar.progress * 1000
                     withLocal { posMs = it.currentPosition }
@@ -4031,6 +4038,19 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         actionMode?.finish()
         toast("➕ " + countText(added, "añadida", "añadidas") + " a la cola" +
             (if (skipped > 0) " · $skipped ya estaban" else ""))
+    }
+
+    // ------------------------------------------- [CORTAR-1a] Cortar audio de lo que suena
+
+    /** ✂️ en «Reproduciendo»: elige inicio y fin de la pista (o video) actual y guarda ese tramo como MP3 en Descargas. */
+    private fun cutPlaying() {
+        val item = playingItem
+        if (item == null) { toast("No hay nada reproduciéndose"); return }
+        CutAudio.show(this, uriOf(item), item.name, item.durationSec * 1000L) {
+            var p = seekBar.progress * 1000L
+            withLocal { mp -> p = mp.currentPosition.toLong() }
+            p
+        }
     }
 
     // ------------------------------------------- [MP3-LOTE-1] Varios videos → MP3

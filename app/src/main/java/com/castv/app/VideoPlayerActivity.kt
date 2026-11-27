@@ -1144,6 +1144,8 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         // [VIDEO-MP3-1] «Convertir a MP3» solo en videos del teléfono (no en canales ni enlaces)
         val mp3Idx = if (items.getOrNull(index)?.let { it.id != 0L } == true) labels.size else -1
         if (mp3Idx >= 0) labels.add(CastvIcons.item(ic, R.drawable.ic_vp_mp3, "Convertir a MP3"))
+        val cutIdx = if (mp3Idx >= 0) labels.size else -1   // [CORTAR-1a] «Cortar audio…» (mismos videos que «Convertir a MP3»)
+        if (cutIdx >= 0) labels.add("✂️ Cortar audio…")
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
         if (ch != null && Epg.nowNext(ch) != null) labels.add(CastvIcons.item(ic, R.drawable.ic_event, "Guía: ahora y lo que sigue"))
         b
@@ -1154,11 +1156,23 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     2 -> showSleepMenu()
                     3 -> showToolsMenu()
                     4 -> showSubtitleMenu()
-                    else -> if (which == mp3Idx) startMp3() else showGuideNow()   // [VIDEO-MP3-1] / [EPG-1]
+                    else -> if (which == mp3Idx) startMp3() else if (which == cutIdx) startCut() else showGuideNow()   // [VIDEO-MP3-1] / [CORTAR-1a] / [EPG-1]
                 }
             }
             .show()
         keepControls()
+    }
+
+    // ------------------------------------------------------------ [CORTAR-1a] Cortar audio
+
+    /** ✂️ Elige inicio y fin del video actual y guarda ese tramo como MP3 en Descargas (el video no se toca). */
+    private fun startCut() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
+        val dur = try { video.duration } catch (e: Exception) { -1 }
+        CutAudio.show(this, Uri.parse(cur.uriString), cur.name, dur.toLong()) {
+            try { video.currentPosition.toLong() } catch (e: Exception) { 0L }
+        }
     }
 
     // ------------------------------------------------------------ [VIDEO-MP3-1] Convertir a MP3

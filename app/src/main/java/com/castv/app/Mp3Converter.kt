@@ -142,10 +142,13 @@ object Mp3Converter {
         src: Uri,
         videoName: String,
         onProgress: (Int) -> Unit,
-        isCancelled: () -> Boolean
+        isCancelled: () -> Boolean,
+        startUs: Long = 0L,      // [CORTAR-1a] inicio del tramo en microsegundos (0 = desde el principio)
+        endUs: Long = -1L,       // [CORTAR-1a] fin del tramo en microsegundos (<= 0 = hasta el final)
+        suffix: String = ""      // [CORTAR-1a] se agrega al nombre y al título ID3, p. ej. « (corte)»
     ): Result {
         if (!running.compareAndSet(false, true)) return Result(false, "Ya hay una conversión en curso")
-        val title = cleanTitle(videoName)
+        val title = cleanTitle(videoName) + suffix
         val ex = MediaExtractor()
         var codec: MediaCodec? = null
         var sink: Sink? = null
@@ -164,6 +167,7 @@ object Mp3Converter {
             if (track < 0 || fmt == null) return Result(false, "El video no tiene pista de audio")
             val mime = fmt.getString(MediaFormat.KEY_MIME) ?: ""
             ex.selectTrack(track)
+            if (startUs > 0L) ex.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)   // [CORTAR-1a]
             val totalUs = if (fmt.containsKey(MediaFormat.KEY_DURATION)) fmt.getLong(MediaFormat.KEY_DURATION) else 0L
             var srcHz = if (fmt.containsKey(MediaFormat.KEY_SAMPLE_RATE)) fmt.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
             var ch = if (fmt.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) fmt.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
@@ -187,6 +191,9 @@ object Mp3Converter {
             var outDone = false
             var idle = 0
             var lastPct = -1
+            val rangeEnd = if (endUs > 0L) endUs else totalUs   // [CORTAR-1a] el avance se mide sobre el tramo
+            val span = rangeEnd - startUs
+            var reachedEnd = false
 
             while (!outDone) {
                 if (isCancelled()) return Result(false, "Cancelado", cancelled = true)
@@ -196,14 +203,14 @@ object Mp3Converter {
                     if (ii >= 0) {
                         val ib = dec.getInputBuffer(ii)
                         val n = if (ib != null) ex.readSampleData(ib, 0) else -1
-                        if (n < 0) {
+                        if (n < 0 || (endUs > 0L && ex.sampleTime > endUs)) {   // [CORTAR-1a] pasó el fin del tramo
                             dec.queueInputBuffer(ii, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inDone = true
                         } else {
                             val t = ex.sampleTime
                             dec.queueInputBuffer(ii, 0, n, if (t < 0) 0 else t, 0)
-                            if (totalUs > 0 && t >= 0) {
-                                val pct = ((t * 100L) / totalUs).toInt().coerceIn(0, 100)
+                            if (span > 0L && t >= 0) {
+                                val pct = (((t - startUs) * 100L) / span).toInt().coerceIn(0, 100)
                                 if (pct != lastPct) { lastPct = pct; onProgress(pct) }
                             }
                             ex.advance()
@@ -228,6 +235,8 @@ object Mp3Converter {
                             enc = e
                         }
                         val bps = if (pcmFloat) 4 else 2
+                        val pts = info.presentationTimeUs   // [CORTAR-1a]
+                        var fi = 0L
                         while (ob.remaining() >= bps * ch) {
                             var l: Short = 0
                             var r: Short = 0
@@ -236,11 +245,17 @@ object Mp3Converter {
                                 if (c == 0) l = v else if (c == 1) r = v
                             }
                             if (ch == 1) r = l
+                            if (startUs > 0L || endUs > 0L) {   // [CORTAR-1a] recorta cuadro por cuadro al tramo pedido
+                                val ft = pts + (fi * 1000000L) / srcHz
+                                fi++
+                                if (ft < startUs) continue
+                                if (endUs > 0L && ft >= endUs) { reachedEnd = true; break }
+                            }
                             e.push(l, r)
                         }
                     }
                     dec.releaseOutputBuffer(oi, false)
-                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outDone = true
+                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0 || reachedEnd) outDone = true   // [CORTAR-1a]
                 } else if (oi == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     val nf = dec.outputFormat
                     if (nf.containsKey(MediaFormat.KEY_SAMPLE_RATE)) srcHz = nf.getInteger(MediaFormat.KEY_SAMPLE_RATE)
