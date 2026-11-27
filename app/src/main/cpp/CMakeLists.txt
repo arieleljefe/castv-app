@@ -31,7 +31,7 @@ add_library(lame_static STATIC ${LAME_SRC})
 target_include_directories(lame_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lame/include
                                        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lame/libmp3lame)
 target_compile_definitions(lame_static PRIVATE STDC_HEADERS=1 HAVE_STDINT_H=1 HAVE_LIMITS_H=1
-                           HAVE_STRCHR=1 HAVE_MEMCPY=1 LAME_LIBRARY_BUILD=1)
+                           HAVE_STRCHR=1 HAVE_MEMCPY=1 LAME_LIBRARY_BUILD=1 ieee754_float32_t=float)   # float32 de LAME (en su configure sale de config.h)
 target_compile_options(lame_static PRIVATE -fPIC -w -Wno-implicit-function-declaration
                        -Wno-int-conversion -Wno-incompatible-pointer-types)
 add_library(castv_lame SHARED jni_lame.cpp)
