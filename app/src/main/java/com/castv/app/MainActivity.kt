@@ -492,6 +492,13 @@ class MainActivity : AppCompatActivity() {
         }
         tvNowPlaying.setOnTouchListener(miniSwipe)
         nowThumbBox.setOnTouchListener(miniSwipe)
+        // [VIBRA-1] Vibración suave al tocar ▶, ⏮ ⏭ y ★ del mini reproductor
+        for (id in intArrayOf(R.id.btnPlay, R.id.btnPrev, R.id.btnNext, R.id.btnNowFav)) {
+            findViewById<View>(id).setOnTouchListener { v, ev ->
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) haptic(v)
+                false
+            }
+        }
         setPlayerExpanded(false)
         updateMiniCompact()   // [PULIDO-2b]
         nowBigArt.setOnClickListener { showFullPlayer() }   // [UI-3b] tocar la carátula grande
@@ -1401,6 +1408,14 @@ class MainActivity : AppCompatActivity() {
             etSearch.requestFocus()
             imm.showSoftInput(etSearch, InputMethodManager.SHOW_IMPLICIT)
         }
+    }
+
+    /** [VIBRA-1] Vibración suave (si está activada en Ajustes › Interfaz y el teléfono permite vibrar al tocar). */
+    private fun haptic(v: View) {
+        if (!getSharedPreferences("castv", MODE_PRIVATE).getBoolean("haptic", true)) return
+        v.performHapticFeedback(
+            if (Build.VERSION.SDK_INT >= 23) android.view.HapticFeedbackConstants.CONTEXT_CLICK
+            else android.view.HapticFeedbackConstants.VIRTUAL_KEY)
     }
 
     private fun setPlayerExpanded(expanded: Boolean) {
@@ -3135,7 +3150,7 @@ class MainActivity : AppCompatActivity() {
             setBackgroundResource(ripple.resourceId)
             setPadding(dp(11), dp(11), dp(11), dp(11))
             layoutParams = android.widget.LinearLayout.LayoutParams(0, dp(h), 1f)
-            setOnClickListener { onClick() }
+            setOnClickListener { haptic(it); onClick() }   // [VIBRA-1]
         }
         fun txtBtn(t: String, onClick: () -> Unit) = TextView(this).apply {
             text = t
@@ -3145,7 +3160,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(col(R.color.vlc_text))
             setBackgroundResource(ripple.resourceId)
             layoutParams = android.widget.LinearLayout.LayoutParams(0, dp(48), 1f)
-            setOnClickListener { onClick() }
+            setOnClickListener { haptic(it); onClick() }   // [VIBRA-1]
         }
 
         val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar)
@@ -3226,7 +3241,7 @@ class MainActivity : AppCompatActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(16), dp(16), dp(16), dp(16))
             layoutParams = android.widget.LinearLayout.LayoutParams(dp(68), dp(68))
-            setOnClickListener { btnPlay.performClick() }
+            setOnClickListener { haptic(it); btnPlay.performClick() }   // [VIBRA-1]
         }
         row1.addView(play)
         row1.addView(imgBtn(R.drawable.ic_next, "Siguiente", 52) { findViewById<View>(R.id.btnNext).performClick() })

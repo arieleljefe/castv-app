@@ -237,6 +237,10 @@ class SettingsActivity : AppCompatActivity() {
             Themes.bgNames[Themes.savedBg(this)] + (if (Themes.isNight(this)) "" else " · solo en modo oscuro"),
             { pickBg() }))
 
+        l.add(Entry("Interfaz", "Vibración al tocar",   // [VIBRA-1]
+            if (hapticOn()) "Sí: vibración suave en ▶, ⏮ ⏭ y ★ (si el teléfono tiene activada la vibración al tocar)"
+            else "No", { toggleHaptic() }))
+
         l.add(Entry("Subtítulos", "Tamaño", subSizeNames[stSize()],
             { pickSub("Tamaño", subSizeNames, stSize(), "style_size") }))
         l.add(Entry("Subtítulos", "Negrita", if (stBold()) "Sí" else "No", { toggleSubBold() }))
@@ -385,7 +389,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema, color de acento y fondo oscuro"
+        "Interfaz" -> "Tema, color de acento, fondo oscuro y vibración"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -1588,6 +1592,15 @@ class SettingsActivity : AppCompatActivity() {
                 render()
             }
             .show()
+    }
+
+    private fun hapticOn(): Boolean = prefs().getBoolean("haptic", true)   // [VIBRA-1]
+
+    private fun toggleHaptic() {
+        val now = !hapticOn()
+        prefs().edit().putBoolean("haptic", now).apply()
+        toast(if (now) "📳 Vibración suave en los botones" else "📳 Sin vibración en los botones")
+        render()
     }
 
     /** [BUSQ-RECIENTES-1] Confirma antes de borrar las búsquedas guardadas. */
