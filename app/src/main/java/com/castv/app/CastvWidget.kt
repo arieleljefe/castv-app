@@ -38,6 +38,9 @@ class CastvWidget : AppWidgetProvider() {
         /** Vuelve al estado de reposo (app cerrada o sin nada sonando). */
         fun reset(ctx: Context) = push(ctx, "CASTV", "Abre la app para reproducir", false)
 
+        /** [SOFA-1] Repinta con el estado actual (al cambiar «Botones grandes» en Ajustes). */
+        fun repaint(ctx: Context) = refresh(ctx)
+
         private fun refresh(ctx: Context) {
             try {
                 val mgr = AppWidgetManager.getInstance(ctx)
@@ -49,7 +52,7 @@ class CastvWidget : AppWidgetProvider() {
         }
 
         private fun build(ctx: Context): RemoteViews {
-            val rv = RemoteViews(ctx.packageName, R.layout.widget_castv)
+            val rv = RemoteViews(ctx.packageName, if (CastvSofa.on(ctx)) R.layout.widget_castv_big else R.layout.widget_castv)   // [SOFA-1]
             rv.setTextViewText(R.id.wdgTitle, title)
             rv.setTextViewText(R.id.wdgSub, sub)
             rv.setImageViewResource(R.id.wdgToggle, if (playing) R.drawable.wdg_pause else R.drawable.wdg_play)

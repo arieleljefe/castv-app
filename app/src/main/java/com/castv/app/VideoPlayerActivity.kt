@@ -869,7 +869,8 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         // Fila 2: anterior · −N · play/pausa · +N · siguiente
         val btnRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
-        btnRow.addView(iconBtn(R.drawable.ic_prev) { stepOrZap(-1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        val sf = CastvSofa.scale(this)   // [SOFA-1] «Botones grandes»: anterior, play, siguiente y ↩ más grandes
+        btnRow.addView(iconBtn(R.drawable.ic_prev) { stepOrZap(-1) }, LinearLayout.LayoutParams(dp((48 * sf).toInt()), dp((48 * sf).toInt())))
         backSkip = skipBtn { seekBy(-btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(backSkip)
         playBtn = ImageView(this).apply {
@@ -879,12 +880,12 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(acc) }
             setOnClickListener { togglePlay() }
         }
-        btnRow.addView(playBtn, LinearLayout.LayoutParams(dp(56), dp(56)).apply {
+        btnRow.addView(playBtn, LinearLayout.LayoutParams(dp((56 * sf).toInt()), dp((56 * sf).toInt())).apply {
             leftMargin = dp(8); rightMargin = dp(8)
         })
         fwdSkip = skipBtn { seekBy(btnSec()) }   // [GESTOS-AJ-1]
         btnRow.addView(fwdSkip)
-        btnRow.addView(iconBtn(R.drawable.ic_next) { stepOrZap(+1) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        btnRow.addView(iconBtn(R.drawable.ic_next) { stepOrZap(+1) }, LinearLayout.LayoutParams(dp((48 * sf).toInt()), dp((48 * sf).toInt())))
         backBtn = TextView(this).apply {   // [ANTERIOR-2] vuelve al canal de antes; pulsarlo otra vez regresa al de ahora
             text = "↩"
             textSize = 22f
@@ -893,7 +894,7 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
             visibility = View.GONE
             setOnClickListener { backToPrevChannel(); keepControls() }
         }
-        btnRow.addView(backBtn, LinearLayout.LayoutParams(dp(40), dp(48)))
+        btnRow.addView(backBtn, LinearLayout.LayoutParams(dp((40 * sf).toInt()), dp((48 * sf).toInt())))
         bottomBar.addView(btnRow)
 
         root.addView(bottomBar, FrameLayout.LayoutParams(

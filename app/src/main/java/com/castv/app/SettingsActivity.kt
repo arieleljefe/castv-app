@@ -244,6 +244,10 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
             if (CastvCompact.on(this)) "Sí: filas más bajas en Pistas, Videos y Canales" else "No: filas como siempre",
             { toggleCompact() }))
 
+        l.add(Entry("Interfaz", "Botones grandes (modo sofá)",   // [SOFA-1]
+            if (CastvSofa.on(this)) "Sí: botones más grandes en el reproductor de música, el de video y el widget"
+            else "No: botones como siempre", { toggleSofa() }))
+
         l.add(Entry("Interfaz", "Vibración al tocar",   // [VIBRA-1]
             if (hapticOn()) "Sí: vibración suave en ▶, ⏮ ⏭ y ★ (si el teléfono tiene activada la vibración al tocar)"
             else "No", { toggleHaptic() }))
@@ -396,7 +400,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema, color de acento, fondo oscuro, tamaño del texto, filas compactas y vibración"
+        "Interfaz" -> "Tema, color de acento, fondo oscuro, tamaño del texto, filas compactas, botones grandes y vibración"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -1620,6 +1624,15 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val now = !CastvCompact.on(this)
         prefs().edit().putBoolean("compact", now).apply()
         toast(if (now) "↕ Filas compactas" else "↕ Filas como siempre")
+        render()
+    }
+
+    /** [SOFA-1] Botones más grandes para usar el teléfono de lejos (MainActivity y el reproductor lo leen al volver; el widget se repinta ya). */
+    private fun toggleSofa() {
+        val now = !CastvSofa.on(this)
+        prefs().edit().putBoolean("sofa", now).apply()
+        CastvWidget.repaint(applicationContext)
+        toast(if (now) "🛋 Botones grandes" else "🛋 Botones como siempre")
         render()
     }
 

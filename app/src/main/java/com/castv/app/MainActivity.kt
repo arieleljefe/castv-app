@@ -503,6 +503,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             }
         }
         setPlayerExpanded(false)
+        applySofa()   // [SOFA-1]
         updateMiniCompact()   // [PULIDO-2b]
         nowBigArt.setOnClickListener { showFullPlayer() }   // [UI-3b] tocar la carátula grande
         btnExpand.setOnLongClickListener { showFullPlayer(); true }   // [UI-3b] o mantener la flecha ˄
@@ -1457,6 +1458,23 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         v.performHapticFeedback(
             if (Build.VERSION.SDK_INT >= 23) android.view.HapticFeedbackConstants.CONTEXT_CLICK
             else android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+
+    /** [SOFA-1] Botones del mini reproductor y del panel más grandes (×1,35) con «Botones grandes»; medidas base en dp, así se puede apagar sin acumular. */
+    private fun applySofa() {
+        val f = CastvSofa.scale(this)
+        val d = resources.displayMetrics.density
+        fun size(id: Int, w: Int, h: Int) {   // w = 0: el ancho lo da el peso y no se toca
+            val v = findViewById<View>(id) ?: return
+            val lp = v.layoutParams ?: return
+            if (w > 0) lp.width = (w * d * f).toInt()
+            lp.height = (h * d * f).toInt()
+            v.layoutParams = lp
+        }
+        size(R.id.btnNowFav, 40, 40); size(R.id.btnQuick, 40, 40); size(R.id.btnExpand, 36, 40)
+        size(R.id.btnShuffle, 0, 44); size(R.id.btnPrev, 0, 44); size(R.id.btnPlay, 52, 52)
+        size(R.id.btnStop, 0, 44); size(R.id.btnNext, 0, 44); size(R.id.btnAuto, 0, 44)
+        size(R.id.btnBack10, 56, 40); size(R.id.btnFwd10, 56, 40); size(R.id.btnMute, 40, 40)
     }
 
     private fun setPlayerExpanded(expanded: Boolean) {
@@ -2614,6 +2632,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (Themes.savedBg(this) != bgAtStart) { recreate(); return }   // [TEMAS-2] fondo cambiado en Ajustes
         if (CastvTextSize.saved(this) != textAtStart) { recreate(); return }   // [TEXTO-TAM-1] tamaño de texto cambiado en Ajustes
         updateIncogBadge()   // [INCOG-2]
+        applySofa()   // [SOFA-1] «Botones grandes» cambiado en Ajustes
         if (::adapter.isInitialized) {   // refresca "Continuar" (y "No vistos") al volver del reproductor
             if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
         }

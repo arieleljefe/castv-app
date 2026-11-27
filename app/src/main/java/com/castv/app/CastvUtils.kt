@@ -109,6 +109,12 @@ object CastvCompact {
     fun on(ctx: Context): Boolean = ctx.getSharedPreferences("castv", Context.MODE_PRIVATE).getBoolean("compact", false)
 }
 
+/** [SOFA-1] «Botones grandes (modo sofá)» (Ajustes › Interfaz): botones más grandes en el reproductor de música, el de video y el widget. Se guarda en `castv` › `sofa` (apagado por defecto). */
+object CastvSofa {
+    fun on(ctx: Context): Boolean = ctx.getSharedPreferences("castv", Context.MODE_PRIVATE).getBoolean("sofa", false)
+    fun scale(ctx: Context): Float = if (on(ctx)) 1.35f else 1f
+}
+
 /** [TEXTO-TAM-1] Tamaño del texto de la app: 0 = Pequeño, 1 = Normal (el del sistema, sin tocar), 2 = Grande. Se guarda en `castv` › `text_size`. */
 object CastvTextSize {
     val names = arrayOf("Pequeño", "Normal (el del sistema)", "Grande")
