@@ -1041,6 +1041,20 @@ object Store {
         if (lists.remove(name) != null) saveLists()
     }
 
+    /** [LISTAS-1] Cambia el nombre de una lista sin mover su lugar ni sus pistas. false si el nombre está vacío, ya existe o la lista no existe. */
+    @Synchronized
+    fun renameList(old: String, new: String): Boolean {
+        val n = new.trim()
+        if (n.isEmpty() || !lists.containsKey(old)) return false
+        if (n == old) return true
+        if (lists.containsKey(n)) return false
+        val rebuilt = LinkedHashMap<String, MutableList<String>>()
+        for ((k, v) in lists) rebuilt[if (k == old) n else k] = v
+        lists = rebuilt
+        saveLists()
+        return true
+    }
+
     @Synchronized
     fun inList(name: String, item: MediaItem): Boolean = lists[name]?.contains(key(item)) == true
 

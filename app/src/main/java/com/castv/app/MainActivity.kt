@@ -4339,26 +4339,102 @@ class MainActivity : AppCompatActivity() {
         val bldPl = AlertDialog.Builder(this)   // [ICONOS-9]
         val icPl = bldPl.context
         bldPl
-            .setTitle(name)
+            .setTitle(name + " (" + Store.listSize(name) + ")")   // [LISTAS-1]
             .setItems(arrayOf<CharSequence>(
                 CastvIcons.item(icPl, R.drawable.ic_mn_folder_open, "Abrir"),
+                CastvIcons.item(icPl, R.drawable.ic_vp_play, "Reproducir"),
+                CastvIcons.item(icPl, R.drawable.ic_shuffle, "Mezclar"),
+                CastvIcons.item(icPl, R.drawable.ic_mn_queue_add, "Añadir a la cola"),
+                CastvIcons.item(icPl, R.drawable.ic_mn_edit, "Renombrar…"),
                 CastvIcons.item(icPl, R.drawable.ic_vp_delete, "Quitar lista"))) { _, which ->
-                if (which == 0) {
-                    selectedPlaylist = name
-                    groupReturn = if (inGroups()) viewMode else null   // [TABS-1]
-                    viewMode = ViewMode.ALL
-                    applyFilters()
-                } else {
-                    Store.deleteList(name)
-                    if (selectedPlaylist == name) {
-                        selectedPlaylist = null
+                when (which) {
+                    0 -> {
+                        selectedPlaylist = name
+                        groupReturn = if (inGroups()) viewMode else null   // [TABS-1]
+                        viewMode = ViewMode.ALL
                         applyFilters()
-                    } else if (groupsShown) {
-                        applyFilters()   // [TABS-1] repinta la pestaña Listas
                     }
-                    toast("Lista quitada")
+                    1 -> playPlaylist(name, false)
+                    2 -> playPlaylist(name, true)
+                    3 -> queuePlaylist(name)
+                    4 -> renamePlaylist(name)
+                    else -> confirmRemovePlaylist(name)
                 }
             }
+            .show()
+    }
+
+    /** [LISTAS-1] Abre la lista y la reproduce en orden (o mezclada). El orden es el de Ordenar. */
+    private fun playPlaylist(name: String, shuffle: Boolean) {
+        if (allItems.none { Store.inList(name, it) }) {
+            toast("Esta lista no tiene " + (if (showingMusic) "audios" else "videos"))
+            return
+        }
+        val back = if (inGroups()) viewMode else null   // [TABS-1]
+        resetFilters()
+        selectedPlaylist = name
+        groupReturn = back
+        viewMode = ViewMode.ALL
+        applyFilters()
+        if (currentList.isEmpty()) return
+        if (shuffle) shuffleAndPlay() else playFromList(0)
+    }
+
+    /** [LISTAS-1] Pone todas las pistas de la lista en la cola (suenan después de la actual). */
+    private fun queuePlaylist(name: String) {
+        val items = allItems.filter { Store.inList(name, it) }
+        if (items.isEmpty()) {
+            toast("Esta lista no tiene " + (if (showingMusic) "audios" else "videos"))
+            return
+        }
+        queue.addAll(items)
+        updateQueueBadge()
+        toast("➕ " + countText(items.size, "añadida", "añadidas") + " a la cola")
+    }
+
+    /** [LISTAS-1] Cambiar el nombre de una lista. */
+    private fun renamePlaylist(old: String) {
+        val et = EditText(this)
+        et.setText(old)
+        et.setSelection(old.length)
+        et.setSingleLine(true)
+        AlertDialog.Builder(this)
+            .setTitle("Renombrar lista")
+            .setView(et)
+            .setPositiveButton("Guardar") { _, _ ->
+                val n = et.text.toString().trim()
+                if (n.isEmpty()) {
+                    toast("Escribe un nombre")
+                } else if (n != old) {
+                    if (!Store.renameList(old, n)) {
+                        toast("Ya existe una lista con ese nombre")
+                    } else {
+                        if (selectedPlaylist == old) selectedPlaylist = n
+                        applyFilters()
+                        toast("Lista renombrada a «$n»")
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** [LISTAS-1] Antes se quitaba al instante; ahora se confirma (las pistas no se borran del teléfono). */
+    private fun confirmRemovePlaylist(name: String) {
+        AlertDialog.Builder(this)
+            .setTitle("¿Quitar la lista «$name»?")
+            .setMessage("Tiene " + Store.listSize(name) + " elementos. Los archivos no se borran del teléfono.")
+            .setPositiveButton("Quitar") { _, _ ->
+                Store.deleteList(name)
+                if (selectedPlaylist == name) {
+                    selectedPlaylist = null
+                    applyFilters()
+                } else if (groupsShown) {
+                    applyFilters()   // [TABS-1] repinta la pestaña Listas
+                }
+                toast("Lista quitada")
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 
