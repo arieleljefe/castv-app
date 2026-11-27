@@ -772,6 +772,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         monitoring = false
         // [SERVICIO-1b] con música del teléfono sonando, la música sigue sin pantalla (PlayerCore); si no, se detiene como siempre
         abReset()   // [AB-MUSICA-1] sin pantalla no hay A-B
+        gapAbort()   // [GAPLESS-1] PlayerCore lleva su propio sin pausa y fundido
         var handedOff = false
         val curSong = playingItem
         if (localActive && localPrepared && localPlayer != null && curSong != null && curSong.isMusic) {
@@ -905,7 +906,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             }
             true
         }
-        if (localPrepared) { attachEffects(mp); applySpeed() }
+        if (localPrepared) { attachEffects(mp); applySpeed(); gapStart() }   // [GAPLESS-1]
         lastNotifKey = ""
         refreshNotification()
     }
@@ -3213,12 +3214,48 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     @Suppress("DEPRECATION")
     private fun startLocal(item: MediaItem, resumeAt: Int) {
-        stopLocal()
+        val xo = gapXfOld.takeIf { it != null && it === localPlayer }   // [GAPLESS-1] viene de un fundido
+        gapXfOld = null
+        val pre = if (resumeAt == 0) nextTrack.take(item, localPlayer) else { nextTrack.discard(localPlayer); null }   // [GAPLESS-1]
+        stopLocal(if (pre != null) xo else null)
         // Si el TV estaba reproduciendo algo, se detiene: ahora suena en el teléfono
         thread { try { if (TvController.tvIp != null) TvController.stop() } catch (e: Exception) { } }
         audioManager.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
         pausedByFocus = false
         pendingResume = 0   // el salto se hace aquí mismo, no hace falta esperar al TV
+
+        if (pre != null) {   // [GAPLESS-1] sin pausa o fundido: la pista ya está preparada (y, sin pausa, ya sonando)
+            localPlayer = pre
+            localPrepared = true
+            localActive = true
+            try {
+                pre.setOnCompletionListener { p -> if (localPlayer === p) onLocalCompleted() }
+                pre.setOnErrorListener { p, _, _ ->
+                    if (localPlayer === p) {
+                        stopLocal()
+                        adapter.playingLocal = false
+                        adapter.notifyDataSetChanged()
+                        setStatus("❌ No se pudo reproducir en el teléfono (formato no compatible o archivo dañado)")
+                    }
+                    true
+                }
+                if (xo != null) pre.setVolume(0f, 0f) else applyLocalVolume()
+                if (!pre.isPlaying) pre.start()
+                attachEffects(pre)
+                applySpeed()
+                wasPlaying = true
+                if (xo != null) PlayerCore.startXfade(xo, pre, PlayerCore.xfadeSec(this) * 1000L) { if (muted) 0f else 1f }
+                setStatus("✅ Reproduciendo en el teléfono")
+                gapStart()
+                return
+            } catch (e: Exception) {
+                try { pre.release() } catch (e2: Exception) { }
+                localPlayer = null
+                localPrepared = false
+                localActive = false
+                try { xo?.release() } catch (e2: Exception) { }
+            }
+        }
 
         val mp = MediaPlayer()
         localPlayer = mp
@@ -3242,6 +3279,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     attachEffects(p)
                     applySpeed()
                     wasPlaying = true
+                    gapStart()   // [GAPLESS-1]
                     setStatus(if (resumeAt > 0) "⏩ Retomando en ${fmt(resumeAt)} (teléfono)"
                               else "✅ Reproduciendo en el teléfono")
                 }
@@ -3268,21 +3306,25 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     @Suppress("DEPRECATION")
-    private fun stopLocal() {
+    private fun stopLocal(keep: MediaPlayer? = null) {   // [GAPLESS-1] keep = el que baja en un fundido (lo suelta el fundido)
         abReset()   // [AB-MUSICA-1] cambiar de pista, detener o pasar al TV apaga el A-B
+        gapStop()   // [GAPLESS-1]
         val mp = localPlayer
+        nextTrack.discard(mp)   // [GAPLESS-1] la siguiente preparada (y su enlace) se sueltan antes que esta
+        PlayerCore.cancelXfade()
         localPlayer = null
         localActive = false
         localPrepared = false
         pausedByFocus = false
         releaseEffects()
-        if (mp != null) {
+        if (mp != null && mp !== keep) {
             try { mp.release() } catch (e: Exception) { }
             audioManager.abandonAudioFocus(focusListener)
         }
     }
 
     private fun onLocalCompleted() {
+        gapSettle()   // [GAPLESS-1]
         playingItem?.let { Store.clearResume(it) }
         wasPlaying = false
         adapter.notifyDataSetChanged()
@@ -4053,6 +4095,76 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         actionMode?.finish()
         toast("➕ " + countText(added, "añadida", "añadidas") + " a la cola" +
             (if (skipped > 0) " · $skipped ya estaban" else ""))
+    }
+
+    // ------------------------------------------- [GAPLESS-1] Sin pausa y fundido entre canciones (música del teléfono)
+
+    private val nextTrack = PlayerCore.NextTrack()
+    private var gapXfOld: MediaPlayer? = null   // el reproductor que baja durante un fundido; startLocal lo recoge
+    private var gapRunning = false
+    private val gapHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val gapTick = object : Runnable {
+        override fun run() {
+            if (!gapRunning) return
+            try { gapStep() } catch (e: Exception) { }
+            gapHandler.postDelayed(this, 300)
+        }
+    }
+
+    /** Se vigila la pista siguiente solo si «Sin pausa» o el fundido están encendidos (los dos apagados por defecto). */
+    private fun gapStart() {
+        gapHandler.removeCallbacks(gapTick)
+        if (!PlayerCore.gaplessOn(this) && PlayerCore.xfadeSec(this) == 0) { gapRunning = false; return }
+        gapRunning = true
+        gapHandler.postDelayed(gapTick, 300)
+    }
+
+    private fun gapStop() {
+        gapRunning = false
+        gapHandler.removeCallbacks(gapTick)
+    }
+
+    /** Al cerrar la pantalla con música sonando sin pantalla: PlayerCore lleva lo suyo, aquí no queda nada. */
+    private fun gapAbort() {
+        gapStop()
+        nextTrack.discard(localPlayer)
+        PlayerCore.cancelXfade()
+    }
+
+    /** Qué sonaría después, igual que step(+1) (cola primero, luego la lista si se repite todo). Null si no hay o si hay que parar. */
+    private fun gapPeek(): MediaItem? {
+        val cur = playingItem ?: return null
+        if (!cur.isMusic || sleepAfterTrack || repeatMode == Repeat.ONE) return null
+        if (queue.isNotEmpty()) return queue[0]
+        if (repeatMode == Repeat.ALL && playlist.isNotEmpty()) {
+            val i = if (playIndex < 0) 0 else Math.floorMod(playIndex + 1, playlist.size)
+            val n = playlist[i]
+            return if (n.isMusic) n else null
+        }
+        return null
+    }
+
+    private fun gapStep() {
+        val mp = localPlayer
+        val cur = playingItem
+        if (!localActive || !localPrepared || mp == null || cur == null || !cur.isMusic) return
+        nextTrack.tick(applicationContext, mp, gapPeek()) { gapCrossfade() }
+    }
+
+    /** Faltan N segundos: se pasa a la siguiente con las reglas de siempre (step); startLocal arranca la ya preparada con volumen 0 y empieza el fundido. */
+    private fun gapCrossfade() {
+        val old = localPlayer ?: return
+        playingItem?.let { Store.clearResume(it) }
+        gapXfOld = old
+        try { step(+1) } catch (e: Exception) { }
+        gapXfOld = null
+    }
+
+    /** Al terminar una pista: si lo preparado ya no es lo que toca (cambió la cola, el modo repetir, el temporizador…), se suelta. */
+    private fun gapSettle() {
+        if (nextTrack.player == null) return
+        val pk = gapPeek()
+        if (pk == null || nextTrack.item?.uriString != pk.uriString) nextTrack.discard(null)
     }
 
     // ------------------------------------------- [AB-MUSICA-1] Repetir un tramo (A-B) de la música del teléfono

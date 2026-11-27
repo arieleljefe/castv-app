@@ -318,6 +318,13 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         // [AUDIO-1] Audio
         val bassOn = prefs().getBoolean("bassOn", false)
+        l.add(Entry("Reproducción", "Sin pausa entre canciones",   // [GAPLESS-1]
+            if (gaplessOn()) "Sí: la siguiente canción empieza sin silencio (música del teléfono: lista, cola y repetir todo)"
+            else "No: como siempre", { toggleGapless() }))
+        l.add(Entry("Reproducción", "Fundido entre canciones",   // [GAPLESS-1]
+            if (xfadeIdx() == 0) "Apagado"
+            else xfadeLabels[xfadeIdx()] + ": una canción baja mientras la otra sube (tiene prioridad sobre «Sin pausa»)", { pickXfade() }))
+
         l.add(Entry("Audio", "Ecualizador (teléfono)",
             "Graves reforzados: ${if (bassOn) "Sí" else "No"}. Pon una pista en el teléfono antes de abrirlo",
             { sendAction("equalizer") }))
@@ -405,6 +412,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
         "Biblioteca" -> "Re-escanear y carpetas ocultas"
+        "Reproducción" -> "Sin pausa y fundido entre canciones"
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
         "Emisión al TV" -> "Salida al abrir, calidad en TV, TV detectada e IP del teléfono"
@@ -1634,6 +1642,34 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         CastvWidget.repaint(applicationContext)
         toast(if (now) "🛋 Botones grandes" else "🛋 Botones como siempre")
         render()
+    }
+
+    // ------------------------------------------------------------ [GAPLESS-1] Reproducción
+
+    private fun gaplessOn(): Boolean = prefs().getBoolean("gapless", false)
+
+    private val xfadeValues = intArrayOf(0, 2, 4, 6)
+    private val xfadeLabels = arrayOf("Apagado", "2 segundos", "4 segundos", "6 segundos")
+
+    private fun xfadeIdx(): Int = xfadeValues.indexOf(prefs().getInt("xfade", 0)).let { if (it < 0) 0 else it }
+
+    /** «Sin pausa»: MainActivity y el modo sin pantalla lo leen al empezar la siguiente pista. */
+    private fun toggleGapless() {
+        val now = !gaplessOn()
+        prefs().edit().putBoolean("gapless", now).apply()
+        toast(if (now) "▶▶ Sin pausa entre canciones" else "▶▶ Canciones como siempre")
+        render()
+    }
+
+    private fun pickXfade() {
+        AlertDialog.Builder(this)
+            .setTitle("Fundido entre canciones")
+            .setSingleChoiceItems(xfadeLabels, xfadeIdx()) { d, which ->
+                prefs().edit().putInt("xfade", xfadeValues[which]).apply()
+                d.dismiss()
+                render()
+            }
+            .show()
     }
 
     private fun toggleHaptic() {
