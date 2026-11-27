@@ -389,8 +389,9 @@ class MainActivity : AppCompatActivity() {
         tabResume = findViewById(R.id.tabResume)
         tvIncog = findViewById(R.id.tvIncog)   // [INCOG-2]
         // [VERSION-2] La versión de la cabecera sale de la app instalada (ya no es un texto fijo)
+        // [VERSION-5] en la cabecera solo el número (sin « (build N)»); Acerca de y Ajustes lo muestran completo
         findViewById<TextView>(R.id.tvVersion).text = try {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+            (packageManager.getPackageInfo(packageName, 0).versionName ?: "").substringBefore(" ")
         } catch (e: Exception) { "" }
         navVideo = findViewById(R.id.navVideo)
         navAudio = findViewById(R.id.navAudio)
