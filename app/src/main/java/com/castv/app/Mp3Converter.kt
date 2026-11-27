@@ -65,7 +65,7 @@ object Mp3Converter {
     }
 
     /** Destino del MP3: MediaStore › Descargas (Android 10+) o carpeta Descargas de la app. */
-    private class Sink(
+    class Sink(
         val stream: OutputStream,
         val resolver: ContentResolver?,
         val uri: Uri?,
@@ -94,12 +94,12 @@ object Mp3Converter {
         }
     }
 
-    private fun openSink(context: Context, displayName: String): Sink {
+    fun openSink(context: Context, displayName: String, mime: String = "audio/mpeg"): Sink {   // [VIDEO-MP3-1b] también lo usa LinkDownload
         if (Build.VERSION.SDK_INT >= 29) {
             val cr = context.contentResolver
             val cv = ContentValues()
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-            cv.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg")
+            cv.put(MediaStore.MediaColumns.MIME_TYPE, mime)
             cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             cv.put(MediaStore.MediaColumns.IS_PENDING, 1)
             val u = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)
@@ -115,8 +115,10 @@ object Mp3Converter {
         dir.mkdirs()
         var f = File(dir, displayName)
         var i = 1
-        val base = displayName.removeSuffix(".mp3")
-        while (f.exists()) { f = File(dir, "$base ($i).mp3"); i++ }
+        val dot = displayName.lastIndexOf('.')
+        val base = if (dot > 0) displayName.substring(0, dot) else displayName
+        val ext = if (dot > 0) displayName.substring(dot) else ""
+        while (f.exists()) { f = File(dir, "$base ($i)$ext"); i++ }
         return Sink(FileOutputStream(f), null, null, f)
     }
 
@@ -255,7 +257,7 @@ object Mp3Converter {
             success = true
             return Result(true, "OK", savedAs)
         } catch (e: Throwable) {
-            return Result(false, "Error: ${e.javaClass.simpleName}: ${e.message}")
+            return Result(false, "Error: ${e.javaClass.simpleName}" + (if (src.scheme == "http" || src.scheme == "https") "" else ": ${e.message}"))   // [VIDEO-MP3-1b] sin el mensaje si es un enlace: puede traerlo (R9)
         } finally {
             try { codec?.stop() } catch (e: Exception) { }
             try { codec?.release() } catch (e: Exception) { }

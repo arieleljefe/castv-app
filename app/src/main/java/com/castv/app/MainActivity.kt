@@ -1477,6 +1477,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             menu.add(0, 14, 11, if (useTrash()) "Eliminado: a la papelera" else "Eliminado: permanente")
         }
         menu.add(0, 15, 11, "Reproducir enlace…")   // [Etapa 13-A]
+        menu.add(0, 25, 11, "Enlace → MP3 / descargar…")   // [VIDEO-MP3-1b]
         menu.add(0, 16, 11, "Listas M3U (canales)…")   // [Etapa 13-B]
         menu.add(0, 17, 11, "Respaldo (exportar/importar)…")   // [Respaldo JSON]
         menu.add(0, 18, 11, "📁 Carpetas…")   // [UI-5]
@@ -1510,6 +1511,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             13 -> pickAccent()
             14 -> toggleTrash()
             15 -> askLinkAndPlay()
+            25 -> askLinkToMp3()   // [VIDEO-MP3-1b]
             16 -> {
                 val open = { startActivityForResult(Intent(this, M3uActivity::class.java), reqM3u) }
                 if (ParentalPin.guardsChannels(this)) {   // [PARENTAL-2]
@@ -1552,7 +1554,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
 
         val groups = ArrayList<Pair<String, List<Int>>>()
-        groups.add("Reproducir y canales" to listOf(15, 18, 10, 3))
+        groups.add("Reproducir y canales" to listOf(15, 25, 18, 10, 3))
         groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21, 22, 23))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
@@ -1601,6 +1603,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     9 -> R.drawable.ic_mas_eq
                     10 -> R.drawable.ic_tv
                     15 -> R.drawable.ic_mas_link
+                    25 -> R.drawable.ic_vp_mp3   // [VIDEO-MP3-1b]
                     18 -> R.drawable.ic_mas_folder
                     21 -> R.drawable.ic_mas_list   // [TOP-1]
                     22 -> R.drawable.ic_vp_star   // [TABS-1]
@@ -2163,6 +2166,92 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .setNegativeButton("📱 En el teléfono") { _, _ -> playLink(input.text.toString().trim(), false) }
             .setNeutralButton("🕘 Historial") { _, _ -> showLinkHistory() }
             .show()
+    }
+
+    // ------------------------------------------- [VIDEO-MP3-1b] Enlace → MP3 / descargar
+
+    @Volatile private var linkCancel = false
+    private var linkDialog: AlertDialog? = null
+
+    /** Pide un enlace directo a un archivo y deja elegir: 🎵 convertirlo a MP3 o ⬇ descargarlo (los dos van a Descargas). */
+    private fun askLinkToMp3() {
+        val input = EditText(this).apply {
+            hint = "https://…/video.mp4"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI
+            try {
+                val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val c = cm.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                if (c != null && (c.startsWith("http://") || c.startsWith("https://"))) setText(c)
+            } catch (e: Exception) { }
+        }
+        val box = FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Enlace → MP3 / descargar")
+            .setMessage("Pega un enlace directo a un archivo (.mp4, .mkv, .mp3…). No sirve con YouTube ni redes, directos, listas .m3u8 ni enlaces con usuario y clave.")
+            .setView(box)
+            .setPositiveButton("🎵 A MP3") { _, _ -> runLinkJob(input.text.toString().trim(), true) }
+            .setNegativeButton("⬇ Descargar") { _, _ -> runLinkJob(input.text.toString().trim(), false) }
+            .setNeutralButton("Cancelar", null)
+            .show()
+    }
+
+    private fun runLinkJob(url: String, toMp3: Boolean) {
+        val bad = LinkDownload.check(url)
+        if (bad != null) { toast(bad); return }
+        if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return }
+        val app = applicationContext
+        val title = if (toMp3) "🎵 Enlace → MP3" else "⬇ Descargar enlace"
+        linkCancel = false
+        val dlg = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage("Preparando…")
+            .setCancelable(false)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            linkCancel = true
+            dlg.setMessage("Cancelando…")
+        }
+        linkDialog = dlg
+        val name = LinkDownload.nameFromUrl(url)
+        thread {
+            var ok = false
+            var cancelled = false
+            var msg = ""
+            try {
+                if (toMp3) {
+                    val r = Mp3Converter.convert(app, Uri.parse(url), name, { pct ->
+                        runOnUiThread { if (!isFinishing && linkDialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
+                    }, { linkCancel })
+                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message
+                } else {
+                    val r = LinkDownload.download(app, url, { pct, mb ->
+                        runOnUiThread {
+                            if (!isFinishing && linkDialog === dlg) dlg.setMessage(if (pct >= 0) "Descargando… $pct %" else "Descargando… $mb MB")
+                        }
+                    }, { linkCancel })
+                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message
+                }
+            } catch (e: Throwable) {
+                msg = "Error: " + e.javaClass.simpleName
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try { if (linkDialog === dlg) dlg.dismiss() } catch (e: Exception) { }
+                if (linkDialog === dlg) linkDialog = null
+                val text = when {
+                    cancelled -> "Cancelado"
+                    ok -> (if (toMp3) "🎵 Guardado en Descargas: " else "⬇ Guardado en Descargas: ") + msg
+                    else -> "No se pudo: " + msg.replace(url, "(enlace)")   // R9: el enlace no se muestra
+                }
+                Toast.makeText(app, text, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /** Últimos enlaces usados y favoritos (★). */
