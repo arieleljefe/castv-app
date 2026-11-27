@@ -3250,6 +3250,18 @@ class MainActivity : AppCompatActivity() {
         row3.addView(volFull)
         root.addView(row3, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
 
+        // [UI-ART-1] El fondo y las barras toman el color de la carátula (sin carátula, los de siempre)
+        fun applyArtTint(bmp: android.graphics.Bitmap?) {
+            val dom = if (bmp != null) dominantColor(bmp) else null
+            val bg = if (dom != null) androidx.core.graphics.ColorUtils.blendARGB(bgTv.data, dom, 0.30f) else bgTv.data
+            root.setBackgroundColor(bg)
+            val acc = if (dom != null) readableAccent(dom, bgTv.data) else accentColor()
+            for (sb in arrayOf(seek, volFull)) {
+                sb.progressTintList = ColorStateList.valueOf(acc)
+                sb.thumbTintList = ColorStateList.valueOf(acc)
+            }
+        }
+
         // Refleja el panel cada medio segundo mientras la ventana está abierta
         var shownKey: Any? = null
         val sync = object : Runnable {
@@ -3265,7 +3277,9 @@ class MainActivity : AppCompatActivity() {
                         art.clearColorFilter()
                         art.setPadding(0, 0, 0, 0)
                         art.setImageBitmap(bmp)
+                        applyArtTint(bmp)   // [UI-ART-1]
                     } else {
+                        applyArtTint(null)   // [UI-ART-1]
                         art.setPadding(dp(64), dp(64), dp(64), dp(64))
                         art.setColorFilter(col(R.color.vlc_muted))
                         art.setImageResource(if (playingItem?.isMusic == true) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
@@ -3297,6 +3311,40 @@ class MainActivity : AppCompatActivity() {
         fullDialog = dlg
         dlg.show()
         sync.run()
+    }
+
+    /** [UI-ART-1] Color dominante de una carátula: promedio de una versión de 24×24 donde los colores vivos pesan más. Null si es gris o no se puede leer. */
+    private fun dominantColor(src: android.graphics.Bitmap): Int? {
+        return try {
+            val s = android.graphics.Bitmap.createScaledBitmap(src, 24, 24, true)
+            var r = 0.0; var g = 0.0; var b = 0.0; var wSum = 0.0
+            val hsv = FloatArray(3)
+            for (y in 0 until 24) for (x in 0 until 24) {
+                val p = s.getPixel(x, y)
+                android.graphics.Color.colorToHSV(p, hsv)
+                val w = (hsv[1] * hsv[2]).toDouble()
+                r += android.graphics.Color.red(p) * w
+                g += android.graphics.Color.green(p) * w
+                b += android.graphics.Color.blue(p) * w
+                wSum += w
+            }
+            if (wSum < 24 * 24 * 0.05) null
+            else android.graphics.Color.rgb((r / wSum).toInt(), (g / wSum).toInt(), (b / wSum).toInt())
+        } catch (e: Exception) { null }
+    }
+
+    /** [UI-ART-1] Aclara (fondo oscuro) u oscurece (fondo claro) el color para que las barras se vean. */
+    private fun readableAccent(dom: Int, bg: Int): Int {
+        val bgDark = androidx.core.graphics.ColorUtils.calculateLuminance(bg) < 0.5
+        var c = dom
+        var n = 0
+        while (n < 8) {
+            val lum = androidx.core.graphics.ColorUtils.calculateLuminance(c)
+            if (if (bgDark) lum >= 0.35 else lum <= 0.35) break
+            c = androidx.core.graphics.ColorUtils.blendARGB(c, if (bgDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt(), 0.15f)
+            n++
+        }
+        return c
     }
 
     private fun updateNowFav() {
