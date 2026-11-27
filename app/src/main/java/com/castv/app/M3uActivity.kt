@@ -1737,7 +1737,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val recent = Store.recentChannels().filter { !h.contains(it.url) }
         val favList = Store.chFavChannels().filter { !h.contains(it.url) }.take(20)
         addSection("🕘 Continuar", recent)
-        addSection("★ Favoritos", favList)   // [VISTA-4] misma estrella (color de acento) que la lista
+        addSection("★ Favoritos", favList, big = true)   // [VISTA-4] misma estrella (color de acento) que la lista; [CARTELERA-1] tarjetas grandes
         val top = Store.topChannels().filter { !h.contains(it.first.url) }   // [TOP-CANALES-1]
         addSection("🔥 Más vistos", top.map { it.first }, top.associate { it.first.url to it.second }) { confirmResetTop() }
     }
@@ -1755,7 +1755,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .show()
     }
 
-    private fun addSection(title: String, list: List<M3uChannel>, plays: Map<String, Int>? = null, onHeaderLong: (() -> Unit)? = null) {
+    private fun addSection(title: String, list: List<M3uChannel>, plays: Map<String, Int>? = null, big: Boolean = false, onHeaderLong: (() -> Unit)? = null) {
         if (list.isEmpty()) return
         val t = TextView(this)
         val sp = android.text.SpannableString(title)
@@ -1771,11 +1771,57 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         sections.addView(t)
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
-        for (c in list) row.addView(card(c, plays?.get(c.url)), LinearLayout.LayoutParams(dp(96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })
+        for (c in list) row.addView(if (big) bigCard(c) else card(c, plays?.get(c.url)),
+            LinearLayout.LayoutParams(dp(if (big) 168 else 96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })   // [CARTELERA-1]
         val scroll = HorizontalScrollView(this)
         scroll.isHorizontalScrollBarEnabled = false
         scroll.addView(row)
         sections.addView(scroll)
+    }
+
+    /** [CARTELERA-1] Tarjeta grande de la fila ★ Favoritos: fondo redondeado, logo grande, nombre y «▶ ahora» (con la guía activada).
+     *  Tocar = mismo menú 📺 / 📱; mantener pulsado = ocultar (igual que la tarjeta pequeña). */
+    private fun bigCard(c: M3uChannel): View {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(10), dp(10), dp(10), dp(10))
+        box.minimumHeight = dp(128)
+        box.background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(14).toFloat()
+            setColor(Themes.color(this@M3uActivity, R.attr.castvSurface))
+        }
+        val logo = ImageView(this)
+        logo.scaleType = ImageView.ScaleType.FIT_CENTER
+        Logos.load(logo, c.logo)
+        if (c.logo.isEmpty()) {
+            logo.setImageResource(R.drawable.ic_tv)
+            logo.setColorFilter(mutedColor)
+        } else {
+            logo.clearColorFilter()
+        }
+        styleLogo(logo, c.logo)
+        box.addView(logo, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)))
+        val name = TextView(this)
+        name.text = (if (failed.containsKey(c.url)) "⚠ " else "") + (if (newUrls.contains(c.url)) "🆕 " else "") + splitName(c.name).first
+        name.setTextColor(txtColor)
+        name.textSize = 14f
+        name.setTypeface(null, android.graphics.Typeface.BOLD)
+        name.maxLines = 2
+        name.ellipsize = TextUtils.TruncateAt.END
+        box.addView(name, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+        val nowT = Epg.nowTitle(c)
+        if (nowT != null) {
+            val g = TextView(this)
+            g.text = "▶ $nowT"
+            g.setTextColor(accent())
+            g.textSize = 11f
+            g.maxLines = 2
+            g.ellipsize = TextUtils.TruncateAt.END
+            box.addView(g, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(2) })
+        }
+        box.setOnClickListener { openChannel(c) }
+        box.setOnLongClickListener { confirmHide(c); true }
+        return box
     }
 
     /** Tarjeta pequeña: logo y nombre. Tocar = mismo menú 📺 / 📱; mantener pulsado = quitar (como en la lista). */
