@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v495
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v497
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -197,3 +197,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - ACCESO-3 · 26 nov · el acceso directo «📌 Añadir al inicio» de un favorito lleva el logo del canal (cuadrado redondeado de 192 px) sacado de la caché de Logos; sin logo en memoria o sin logo, icono de la app; el de un grupo y los de Xtream sin cambio · `Logos.kt` (`cached`), `M3uActivity.kt` (`shortcutIcon`, `pinShortcut`)
 - TAG-3.20 · 26 nov · etiqueta `v3.20` publicada e instalada (Acerca de: 3.20); incluye todo lo de la `v3.19` más EXPORTA-GRUPO-1 y ACCESO-3
 - TAG-3.21 · 26 nov · etiqueta `v3.21` publicada e instalada (mismo código que la `v3.20`; se cortó porque la app de Ariel quedó en 3.8 con código 355 y el APK de la `v3.20` tenía 354)
+- TAG-3.22 · 27 nov · etiqueta `v3.22` publicada e instalada (Acerca de: 3.22); incluye TEMAS-1, TEMAS-2, VERSION-4, VERSION-5, LISTAS-1 y DESHACER-UNIR-1
