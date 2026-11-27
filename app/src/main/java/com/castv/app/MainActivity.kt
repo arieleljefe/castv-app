@@ -653,6 +653,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (savedInstanceState == null) {   // [ATAJOS-1] abierta desde un atajo del icono (no al recrearse)
             pendingShortcut = intent?.action?.takeIf { it.startsWith("com.castv.app.SC_") }
             handleReminderTap(intent)   // [AVISO-TV-1]
+            handleShareIn(intent)   // [SHARE-IN-1]
         }
         registerShortcuts()   // [ATAJOS-1]
         checkPermissionsAndStart()
@@ -705,6 +706,36 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             if (monitoring) applyPendingShortcut()
         }
         handleReminderTap(intent)   // [AVISO-TV-1]
+        handleShareIn(intent)   // [SHARE-IN-1]
+    }
+
+    /** [SHARE-IN-1] «Compartir › CASTV» desde otra app: toma el primer enlace http(s) del texto y deja elegir 📺 TV · 📱 teléfono ·
+     *  🎵 A MP3 · ⬇ Descargar (estas dos solo si el enlace es un archivo directo, igual que «Enlace → MP3 / descargar»).
+     *  Los enlaces con usuario y clave se rechazan y el enlace no se muestra entero ni va al /log (R9): el título solo lleva el sitio. */
+    private fun handleShareIn(i: Intent?) {
+        if (i == null || i.action != Intent.ACTION_SEND) return
+        val text = i.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        i.action = null   // que no se repita al girar o volver
+        val m = Regex("https?://\\S+", RegexOption.IGNORE_CASE).find(text)
+        if (m == null) { toast("No encontré un enlace http(s) en lo compartido"); return }
+        val url = m.value.trimEnd('.', ',', ';', ')', ']', '>', '"', '\'')
+        val u = try { Uri.parse(url) } catch (e: Exception) { null }
+        val host = u?.host
+        if (u == null || host.isNullOrEmpty()) { toast("Enlace no válido"); return }
+        if (!u.userInfo.isNullOrEmpty()) { toast("Los enlaces con usuario y clave no se admiten"); return }
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        opts.add("📺 Al TV"); acts.add { playLink(url, true) }
+        opts.add("📱 En el teléfono"); acts.add { playLink(url, false) }
+        if (LinkDownload.check(url) == null) {
+            opts.add("🎵 A MP3"); acts.add { runLinkJob(url, true) }
+            opts.add("⬇ Descargar"); acts.add { runLinkJob(url, false) }
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Enlace de $host")
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     /** [AVISO-TV-1] Se tocó el aviso de un programa (EPG-RECORDA-1). Con la salida en TV el canal se manda al TV (si el TV
