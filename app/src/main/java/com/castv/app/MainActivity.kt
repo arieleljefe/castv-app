@@ -469,6 +469,29 @@ class MainActivity : AppCompatActivity() {
         btnExpand.setOnClickListener(toggleExpand)
         tvNowPlaying.setOnClickListener(toggleExpand)
         nowThumbBox.setOnClickListener(toggleExpand)
+        // [MINI-GESTOS-1] Deslizar sobre el título o la carátula del mini reproductor:
+        // ← siguiente, → anterior, ↑ abre el panel, ↓ lo cierra. Los toques normales siguen igual.
+        var swX = 0f; var swY = 0f
+        val miniSwipe = View.OnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { swX = ev.x; swY = ev.y }
+                android.view.MotionEvent.ACTION_UP -> {
+                    val dx = ev.x - swX
+                    val dy = ev.y - swY
+                    val min = 80 * resources.displayMetrics.density
+                    if (playingItem != null || linkOnTv) {
+                        if (kotlin.math.abs(dx) > kotlin.math.abs(dy) && kotlin.math.abs(dx) > min) {
+                            findViewById<View>(if (dx < 0) R.id.btnNext else R.id.btnPrev).performClick()
+                        } else if (kotlin.math.abs(dy) > min) {
+                            setPlayerExpanded(dy < 0)
+                        }
+                    }
+                }
+            }
+            false
+        }
+        tvNowPlaying.setOnTouchListener(miniSwipe)
+        nowThumbBox.setOnTouchListener(miniSwipe)
         setPlayerExpanded(false)
         updateMiniCompact()   // [PULIDO-2b]
         nowBigArt.setOnClickListener { showFullPlayer() }   // [UI-3b] tocar la carátula grande
