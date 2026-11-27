@@ -1,7 +1,10 @@
 package com.castv.app
 
 import android.app.Activity
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
@@ -13,6 +16,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -26,6 +30,69 @@ import kotlin.concurrent.thread
  */
 object CutAudio {
     private val cancelFlag = AtomicBoolean(false)
+
+    /**
+     * [CORTAR-2] Quien abre el recuadro puede dejar aquí qué hacer antes de «Oír el tramo» (p. ej. pausar lo que suena
+     * en CASTV). `show` lo toma una sola vez y lo borra; si nadie lo pone, no se pausa nada.
+     */
+    @Volatile var pauseHook: (() -> Unit)? = null
+
+    /** [CORTAR-2] Vista previa del tramo: un MediaPlayer propio sobre el mismo archivo; salta al inicio y para al llegar al fin. */
+    private class Preview(val act: Activity, val uri: Uri, val onStop: (Boolean) -> Unit) {
+        private val ui = Handler(Looper.getMainLooper())
+        private var mp: MediaPlayer? = null
+        private var endMs = 0L
+        val playing: Boolean get() = mp != null
+
+        private val tick = object : Runnable {
+            override fun run() {
+                val p = mp ?: return
+                val pos = try { p.currentPosition } catch (e: Exception) { stop(true); return }
+                if (pos >= endMs) { stop(true); return }
+                ui.postDelayed(this, 100)
+            }
+        }
+
+        fun start(startMs: Long, end: Long) {
+            stop(true)
+            endMs = end
+            val p = MediaPlayer()
+            mp = p
+            try {
+                p.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                p.setDataSource(act, uri)
+                p.setOnPreparedListener { q ->
+                    if (mp === q) {
+                        q.setOnSeekCompleteListener { s ->
+                            if (mp === s) {
+                                try { s.start() } catch (e: Exception) { stop(false); return@setOnSeekCompleteListener }
+                                ui.postDelayed(tick, 100)
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= 26) q.seekTo(startMs, MediaPlayer.SEEK_CLOSEST) else q.seekTo(startMs.toInt())
+                    }
+                }
+                p.setOnCompletionListener { q -> if (mp === q) stop(true) }
+                p.setOnErrorListener { q, _, _ -> if (mp === q) stop(false); true }
+                p.prepareAsync()
+            } catch (e: Exception) {
+                stop(false)
+            }
+        }
+
+        fun stop(ok: Boolean) {
+            ui.removeCallbacks(tick)
+            val p = mp ?: return
+            mp = null
+            try { p.release() } catch (e: Exception) { }
+            onStop(ok)
+        }
+    }
 
     /** Milisegundos como m:ss (o h:mm:ss). */
     fun fmt(ms: Long): String {
@@ -55,6 +122,8 @@ object CutAudio {
     /** Recuadro para elegir inicio y fin. [posMs] da la posición actual de lo que suena (botones «Aquí»). */
     fun show(act: Activity, uri: Uri, name: String, durationMs: Long, video: Boolean = false, posMs: () -> Long) {   // [CORTAR-1b] video = corte de video (.mp4)
         if (act.isFinishing || act.isDestroyed) return
+        val hook = pauseHook   // [CORTAR-2]
+        pauseHook = null
         if (durationMs < 2000L) {
             Toast.makeText(act.applicationContext, "No sé cuánto dura este archivo", Toast.LENGTH_SHORT).show()
             return
@@ -73,7 +142,7 @@ object CutAudio {
         box.setPadding(dp(20), dp(8), dp(20), dp(4))
 
         val info = TextView(act)
-        info.text = "Duración total: " + fmt(durationMs) + "\nEscribe los tiempos como m:ss, o toca «Aquí» para usar donde va ahora." +
+        info.text = "Duración total: " + fmt(durationMs) + "\nMueve las barras, escribe los tiempos como m:ss o toca «Aquí» para usar donde va ahora." +
             (if (video) "\nSin recodificar: el inicio puede adelantarse hasta el fotograma clave anterior." else "")
         info.textSize = 14f
         box.addView(info, LinearLayout.LayoutParams(match, wrap))
@@ -100,8 +169,21 @@ object CutAudio {
             return et
         }
 
+        // [CORTAR-2] una barra bajo cada campo (de a 1 s), sincronizada con el texto
+        val maxSec = (durationMs / 1000L).toInt().coerceAtLeast(1)
+        var syncing = false
+        fun addBar(initial: Int): SeekBar {
+            val sb = SeekBar(act)
+            sb.max = maxSec
+            sb.progress = initial.coerceIn(0, maxSec)
+            box.addView(sb, LinearLayout.LayoutParams(match, wrap))
+            return sb
+        }
+
         val etStart = row("Inicio", "0:00")
+        val sbStart = addBar(0)
         val etEnd = row("Fin", fmt(durationMs))
+        val sbEnd = addBar(maxSec)
         val res = TextView(act)
         res.textSize = 14f
         box.addView(res, LinearLayout.LayoutParams(match, wrap))
@@ -117,8 +199,68 @@ object CutAudio {
             res.text = if (r == null) "Revisa los tiempos: el fin debe ir al menos 1 s después del inicio."
             else "Se guardarán " + fmt(r.second - r.first) + " (de " + fmt(r.first) + " a " + fmt(r.second) + ")."
         }
+        sbStart.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                if (!fromUser || syncing) return
+                val endSec = ((parse(etEnd.text.toString()) ?: durationMs) / 1000L).toInt()
+                var v = p
+                if (v > endSec - 1) { v = (endSec - 1).coerceAtLeast(0); sbStart.progress = v }
+                syncing = true
+                etStart.setText(fmt(v * 1000L))
+                syncing = false
+                refresh()
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) { }
+            override fun onStopTrackingTouch(sb: SeekBar?) { }
+        })
+        sbEnd.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                if (!fromUser || syncing) return
+                val startSec = ((parse(etStart.text.toString()) ?: 0L) / 1000L).toInt()
+                var v = p
+                if (v < startSec + 1) { v = (startSec + 1).coerceAtMost(maxSec); sbEnd.progress = v }
+                syncing = true
+                etEnd.setText(fmt(v * 1000L))
+                syncing = false
+                refresh()
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) { }
+            override fun onStopTrackingTouch(sb: SeekBar?) { }
+        })
+
+        // [CORTAR-2] ▶ Oír el tramo: antes pausa lo que suene en CASTV (si quien abrió el recuadro lo pidió)
+        val play = Button(act)
+        play.text = "▶ Oír el tramo"
+        val preview = Preview(act, uri) { ok ->
+            play.text = "▶ Oír el tramo"
+            if (!ok) Toast.makeText(act.applicationContext, "No se pudo oír el tramo", Toast.LENGTH_SHORT).show()
+        }
+        play.setOnClickListener {
+            if (preview.playing) {
+                preview.stop(true)
+            } else {
+                val r = range()
+                if (r == null) {
+                    refresh()
+                } else {
+                    try { hook?.invoke() } catch (e: Exception) { }
+                    play.text = "■ Parar"
+                    preview.start(r.first, r.second)
+                }
+            }
+        }
+        box.addView(play, LinearLayout.LayoutParams(match, wrap))
+
         val watcher = object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) { refresh() }
+            override fun afterTextChanged(s: Editable?) {
+                if (!syncing) {
+                    syncing = true
+                    parse(etStart.text.toString())?.let { sbStart.progress = (it / 1000L).toInt().coerceIn(0, maxSec) }
+                    parse(etEnd.text.toString())?.let { sbEnd.progress = (it / 1000L).toInt().coerceIn(0, maxSec) }
+                    syncing = false
+                }
+                refresh()
+            }
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) { }
             override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) { }
         }
@@ -134,6 +276,7 @@ object CutAudio {
             .setPositiveButton("Cortar", null)
             .setNegativeButton("Cancelar", null)
             .create()
+        dlg.setOnDismissListener { preview.stop(true) }   // [CORTAR-2] cerrar o cortar apaga la vista previa
         dlg.show()
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val r = range()

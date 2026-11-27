@@ -4054,11 +4054,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             p
         }
         if (item.isMusic) {
+            CutAudio.pauseHook = { pauseAll() }   // [CORTAR-2] «Oír el tramo» pausa antes lo que suene en CASTV
             CutAudio.show(this, uri, item.name, durMs, false, pos)
         } else {   // [CORTAR-1b] un video: audio a MP3 o el tramo de video en .mp4
             AlertDialog.Builder(this)
                 .setTitle("✂️ Cortar")
                 .setItems(arrayOf<CharSequence>("🎵 Solo el audio → MP3", "🎬 El video → MP4 (sin recodificar)")) { _, which ->
+                    CutAudio.pauseHook = { pauseAll() }   // [CORTAR-2]
                     CutAudio.show(this, uri, item.name, durMs, which == 1, pos)
                 }
                 .setNegativeButton("Cancelar", null)
