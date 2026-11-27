@@ -2312,18 +2312,27 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val app = applicationContext
         val title = if (toMp3) "🎵 Enlace → MP3" else "⬇ Descargar enlace"
         linkCancel = false
-        val dlg = AlertDialog.Builder(this)
+        LinkJobNotifier.cancel = false   // [DESCARGA-BG-1]
+        // [DESCARGA-BG-1] con las notificaciones permitidas va en segundo plano (notificación con % y Cancelar);
+        // si Android las tiene apagadas para CASTV, queda el recuadro de siempre (dlg != null)
+        val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage("Preparando…")
             .setCancelable(false)
             .setNegativeButton("Cancelar", null)
             .create()
-        dlg.show()
-        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-            linkCancel = true
-            dlg.setMessage("Cancelando…")
+        if (dlg != null) {
+            dlg.show()
+            dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                linkCancel = true
+                dlg.setMessage("Cancelando…")
+            }
+            linkDialog = dlg
+        } else {
+            LinkJobNotifier.progress(app, title, "Preparando…", -1)
+            toast("En segundo plano: mira la notificación para ver el avance o cancelar")
         }
-        linkDialog = dlg
+        val isCancelled = { linkCancel || LinkJobNotifier.cancel }
         val name = LinkDownload.nameFromUrl(url)
         thread {
             var ok = false
@@ -2333,27 +2342,42 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             try {
                 if (toMp3) {
                     val r = Mp3Converter.convert(app, Uri.parse(url), name, { pct ->
-                        runOnUiThread { if (!isFinishing && linkDialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
-                    }, { linkCancel })
+                        if (dlg == null) LinkJobNotifier.progress(app, title, "Convirtiendo… $pct %", pct)
+                        else runOnUiThread { if (!isFinishing && linkDialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
+                    }, isCancelled)
                     ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message; savedUri = r.uri
                 } else {
                     val r = LinkDownload.download(app, url, { pct, mb ->
-                        runOnUiThread {
-                            if (!isFinishing && linkDialog === dlg) dlg.setMessage(if (pct >= 0) "Descargando… $pct %" else "Descargando… $mb MB")
-                        }
-                    }, { linkCancel })
+                        val text = if (pct >= 0) "Descargando… $pct %" else "Descargando… $mb MB"
+                        if (dlg == null) LinkJobNotifier.progress(app, title, text, pct)
+                        else runOnUiThread { if (!isFinishing && linkDialog === dlg) dlg.setMessage(text) }
+                    }, isCancelled)
                     ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message; savedUri = r.uri
                 }
             } catch (e: Throwable) {
                 msg = "Error: " + e.javaClass.simpleName
             }
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                try { if (linkDialog === dlg) dlg.dismiss() } catch (e: Exception) { }
-                if (linkDialog === dlg) linkDialog = null
+                if (dlg != null) {
+                    try { if (linkDialog === dlg) dlg.dismiss() } catch (e: Exception) { }
+                    if (linkDialog === dlg) linkDialog = null
+                }
+                val icon = if (toMp3) "🎵" else "⬇"
                 if (ok && !cancelled) {
-                    SavedFile.offer(this, if (toMp3) "🎵" else "⬇", msg, savedUri)   // [MP3-ABRIR-1] Abrir / Compartir
+                    // [DESCARGA-BG-1] con la app a la vista sale el recuadro Abrir / Compartir; si no, la notificación final
+                    val front = !isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    if (dlg != null || front) {
+                        if (dlg == null) LinkJobNotifier.clear(app)
+                        SavedFile.offer(this, icon, msg, savedUri)   // [MP3-ABRIR-1] Abrir / Compartir
+                    } else {
+                        LinkJobNotifier.done(app, "$icon Guardado en Descargas", msg, savedUri)
+                    }
                 } else {
                     val text = if (cancelled) "Cancelado" else "No se pudo: " + msg.replace(url, "(enlace)")   // R9: el enlace no se muestra
+                    if (dlg == null) {
+                        if (cancelled) LinkJobNotifier.clear(app)
+                        else LinkJobNotifier.done(app, "$icon No se pudo completar", text.removePrefix("No se pudo: "), null)
+                    }
                     Toast.makeText(app, text, Toast.LENGTH_LONG).show()
                 }
             }

@@ -92,6 +92,11 @@
             android:name=".ChannelAlarmReceiver"
             android:exported="false" />
 
+        <!-- [DESCARGA-BG-1] botón «Cancelar» de la notificación de descarga / conversión -->
+        <receiver
+            android:name=".LinkJobReceiver"
+            android:exported="false" />
+
         <!-- [EPG-RECORDA-1] avisos de programas («⏰ Avisarme» en la guía del reproductor) -->
         <receiver
             android:name=".ReminderReceiver"
