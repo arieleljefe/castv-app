@@ -109,7 +109,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         NAME_ASC("↕ A-Z"), NAME_DESC("↕ Z-A"), NEWEST("↕ Recientes"),
         LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos"),
         MOST_PLAYED("↕ Más reproducidas"), RECENT_PLAYED("↕ Reproducidas hace poco"),
-        NEVER_PLAYED("↕ Sin reproducir primero")   // [LISTAS-INTEL-1] al final, para no mover los números ya guardados
+        NEVER_PLAYED("↕ Sin reproducir primero"),   // [LISTAS-INTEL-1] al final, para no mover los números ya guardados
+        MOST_MONTH("↕ Más escuchadas del mes")   // [MES-1] también al final
     }
 
     private enum class Repeat { OFF, ALL, ONE }
@@ -1087,6 +1088,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             // [LISTAS-INTEL-1] primero lo que nunca se ha reproducido (lo más nuevo arriba); después, lo ya reproducido
             Sort.NEVER_PLAYED -> list.sortedWith(
                 compareBy<MediaItem> { Store.playCount(it) > 0 }.thenByDescending { it.dateAdded })
+            // [MES-1] las más reproducidas este mes primero; a igualdad, las más reproducidas en total
+            Sort.MOST_MONTH -> list.sortedWith(
+                compareByDescending<MediaItem> { Store.monthPlays(it) }.thenByDescending { Store.playCount(it) }.thenBy { nameKey(it) })
         }
         refreshList()
         updateTabs()
@@ -1808,6 +1812,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val today = Store.today()
             val week = (0..6).count { (today - it) in days }
             val streak = Store.streakDays()
+            // [MES-1] lo más reproducido este mes (solo cuenta desde que se activó el registro)
+            val mMonth = m.map { it to Store.monthPlays(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
+            val vMonth = v.map { it to Store.monthPlays(it) }.filter { it.second > 0 }.sortedByDescending { it.second }
+            val since = Store.monthSince()
             val sb = StringBuilder()
             if (mPlays > 0) {
                 sb.append("🎵 Música\n• ").append(if (mPlays == 1) "1 reproducción" else "$mPlays reproducciones")
@@ -1825,6 +1833,18 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 sb.append("📺 Canales\n• ${if (chTotal == 1) "1 apertura" else "$chTotal aperturas"}")
                 topCh?.let { sb.append(" · más abierto: ${it.first.name} (${it.second}×)") }
                 sb.append("\n\n")
+            }
+            if (mMonth.isNotEmpty() || vMonth.isNotEmpty()) {   // [MES-1]
+                sb.append("📆 Este mes\n")
+                if (mMonth.isNotEmpty()) {
+                    sb.append("• Más escuchadas:\n")
+                    mMonth.take(3).forEachIndexed { i, p -> sb.append("   ${i + 1}. ${prettyTitle(p.first)} (${p.second}×)\n") }
+                }
+                vMonth.firstOrNull()?.let { sb.append("• Video más visto: ${prettyTitle(it.first)} (${it.second}×)\n") }
+                if (since > 0) sb.append("(se cuenta desde el ${java.text.SimpleDateFormat("d MMM", java.util.Locale("es")).format(java.util.Date(since))})\n")
+                sb.append("\n")
+            } else if (since == 0L) {
+                sb.append("📆 «Más escuchadas del mes» se cuenta desde esta versión: se llena con el uso.\n\n")
             }
             if (streak > 0) sb.append("📅 Racha: $streak ${if (streak == 1) "día" else "días"} seguidos · activo $week de los últimos 7 días")
             else sb.append("📅 La racha se cuenta desde esta versión: usa la app hoy y mañana la verás.")
@@ -5223,6 +5243,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     if (c > 0) parts.add("▶ ${c}×")
                 }
                 if (sortMode == Sort.NEVER_PLAYED && Store.playCount(item) == 0) parts.add("🆕 sin reproducir")   // [LISTAS-INTEL-1]
+                if (sortMode == Sort.MOST_MONTH) {   // [MES-1]
+                    val mc = Store.monthPlays(item)
+                    if (mc > 0) parts.add("▶ ${mc}× este mes")
+                }
                 action.text = (if (isFav) "★ " else "") + parts.joinToString("  ·  ")
                 action.setTextColor(if (saved >= 10) accentColor() else col(R.color.vlc_muted))
             }

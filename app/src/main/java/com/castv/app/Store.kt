@@ -193,7 +193,69 @@ object Store {
             .putLong("t|$k", System.currentTimeMillis())
             .apply()
         touchDay()   // [RESUMEN-1]
+        bumpMonth(k)   // [MES-1]
     }
+
+    // ------------------------------------------------- [MES-1] Reproducciones por mes
+    // Clave "mp" en castv_top ({"2026-11": {clave del archivo: veces}}): últimos 12 meses, fuera de respaldos. registerPlay ya
+    // descarta el modo incógnito. "mp_since" = desde cuándo se registra. Se lee una vez y se guarda en memoria (el orden la consulta muchas veces).
+
+    private var mpCache: HashMap<String, HashMap<String, Int>>? = null
+
+    fun monthKey(ms: Long = System.currentTimeMillis()): String =
+        java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date(ms))
+
+    @Synchronized
+    private fun monthData(): HashMap<String, HashMap<String, Int>> {
+        mpCache?.let { return it }
+        val out = HashMap<String, HashMap<String, Int>>()
+        if (::topPrefs.isInitialized) {
+            val raw = topPrefs.getString("mp", null)
+            if (raw != null) {
+                try {
+                    val o = JSONObject(raw)
+                    for (m in o.keys()) {
+                        val mo = o.getJSONObject(m)
+                        val h = HashMap<String, Int>()
+                        for (k in mo.keys()) h[k] = mo.getInt(k)
+                        out[m] = h
+                    }
+                } catch (e: Exception) { rescue("mp", raw, e); out.clear() }
+            }
+        }
+        mpCache = out
+        return out
+    }
+
+    @Synchronized
+    private fun bumpMonth(k: String) {
+        if (incognito || !::topPrefs.isInitialized) return
+        try {
+            val data = monthData()
+            val h = data.getOrPut(monthKey()) { HashMap() }
+            h[k] = (h[k] ?: 0) + 1
+            if (h.size > 600) {   // tope: se quedan las 500 más escuchadas del mes
+                val keep = h.entries.sortedByDescending { it.value }.take(500).map { it.key }.toSet()
+                h.keys.retainAll(keep)
+            }
+            for (old in data.keys.sortedDescending().drop(12)) data.remove(old)   // solo los últimos 12 meses
+            val o = JSONObject()
+            for ((m, mh) in data) {
+                val mo = JSONObject()
+                for ((kk, v) in mh) mo.put(kk, v)
+                o.put(m, mo)
+            }
+            val ed = topPrefs.edit().putString("mp", o.toString())
+            if (!topPrefs.contains("mp_since")) ed.putLong("mp_since", System.currentTimeMillis())
+            ed.apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Veces que se reprodujo [item] en [month] («aaaa-mm»; por defecto, este mes). Solo cuenta desde [monthSince]. */
+    fun monthPlays(item: MediaItem, month: String = monthKey()): Int = monthData()[month]?.get(key(item)) ?: 0
+
+    /** Desde cuándo se registran las reproducciones por mes (0 = aún no hay ninguna). */
+    fun monthSince(): Long = if (::topPrefs.isInitialized) topPrefs.getLong("mp_since", 0L) else 0L
 
     // ------------------------------------------------- [RESUMEN-1] Días con actividad (para la racha de «Tu resumen»)
     // Solo guarda qué días se abrió algo (números de día, últimos 60) en castv_top: fuera de respaldos; en incógnito no se cuenta.
