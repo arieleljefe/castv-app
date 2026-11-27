@@ -1520,6 +1520,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         menu.add(0, 19, 11, "🕵️‍♂️ Modo incógnito: " + (if (Store.incognito) "Activado" else "Desactivado"))   // [INCOG-1]
         if (!showingMusic) menu.add(0, 20, 11, "👁 No vistos: " + (if (onlyUnseen) "Solo no vistos" else "Todos"))   // [NOVISTOS-1]
         menu.add(0, 21, 11, "Lo más visto")   // [TOP-1]
+        menu.add(0, 26, 11, "Tu resumen")   // [RESUMEN-1]
         menu.add(0, 22, 11, "Favoritos: " + allItems.count { Store.isFav(it) })   // [TABS-1]
         menu.add(0, 23, 11, "Continuar: " + allItems.count { Store.resumeAt(it) >= 10 })   // [TABS-1]
         menu.add(0, 24, 11, "Informe de diagnóstico")   // [DIAG-1]
@@ -1565,6 +1566,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 updateIncogBadge()   // [INCOG-2]
             }
             21 -> showTop()   // [TOP-1]
+            26 -> showSummary()   // [RESUMEN-1]
             22 -> { groupReturn = null; viewMode = ViewMode.FAVS; applyFilters() }   // [TABS-1]
             23 -> { groupReturn = null; viewMode = ViewMode.RESUME; applyFilters() }   // [TABS-1]
             24 -> showDiagReport()   // [DIAG-1]
@@ -1591,7 +1593,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         val groups = ArrayList<Pair<String, List<Int>>>()
         groups.add("Reproducir y canales" to listOf(15, 25, 18, 10, 3))
-        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21, 22, 23))
+        groups.add("Biblioteca" to listOf(1, 2, 4, 5, 6, 20, 21, 26, 22, 23))
         groups.add("Reproductor" to listOf(7, 8, 9))
         val known = groups.flatMap { it.second }.toSet()
         val inSettings = setOf(11, 12, 13, 14, 16, 17)   // [UI-1b] viven en la pantalla Ajustes
@@ -1642,6 +1644,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     25 -> R.drawable.ic_vp_mp3   // [VIDEO-MP3-1b]
                     18 -> R.drawable.ic_mas_folder
                     21 -> R.drawable.ic_mas_list   // [TOP-1]
+                    26 -> R.drawable.ic_mas_list   // [RESUMEN-1]
                     22 -> R.drawable.ic_vp_star   // [TABS-1]
                     23 -> R.drawable.ic_vp_play   // [TABS-1]
                     else -> R.drawable.ic_nav_more
@@ -1769,6 +1772,72 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 } else {
                     val startMusic = if (showingMusic) (m.isNotEmpty() || v.isEmpty()) else v.isEmpty()
                     showTopDialog(startMusic, m, v)
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------- [RESUMEN-1] Tu resumen
+
+    /** [RESUMEN-1] Más › «Tu resumen»: lo escuchado y visto, el artista y el canal más abiertos y la racha de días.
+     *  Lee `castv_stats` y `castv_top` sin cambiar lo guardado. El tiempo de música es un estimado (reproducciones × duración). */
+    private fun showSummary() {
+        toast("Armando tu resumen…")
+        thread {
+            val hide = hiddenFolderSet()
+            fun uniq(all: List<MediaItem>): List<MediaItem> = all.filter { it.folder !in hide }.distinctBy { Store.key(it) }
+            val m = try { uniq(MediaScanner.scanMusic(this)) } catch (e: Exception) { emptyList() }
+            val v = try { uniq(MediaScanner.scanVideos(this)) } catch (e: Exception) { emptyList() }
+            fun dur(sec: Long): String {
+                val h = sec / 3600
+                val mi = (sec % 3600) / 60
+                return if (h > 0) "$h h $mi min" else "$mi min"
+            }
+            val mp = m.filter { Store.playCount(it) > 0 }
+            val mPlays = mp.sumOf { Store.playCount(it) }
+            val mSec = mp.sumOf { Store.playCount(it).toLong() * it.durationSec.toLong() }
+            val topArtist = mp.filter { it.artist.isNotBlank() }.groupBy { it.artist }
+                .mapValues { e -> e.value.sumOf { Store.playCount(it) } }.maxByOrNull { it.value }
+            val vp = v.filter { Store.playCount(it) > 0 || Store.watchSec(it) > 0 }
+            val vSec = vp.sumOf { Store.watchSec(it).toLong() }
+            val topVideo = vp.maxByOrNull { Store.watchSec(it) }?.takeIf { Store.watchSec(it) > 0 }
+            val chTotal = Store.chViews().values.sum()
+            val topCh = Store.topChannels(1, 1).firstOrNull()
+            val days = Store.activeDays()
+            val today = Store.today()
+            val week = (0..6).count { (today - it) in days }
+            val streak = Store.streakDays()
+            val sb = StringBuilder()
+            if (mPlays > 0) {
+                sb.append("🎵 Música\n• ").append(if (mPlays == 1) "1 reproducción" else "$mPlays reproducciones")
+                    .append(" · ").append(if (mp.size == 1) "1 pista" else "${mp.size} pistas distintas").append("\n")
+                sb.append("• ≈ ${dur(mSec)} escuchados (estimado)\n")
+                topArtist?.let { sb.append("• Artista más escuchado: ${it.key} (${it.value}×)\n") }
+                sb.append("\n")
+            }
+            if (vp.isNotEmpty()) {
+                sb.append("🎬 Videos\n• ${if (vp.size == 1) "1 video visto" else "${vp.size} videos vistos"} · ${dur(vSec)} en total\n")
+                topVideo?.let { sb.append("• Más visto: ${prettyTitle(it)}\n") }
+                sb.append("\n")
+            }
+            if (chTotal > 0) {
+                sb.append("📺 Canales\n• ${if (chTotal == 1) "1 apertura" else "$chTotal aperturas"}")
+                topCh?.let { sb.append(" · más abierto: ${it.first.name} (${it.second}×)") }
+                sb.append("\n\n")
+            }
+            if (streak > 0) sb.append("📅 Racha: $streak ${if (streak == 1) "día" else "días"} seguidos · activo $week de los últimos 7 días")
+            else sb.append("📅 La racha se cuenta desde esta versión: usa la app hoy y mañana la verás.")
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                if (mPlays == 0 && vp.isEmpty() && chTotal == 0 && streak == 0) {
+                    toast("Aún no hay datos para tu resumen (en incógnito no se cuentan)")
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("📊 Tu resumen")
+                        .setMessage(sb.toString().trim())
+                        .setPositiveButton("Cerrar", null)
+                        .setNeutralButton("Lo más visto") { _, _ -> showTop() }
+                        .show()
                 }
             }
         }

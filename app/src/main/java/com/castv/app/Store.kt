@@ -192,6 +192,41 @@ object Store {
             .putInt("c|$k", statsPrefs.getInt("c|$k", 0) + 1)
             .putLong("t|$k", System.currentTimeMillis())
             .apply()
+        touchDay()   // [RESUMEN-1]
+    }
+
+    // ------------------------------------------------- [RESUMEN-1] Días con actividad (para la racha de «Tu resumen»)
+    // Solo guarda qué días se abrió algo (números de día, últimos 60) en castv_top: fuera de respaldos; en incógnito no se cuenta.
+
+    private fun dayIndex(ms: Long): Long = (ms + java.util.TimeZone.getDefault().getOffset(ms)) / 86_400_000L
+
+    fun today(): Long = dayIndex(System.currentTimeMillis())
+
+    fun activeDays(): Set<Long> {
+        if (!::topPrefs.isInitialized) return emptySet()
+        val raw = topPrefs.getString("days", "") ?: ""
+        return raw.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
+    }
+
+    @Synchronized
+    private fun touchDay() {
+        if (incognito || !::topPrefs.isInitialized) return
+        try {
+            val t = today()
+            val days = activeDays()
+            if (t in days) return
+            topPrefs.edit().putString("days", (days + t).sortedDescending().take(60).joinToString(",")).apply()
+        } catch (e: Exception) { }
+    }
+
+    /** Días seguidos con actividad hasta hoy (si hoy aún no hay, se cuenta hasta ayer). */
+    fun streakDays(): Int {
+        val d = activeDays()
+        var day = today()
+        if (day !in d) day -= 1
+        var n = 0
+        while (day in d) { n++; day-- }
+        return n
     }
 
     // ------------------------------------------------- [TIEMPO-1] Tiempo total visto de un video
@@ -883,6 +918,7 @@ object Store {
     @Synchronized
     fun countChannel(c: M3uChannel) {
         if (incognito || c.url.isEmpty() || !::topPrefs.isInitialized) return
+        touchDay()   // [RESUMEN-1]
         try {
             val o = readTopCh()
             val e = o.optJSONObject(c.url) ?: JSONObject()
