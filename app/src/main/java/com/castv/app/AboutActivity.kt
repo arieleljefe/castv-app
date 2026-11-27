@@ -25,7 +25,7 @@ import androidx.core.view.WindowInsetsCompat
  * filas con icono propio (código fuente, comentarios, librerías, autores, redes) y tarjeta final.
  * Armada en código, como SettingsActivity. Solo usa recursos y textos propios de CASTV.
  */
-class AboutActivity : AppCompatActivity() {
+class AboutActivity : CastvActivity()   // [TEXTO-TAM-1] {
 
     private var txtColor = Color.BLACK
     private var mutedColor = Color.GRAY

@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Tema, color y borrado se cambian aquí mismo. Respaldo y "Mis redes y contacto" le piden a
  * MainActivity que los abra (extra "action": "backup" o "socials") y esta pantalla se cierra.
  */
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : CastvActivity()   // [TEXTO-TAM-1] {
 
     private lateinit var content: LinearLayout
     private lateinit var headerTitle: TextView
@@ -237,6 +237,9 @@ class SettingsActivity : AppCompatActivity() {
             Themes.bgNames[Themes.savedBg(this)] + (if (Themes.isNight(this)) "" else " · solo en modo oscuro"),
             { pickBg() }))
 
+        l.add(Entry("Interfaz", "Tamaño del texto", CastvTextSize.names[CastvTextSize.saved(this)],   // [TEXTO-TAM-1]
+            { pickTextSize() }))
+
         l.add(Entry("Interfaz", "Vibración al tocar",   // [VIBRA-1]
             if (hapticOn()) "Sí: vibración suave en ▶, ⏮ ⏭ y ★ (si el teléfono tiene activada la vibración al tocar)"
             else "No", { toggleHaptic() }))
@@ -389,7 +392,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema, color de acento, fondo oscuro y vibración"
+        "Interfaz" -> "Tema, color de acento, fondo oscuro, tamaño del texto y vibración"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -1590,6 +1593,18 @@ class SettingsActivity : AppCompatActivity() {
                 d.dismiss()
                 toast("Se aplica la próxima vez que abras la app")
                 render()
+            }
+            .show()
+    }
+
+    /** [TEXTO-TAM-1] Pequeño / Normal / Grande: multiplica el tamaño de letra del sistema en todas las pantallas de CASTV. */
+    private fun pickTextSize() {
+        AlertDialog.Builder(this)
+            .setTitle("Tamaño del texto")
+            .setSingleChoiceItems(CastvTextSize.names, CastvTextSize.saved(this)) { d, which ->
+                prefs().edit().putInt("text_size", which).apply()
+                d.dismiss()
+                recreate()   // esta pantalla se redibuja con el nuevo tamaño; MainActivity lo hace al volver
             }
             .show()
     }

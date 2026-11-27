@@ -1,11 +1,13 @@
 package com.castv.app
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.text.Spanned
 import android.text.SpannableString
 import android.text.style.ImageSpan
 import android.util.TypedValue
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import java.net.DatagramSocket
 import java.net.Inet4Address
@@ -99,5 +101,40 @@ object CastvIcons {
         val sp = SpannableString("\u00A0 $label")
         sp.setSpan(ImageSpan(d, ImageSpan.ALIGN_BASELINE), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         return sp
+    }
+}
+
+/** [TEXTO-TAM-1] Tamaño del texto de la app: 0 = Pequeño, 1 = Normal (el del sistema, sin tocar), 2 = Grande. Se guarda en `castv` › `text_size`. */
+object CastvTextSize {
+    val names = arrayOf("Pequeño", "Normal (el del sistema)", "Grande")
+    private val factors = floatArrayOf(0.9f, 1f, 1.15f)
+
+    fun saved(ctx: Context): Int =
+        ctx.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("text_size", 1).let { if (it in 0..2) it else 1 }
+
+    /** Con «Normal» devuelve el mismo contexto; con otro tamaño, uno cuyo `fontScale` es el del sistema por el factor elegido. */
+    fun wrap(base: Context): Context {
+        val idx = saved(base)
+        if (idx == 1) return base
+        val cfg = Configuration(base.resources.configuration)
+        cfg.fontScale = cfg.fontScale * factors[idx]
+        return base.createConfigurationContext(cfg)
+    }
+}
+
+/** [TEXTO-TAM-1] Base de las pantallas: aplican el tamaño de texto elegido en Ajustes. */
+open class CastvActivity : AppCompatActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(CastvTextSize.wrap(newBase))
+    }
+
+    // Receta conocida de AppCompat: que el cambio de tema (uiMode) no pierda el fontScale del contexto base
+    override fun applyOverrideConfiguration(overrideConfiguration: Configuration?) {
+        if (overrideConfiguration != null) {
+            val uiMode = overrideConfiguration.uiMode
+            overrideConfiguration.setTo(baseContext.resources.configuration)
+            overrideConfiguration.uiMode = uiMode
+        }
+        super.applyOverrideConfiguration(overrideConfiguration)
     }
 }

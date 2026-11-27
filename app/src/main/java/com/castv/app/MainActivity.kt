@@ -56,7 +56,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import kotlin.concurrent.thread
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : CastvActivity()   // [TEXTO-TAM-1] {
 
     private lateinit var listFiles: ListView
     private lateinit var adapter: FileAdapter
@@ -328,6 +328,7 @@ class MainActivity : AppCompatActivity() {
         Themes.apply(this)   // [TEMAS-1]
         accentAtStart = savedAccent()   // [UI-1b]
         bgAtStart = Themes.savedBg(this)   // [TEMAS-2]
+        textAtStart = CastvTextSize.saved(this)   // [TEXTO-TAM-1]
         setContentView(R.layout.activity_main)
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -2371,6 +2372,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
         if (Themes.savedBg(this) != bgAtStart) { recreate(); return }   // [TEMAS-2] fondo cambiado en Ajustes
+        if (CastvTextSize.saved(this) != textAtStart) { recreate(); return }   // [TEXTO-TAM-1] tamaño de texto cambiado en Ajustes
         updateIncogBadge()   // [INCOG-2]
         if (::adapter.isInitialized) {   // refresca "Continuar" (y "No vistos") al volver del reproductor
             if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
@@ -3499,6 +3501,7 @@ class MainActivity : AppCompatActivity() {
     private val reqSettings = 4718    // [UI-1b] pantalla Ajustes
     private var accentAtStart = 0     // [UI-1b] color con el que se dibujó esta pantalla
     private var bgAtStart = 0         // [TEMAS-2] fondo con el que se dibujó esta pantalla
+    private var textAtStart = 1       // [TEXTO-TAM-1] tamaño de texto con el que se dibujó esta pantalla
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null

@@ -60,7 +60,7 @@ import kotlin.math.abs
  * Reproduce videos en el propio teléfono (pantalla completa).
  * Pasa solo al siguiente video, puede mandar el actual al TV y muestra subtítulos .srt / .vtt.
  */
-class VideoPlayerActivity : AppCompatActivity() {
+class VideoPlayerActivity : CastvActivity()   // [TEXTO-TAM-1] {
 
     private class Cue(val start: Int, val end: Int, val text: String)
 
