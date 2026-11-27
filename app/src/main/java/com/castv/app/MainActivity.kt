@@ -4005,19 +4005,29 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val app = applicationContext
         val total = vids.size
         val uris = vids.map { uriOf(it) }
+        val title = "🎵 Convertir a MP3"
         batchCancel = false
+        LinkJobNotifier.cancel = false   // [DESCARGA-BG-2]
         actionMode?.finish()
-        val dlg = AlertDialog.Builder(this)
-            .setTitle("🎵 Convertir a MP3")
+        // [DESCARGA-BG-2] con las notificaciones permitidas va en segundo plano (notificación con % y Cancelar);
+        // si Android las tiene apagadas para CASTV, queda el recuadro de siempre (dlg != null)
+        val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(this)
+            .setTitle(title)
             .setMessage("Preparando… 1 de $total")
             .setCancelable(false)
             .setNegativeButton("Cancelar", null)
             .create()
-        dlg.show()
-        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-            batchCancel = true
-            dlg.setMessage("Cancelando…")
+        if (dlg != null) {
+            dlg.show()
+            dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                batchCancel = true
+                dlg.setMessage("Cancelando…")
+            }
+        } else {
+            LinkJobNotifier.progress(app, title, "Preparando… 1 de $total", -1)
+            toast("En segundo plano: mira la notificación para ver el avance o cancelar")
         }
+        val isCancelled = { batchCancel || LinkJobNotifier.cancel }
         thread {
             var okN = 0
             var failN = 0
@@ -4025,11 +4035,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             var lastName = ""
             var lastUri: Uri? = null
             for ((k, m) in vids.withIndex()) {
-                if (batchCancel) { cancelled = true; break }
+                if (isCancelled()) { cancelled = true; break }
                 val r = try {
                     Mp3Converter.convert(app, uris[k], m.name, { pct ->
-                        runOnUiThread { if (!isFinishing && dlg.isShowing && !batchCancel) dlg.setMessage("Convirtiendo ${k + 1} de $total… $pct %") }
-                    }, { batchCancel })
+                        val text = "Convirtiendo ${k + 1} de $total… $pct %"
+                        if (dlg == null) LinkJobNotifier.progress(app, title, text, (k * 100 + pct) / total)
+                        else runOnUiThread { if (!isFinishing && dlg.isShowing && !batchCancel) dlg.setMessage(text) }
+                    }, isCancelled)
                 } catch (e: Throwable) {
                     Mp3Converter.Result(false, "Error: " + e.javaClass.simpleName)
                 }
@@ -4037,14 +4049,23 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (r.ok) { okN++; lastName = r.savedAs; lastUri = r.uri } else failN++
             }
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                try { dlg.dismiss() } catch (e: Exception) { }
-                if (okN == 1 && failN == 0 && !cancelled) {
-                    SavedFile.offer(this, "🎵", lastName, lastUri)   // [MP3-ABRIR-1]
+                if (dlg != null) { try { dlg.dismiss() } catch (e: Exception) { } }
+                val summary = "🎵 $okN de $total en Descargas" +
+                    (if (failN > 0) " · $failN no se pudieron convertir (sin audio o formato no compatible)" else "") +
+                    (if (cancelled) " · cancelado" else "")
+                // [DESCARGA-BG-2] con la app a la vista, lo de siempre; en segundo plano, notificación final
+                val front = !isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                if (dlg != null || front || cancelled) {
+                    if (dlg == null) LinkJobNotifier.clear(app)
+                    if (okN == 1 && failN == 0 && !cancelled) {
+                        SavedFile.offer(this, "🎵", lastName, lastUri)   // [MP3-ABRIR-1]
+                    } else {
+                        Toast.makeText(app, summary, Toast.LENGTH_LONG).show()
+                    }
+                } else if (okN == 1 && failN == 0) {
+                    LinkJobNotifier.done(app, "🎵 Guardado en Descargas", lastName, lastUri)
                 } else {
-                    val text = "🎵 $okN de $total en Descargas" +
-                        (if (failN > 0) " · $failN no se pudieron convertir (sin audio o formato no compatible)" else "") +
-                        (if (cancelled) " · cancelado" else "")
-                    Toast.makeText(app, text, Toast.LENGTH_LONG).show()
+                    LinkJobNotifier.done(app, if (okN > 0) "🎵 Conversión terminada" else "🎵 No se pudo completar", summary.removePrefix("🎵 "), null)
                 }
             }
         }

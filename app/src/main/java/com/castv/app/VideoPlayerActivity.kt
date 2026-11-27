@@ -1171,33 +1171,57 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
         if (Mp3Converter.running.get()) { toast("Ya hay una conversión en curso"); return }
         val app = applicationContext
+        val title = "🎵 Convertir a MP3"
         mp3Cancel = false
-        val dlg = AlertDialog.Builder(this)
-            .setTitle("🎵 Convertir a MP3")
+        LinkJobNotifier.cancel = false   // [DESCARGA-BG-2]
+        // [DESCARGA-BG-2] con las notificaciones permitidas va en segundo plano (notificación con % y Cancelar) y se puede
+        // cerrar el reproductor; si Android las tiene apagadas para CASTV, queda el recuadro de siempre (dlg != null)
+        val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(this)
+            .setTitle(title)
             .setMessage("Preparando… No cierres el reproductor.")
             .setCancelable(false)
             .setNegativeButton("Cancelar", null)
             .create()
-        dlg.show()
-        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-            mp3Cancel = true
-            dlg.setMessage("Cancelando…")
+        if (dlg != null) {
+            dlg.show()
+            dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                mp3Cancel = true
+                dlg.setMessage("Cancelando…")
+            }
+            mp3Dialog = dlg
+        } else {
+            LinkJobNotifier.progress(app, title, "Preparando…", -1)
+            toast("En segundo plano: mira la notificación para ver el avance o cancelar")
         }
-        mp3Dialog = dlg
         val uri = Uri.parse(cur.uriString)
         val name = cur.name
         thread {
             val res = try {
                 Mp3Converter.convert(app, uri, name, { pct ->
-                    runOnUiThread { if (!isFinishing && mp3Dialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
-                }, { mp3Cancel })
+                    if (dlg == null) LinkJobNotifier.progress(app, title, "Convirtiendo… $pct %", pct)
+                    else runOnUiThread { if (!isFinishing && mp3Dialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
+                }, { mp3Cancel || LinkJobNotifier.cancel })
             } catch (e: Throwable) {
                 Mp3Converter.Result(false, "Error: ${e.javaClass.simpleName}: ${e.message}")
             }
             Handler(Looper.getMainLooper()).post {
-                try { if (mp3Dialog === dlg) dlg.dismiss() } catch (e: Exception) { }
-                if (mp3Dialog === dlg) mp3Dialog = null
-                when {
+                if (dlg != null) {
+                    try { if (mp3Dialog === dlg) dlg.dismiss() } catch (e: Exception) { }
+                    if (mp3Dialog === dlg) mp3Dialog = null
+                }
+                // [DESCARGA-BG-2] con el reproductor a la vista, lo de siempre; si ya se cerró o está en segundo plano, notificación final
+                val front = !isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                if (dlg == null) {
+                    when {
+                        res.cancelled -> { LinkJobNotifier.clear(app); Toast.makeText(app, "Conversión cancelada", Toast.LENGTH_SHORT).show() }
+                        res.ok && front -> { LinkJobNotifier.clear(app); SavedFile.offer(this, "🎵", res.savedAs, res.uri) }
+                        res.ok -> LinkJobNotifier.done(app, "🎵 Guardado en Descargas", res.savedAs, res.uri)
+                        else -> {
+                            LinkJobNotifier.done(app, "🎵 No se pudo completar", res.message, null)
+                            Toast.makeText(app, "No se pudo convertir: " + res.message, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } else when {
                     res.cancelled -> Toast.makeText(app, "Conversión cancelada", Toast.LENGTH_SHORT).show()
                     res.ok -> SavedFile.offer(this, "🎵", res.savedAs, res.uri)   // [MP3-ABRIR-1] Abrir / Compartir
                     !isFinishing && !isDestroyed -> AlertDialog.Builder(this)
