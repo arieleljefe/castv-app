@@ -1199,7 +1199,7 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (mp3Dialog === dlg) mp3Dialog = null
                 when {
                     res.cancelled -> Toast.makeText(app, "Conversión cancelada", Toast.LENGTH_SHORT).show()
-                    res.ok -> Toast.makeText(app, "🎵 Guardado en Descargas: " + res.savedAs, Toast.LENGTH_LONG).show()
+                    res.ok -> SavedFile.offer(this, "🎵", res.savedAs, res.uri)   // [MP3-ABRIR-1] Abrir / Compartir
                     !isFinishing && !isDestroyed -> AlertDialog.Builder(this)
                         .setTitle("🎵 Convertir a MP3")
                         .setMessage("No se pudo convertir: " + res.message)

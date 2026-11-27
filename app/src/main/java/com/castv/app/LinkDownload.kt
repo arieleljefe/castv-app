@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object LinkDownload {
 
-    class Result(val ok: Boolean, val message: String, val savedAs: String = "", val cancelled: Boolean = false)
+    class Result(val ok: Boolean, val message: String, val savedAs: String = "", val cancelled: Boolean = false, val uri: Uri? = null)   // [MP3-ABRIR-1]
 
     val running = AtomicBoolean(false)
 
@@ -136,7 +136,7 @@ object LinkDownload {
             if (done == 0L) return Result(false, "El enlace no trajo datos")
             val saved = s.commit()
             success = true
-            return Result(true, "OK", saved)
+            return Result(true, "OK", saved, uri = s.savedUri())   // [MP3-ABRIR-1]
         } catch (e: Throwable) {
             return Result(false, "Error: " + e.javaClass.simpleName)   // sin e.message: puede traer el enlace (R9)
         } finally {

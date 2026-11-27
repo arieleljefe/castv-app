@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object Mp3Converter {
 
-    class Result(val ok: Boolean, val message: String, val savedAs: String = "", val cancelled: Boolean = false)
+    class Result(val ok: Boolean, val message: String, val savedAs: String = "", val cancelled: Boolean = false, val uri: Uri? = null)   // [MP3-ABRIR-1] uri del archivo guardado (Android 10+)
 
     val running = AtomicBoolean(false)
 
@@ -86,6 +86,9 @@ object Mp3Converter {
             }
             return file?.name ?: "MP3"
         }
+
+        /** [MP3-ABRIR-1] El archivo ya guardado en Descargas (solo Android 10+, donde hay MediaStore); null si no. */
+        fun savedUri(): Uri? = if (uri != null && Build.VERSION.SDK_INT >= 29) uri else null
 
         fun abort() {
             try { stream.close() } catch (e: Exception) { }
@@ -255,7 +258,7 @@ object Mp3Converter {
             onProgress(100)
             savedAs = s.commit()
             success = true
-            return Result(true, "OK", savedAs)
+            return Result(true, "OK", savedAs, uri = s.savedUri())   // [MP3-ABRIR-1]
         } catch (e: Throwable) {
             return Result(false, "Error: ${e.javaClass.simpleName}" + (if (src.scheme == "http" || src.scheme == "https") "" else ": ${e.message}"))   // [VIDEO-MP3-1b] sin el mensaje si es un enlace: puede traerlo (R9)
         } finally {

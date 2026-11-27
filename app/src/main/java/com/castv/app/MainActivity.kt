@@ -2255,19 +2255,20 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             var ok = false
             var cancelled = false
             var msg = ""
+            var savedUri: Uri? = null   // [MP3-ABRIR-1]
             try {
                 if (toMp3) {
                     val r = Mp3Converter.convert(app, Uri.parse(url), name, { pct ->
                         runOnUiThread { if (!isFinishing && linkDialog === dlg) dlg.setMessage("Convirtiendo… $pct %") }
                     }, { linkCancel })
-                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message
+                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message; savedUri = r.uri
                 } else {
                     val r = LinkDownload.download(app, url, { pct, mb ->
                         runOnUiThread {
                             if (!isFinishing && linkDialog === dlg) dlg.setMessage(if (pct >= 0) "Descargando… $pct %" else "Descargando… $mb MB")
                         }
                     }, { linkCancel })
-                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message
+                    ok = r.ok; cancelled = r.cancelled; msg = if (r.ok) r.savedAs else r.message; savedUri = r.uri
                 }
             } catch (e: Throwable) {
                 msg = "Error: " + e.javaClass.simpleName
@@ -2275,12 +2276,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 try { if (linkDialog === dlg) dlg.dismiss() } catch (e: Exception) { }
                 if (linkDialog === dlg) linkDialog = null
-                val text = when {
-                    cancelled -> "Cancelado"
-                    ok -> (if (toMp3) "🎵 Guardado en Descargas: " else "⬇ Guardado en Descargas: ") + msg
-                    else -> "No se pudo: " + msg.replace(url, "(enlace)")   // R9: el enlace no se muestra
+                if (ok && !cancelled) {
+                    SavedFile.offer(this, if (toMp3) "🎵" else "⬇", msg, savedUri)   // [MP3-ABRIR-1] Abrir / Compartir
+                } else {
+                    val text = if (cancelled) "Cancelado" else "No se pudo: " + msg.replace(url, "(enlace)")   // R9: el enlace no se muestra
+                    Toast.makeText(app, text, Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(app, text, Toast.LENGTH_LONG).show()
             }
         }
     }
