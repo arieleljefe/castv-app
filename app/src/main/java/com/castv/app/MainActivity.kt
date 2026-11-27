@@ -467,7 +467,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             startActivityForResult(Intent(this, SettingsActivity::class.java), reqSettings)
         }
         btnQuick.setOnClickListener { if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause() }
-        val toggleExpand = View.OnClickListener { setPlayerExpanded(playerExpanded.visibility != View.VISIBLE) }
+        val toggleExpand = View.OnClickListener { setPlayerExpanded(!CastvMotion.isOpen(playerExpanded)) }   // [ANIM-1b]
         btnExpand.setOnClickListener(toggleExpand)
         tvNowPlaying.setOnClickListener(toggleExpand)
         nowThumbBox.setOnClickListener(toggleExpand)
@@ -805,7 +805,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         when {
             selecting -> actionMode?.finish()
             searchBar.visibility == View.VISIBLE -> toggleSearch()
-            playerExpanded.visibility == View.VISIBLE -> setPlayerExpanded(false)
+            CastvMotion.isOpen(playerExpanded) -> setPlayerExpanded(false)   // [ANIM-1b]
             hasActiveFilter() -> clearFilters()
             localActive -> moveTaskToBack(true)
             else -> super.onBackPressed()
@@ -1456,8 +1456,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     private fun setPlayerExpanded(expanded: Boolean) {
-        playerExpanded.visibility = if (expanded) View.VISIBLE else View.GONE
-        btnExpand.rotation = if (expanded) 180f else 0f
+        // [ANIM-1b] el panel se despliega deslizando y la flecha gira; con «Quitar animaciones» de Android es inmediato
+        CastvMotion.slide(playerExpanded, expanded)
+        CastvMotion.rotate(btnExpand, if (expanded) 180f else 0f)
     }
 
     // [PULIDO-2b] Mientras no haya sonado nada, el mini reproductor se compacta: sin barra de progreso ni ☆.
@@ -5329,6 +5330,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     .inflate(R.layout.item_group_grid, parent, false)
                 bindAlbumCard(gv.findViewById<View>(R.id.cardA), rows.getOrNull(position * 2))
                 bindAlbumCard(gv.findViewById<View>(R.id.cardB), rows.getOrNull(position * 2 + 1))
+                // [ANIM-1b] las tarjetas nuevas de la primera pantalla aparecen con fundido; las recicladas quedan como estaban
+                if (convertView == null && position < 4) CastvMotion.fadeIn(gv, position) else CastvMotion.reset(gv)
                 return gv
             }
             val v = convertView ?: LayoutInflater.from(parent.context)

@@ -1728,17 +1728,25 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     /** Arma las dos filas de tarjetas de arriba. Se esconden al buscar, filtrar por grupo o con ★ Favs; una fila vacía no se muestra. */
+    private var lastSectionsKey = ""     // [ANIM-1b]
+    private var sectionsFade = false     // [ANIM-1b]
+
     private fun refreshSections() {
         if (!::sections.isInitialized) return
         sections.removeAllViews()
         val plain = !favOnly && groupFilter == null && moodFilter < 0 && searchBox.text.isNullOrEmpty()   // [ESTILO-3]
-        if (!plain) return
+        if (!plain) { lastSectionsKey = ""; return }
         val h = hidden
         val recent = Store.recentChannels().filter { !h.contains(it.url) }
         val favList = Store.chFavChannels().filter { !h.contains(it.url) }.take(20)
+        val topList = Store.topChannels().filter { !h.contains(it.first.url) }   // [TOP-CANALES-1]
+        // [ANIM-1b] el fundido solo si cambió lo que se ve (no en cada repintado igual, para que no parpadee)
+        val key = (recent.map { it.url } + "|" + favList.map { it.url } + "|" + topList.map { it.first.url }).joinToString(",")
+        sectionsFade = key != lastSectionsKey
+        lastSectionsKey = key
         addSection("🕘 Continuar", recent)
         addSection("★ Favoritos", favList, big = true)   // [VISTA-4] misma estrella (color de acento) que la lista; [CARTELERA-1] tarjetas grandes
-        val top = Store.topChannels().filter { !h.contains(it.first.url) }   // [TOP-CANALES-1]
+        val top = topList
         addSection("🔥 Más vistos", top.map { it.first }, top.associate { it.first.url to it.second }) { confirmResetTop() }
     }
 
@@ -1771,8 +1779,11 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         sections.addView(t)
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
-        for (c in list) row.addView(if (big) bigCard(c) else card(c, plays?.get(c.url)),
-            LinearLayout.LayoutParams(dp(if (big) 168 else 96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })   // [CARTELERA-1]
+        for ((i, c) in list.withIndex()) {
+            val cv = if (big) bigCard(c) else card(c, plays?.get(c.url))
+            row.addView(cv, LinearLayout.LayoutParams(dp(if (big) 168 else 96), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) })   // [CARTELERA-1]
+            if (sectionsFade && i < 8) CastvMotion.fadeIn(cv, i)   // [ANIM-1b] las primeras tarjetas aparecen con fundido, una tras otra
+        }
         val scroll = HorizontalScrollView(this)
         scroll.isHorizontalScrollBarEnabled = false
         scroll.addView(row)
