@@ -1172,6 +1172,11 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val cur = items.getOrNull(index) ?: return
         if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
         val dur = try { video.duration } catch (e: Exception) { -1 }
+        CutAudio.pauseHook = {   // [CORTAR-3] «Oír el tramo» pausa antes el video que suena
+            pausedByFocus = false
+            try { if (video.isPlaying) video.pause() } catch (e: Exception) { }
+            updatePlayIcon()
+        }
         CutAudio.show(this, Uri.parse(cur.uriString), cur.name, dur.toLong(), asVideo) {
             try { video.currentPosition.toLong() } catch (e: Exception) { 0L }
         }
