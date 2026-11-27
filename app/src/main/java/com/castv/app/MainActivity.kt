@@ -3186,9 +3186,30 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             contentDescription = null
             setBackgroundResource(R.drawable.bg_thumb)
             clipToOutline = true
-            layoutParams = android.widget.LinearLayout.LayoutParams(lin, 0, 1f).apply { setMargins(0, dp(8), 0, dp(16)) }
         }
-        root.addView(art)
+        // [LRC-1] La carátula y la letra comparten el mismo espacio: se ve una u otra
+        val artBox = android.widget.FrameLayout(this)
+        artBox.addView(art, android.widget.FrameLayout.LayoutParams(lin, lin))
+        val lyrBox = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(8), dp(110), dp(8), dp(110))
+        }
+        val lyrScroll = android.widget.ScrollView(this).apply {
+            visibility = View.GONE
+            isVerticalScrollBarEnabled = false
+            setBackgroundResource(R.drawable.bg_thumb)
+            clipToOutline = true
+            addView(lyrBox, ViewGroup.LayoutParams(lin, wrap))
+        }
+        artBox.addView(lyrScroll, android.widget.FrameLayout.LayoutParams(lin, lin))
+        root.addView(artBox, android.widget.LinearLayout.LayoutParams(lin, 0, 1f).apply { setMargins(0, dp(8), 0, dp(16)) })
+        var lyrDoc: Lrc.Doc? = null
+        var lyrKey: String? = null
+        var lyrRev = -1
+        var showLyr = false
+        var lyrIdx = -2
+        var tintAcc = accentColor()
+        val lyrViews = ArrayList<TextView>()
 
         val title = TextView(this).apply {
             gravity = android.view.Gravity.CENTER
@@ -3261,6 +3282,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         row2.addView(fav)
         val auto = imgBtn(R.drawable.ic_repeat, "Auto-avance", 48) { btnAuto.performClick() }
         row2.addView(auto)
+        val lyrBtn = txtBtn("🎤") { }.apply {   // [LRC-1] los toques se ponen más abajo, cuando ya existen las funciones de la letra
+            textSize = 20f
+            visibility = View.GONE
+        }
+        row2.addView(lyrBtn)
         root.addView(row2, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
 
         // [REMOTO-1a] Fila 3: silencio + volumen (reflejan y mandan lo mismo que el mini reproductor)
@@ -3312,7 +3338,102 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 sb.progressTintList = ColorStateList.valueOf(acc)
                 sb.thumbTintList = ColorStateList.valueOf(acc)
             }
+            tintAcc = acc   // [LRC-1] la línea de la letra que suena usa el mismo color
+            lyrIdx = -2
         }
+
+        // [LRC-1] Letra sincronizada (.lrc): se ve en lugar de la carátula, con la línea que suena resaltada
+        fun showLyrics(on: Boolean) {
+            showLyr = on
+            val vis = on && lyrDoc != null
+            lyrScroll.visibility = if (vis) View.VISIBLE else View.GONE
+            art.visibility = if (vis) View.GONE else View.VISIBLE
+            lyrBtn.alpha = if (lyrDoc == null) 0.45f else if (vis) 1f else 0.75f
+            lyrIdx = -2
+        }
+
+        fun buildLyrics() {
+            lyrBox.removeAllViews()
+            lyrViews.clear()
+            val d = lyrDoc ?: return
+            for (ln in d.lines) {
+                val tv = TextView(this).apply {
+                    text = if (ln.text.isEmpty()) "♪" else ln.text
+                    gravity = android.view.Gravity.CENTER
+                    textSize = 19f
+                    setPadding(dp(6), dp(7), dp(6), dp(7))
+                    setTextColor(col(R.color.vlc_muted))
+                }
+                lyrBox.addView(tv, android.widget.LinearLayout.LayoutParams(lin, wrap))
+                lyrViews.add(tv)
+            }
+            lyrScroll.scrollTo(0, 0)
+        }
+
+        fun loadLyrics(item: MediaItem?) {
+            lyrDoc = if (item != null && item.isMusic) Lrc.load(this, item) else null
+            buildLyrics()
+            showLyrics(showLyr)
+        }
+
+        fun paintLyrics(posMs: Int) {
+            val d = lyrDoc ?: return
+            if (lyrScroll.height == 0) return   // todavía no se dibujó: se reintenta en la próxima vuelta
+            val i = Lrc.indexAt(d, posMs + 250)
+            if (i == lyrIdx) return
+            lyrIdx = i
+            for (k in lyrViews.indices) lyrViews[k].setTextColor(if (k == i) tintAcc else col(R.color.vlc_muted))
+            if (i >= 0 && i < lyrViews.size) {
+                val tv = lyrViews[i]
+                lyrScroll.smoothScrollTo(0, maxOf(tv.top + tv.height / 2 - lyrScroll.height / 2, 0))
+            }
+        }
+
+        fun pickLrc() {
+            val item = playingItem ?: return
+            lrcPending = item
+            try {
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), reqLrc)
+            } catch (e: Exception) {
+                lrcPending = null
+                toast("No pude abrir el selector de archivos")
+            }
+        }
+
+        fun askLrc() {
+            AlertDialog.Builder(this)
+                .setTitle("Letra de la canción")
+                .setMessage("Elige el archivo .lrc (letra con tiempos) de esta canción. CASTV guarda una copia y la muestra aquí, siguiendo la música.")
+                .setPositiveButton("Elegir archivo…") { _, _ -> pickLrc() }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+
+        fun onLyrTap() {
+            if (playingItem?.isMusic != true) return
+            if (lyrDoc != null) showLyrics(!showLyr) else askLrc()
+        }
+
+        fun onLyrMenu() {
+            val item = playingItem ?: return
+            if (!item.isMusic) return
+            val opts = ArrayList<String>()
+            opts.add("Elegir otro archivo .lrc…")
+            if (Lrc.hasSaved(this, item)) opts.add("Quitar la letra guardada")
+            AlertDialog.Builder(this)
+                .setTitle("Letra")
+                .setItems(opts.toTypedArray()) { _, which ->
+                    if (which == 0) pickLrc()
+                    else { Lrc.remove(this, item); lrcRev++; toast("Letra quitada") }
+                }
+                .show()
+        }
+
+        lyrBtn.setOnClickListener { haptic(it); onLyrTap() }
+        lyrBtn.setOnLongClickListener { onLyrMenu(); true }
+        art.setOnClickListener { if (lyrDoc != null) showLyrics(true) }
+        lyrScroll.setOnClickListener { showLyrics(false) }
 
         // Refleja el panel cada medio segundo mientras la ventana está abierta
         var shownKey: Any? = null
@@ -3337,6 +3458,21 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                         art.setImageResource(if (playingItem?.isMusic == true) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
                     }
                 }
+                // [LRC-1] letra: se carga al cambiar de canción (o al elegir/quitar el archivo) y se resalta la línea que suena
+                val curLy = playingItem
+                val lk = if (curLy != null && curLy.isMusic) Store.key(curLy) else null
+                if (lk != lyrKey || lrcRev != lyrRev) {
+                    lyrKey = lk
+                    lyrRev = lrcRev
+                    loadLyrics(curLy)
+                    if (lyrDoc != null && lrcShowNext) { lrcShowNext = false; showLyrics(true) }
+                }
+                lyrBtn.visibility = if (lk != null) View.VISIBLE else View.GONE
+                if (lyrDoc != null && lyrScroll.visibility == View.VISIBLE) {
+                    var posMs = seekBar.progress * 1000
+                    withLocal { posMs = it.currentPosition }
+                    paintLyrics(posMs)
+                }
                 if (!dragging) {
                     seek.isEnabled = seekBar.isEnabled
                     seek.max = seekBar.max
@@ -3350,7 +3486,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 btnAuto.background?.constantState?.newDrawable()?.let { auto.background = it }
                 muteBtn.setImageResource(if (muted) R.drawable.ic_vol_off else R.drawable.ic_vol_on)   // [REMOTO-1a]
                 if (!volTouching) volFull.progress = volSeek.progress
-                fullHandler.postDelayed(this, 500)
+                fullHandler.postDelayed(this, if (lyrScroll.visibility == View.VISIBLE) 250L else 500L)   // [LRC-1] con letra, más seguido
             }
         }
 
@@ -3363,6 +3499,23 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         fullDialog = dlg
         dlg.show()
         sync.run()
+    }
+
+    /** [LRC-1] Guarda como letra de [item] el .lrc elegido (con marcas de tiempo); si no las trae, avisa y no guarda nada. */
+    private fun importLrc(u: Uri, item: MediaItem) {
+        val text = try { contentResolver.openInputStream(u)?.use { Lrc.readText(it) } } catch (e: Exception) { null }
+        val doc = if (text != null) Lrc.parse(text) else null
+        if (text == null || doc == null) {
+            toast("No encontré tiempos tipo [01:23.45] en ese archivo (¿es un .lrc?)")
+            return
+        }
+        if (Lrc.save(this, item, text)) {
+            lrcRev++
+            lrcShowNext = true
+            toast("🎤 Letra guardada (${doc.lines.size} líneas)")
+        } else {
+            toast("No pude guardar la letra")
+        }
     }
 
     /** [UI-ART-1] Color dominante de una carátula: promedio de una versión de 24×24 donde los colores vivos pesan más. Null si es gris o no se puede leer. */
@@ -3499,6 +3652,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private val reqBackupOut = 4716   // [Respaldo JSON] exportar
     private val reqBackupIn = 4717    // [Respaldo JSON] importar
     private val reqSettings = 4718    // [UI-1b] pantalla Ajustes
+    private val reqLrc = 4719         // [LRC-1] elegir el archivo .lrc de la canción
+    private var lrcPending: MediaItem? = null   // [LRC-1] canción a la que va el archivo que se está eligiendo
+    private var lrcRev = 0                      // [LRC-1] sube al guardar o quitar una letra: «Reproduciendo» la vuelve a leer
+    private var lrcShowNext = false             // [LRC-1] al guardar una letra, mostrarla enseguida
     private var accentAtStart = 0     // [UI-1b] color con el que se dibujó esta pantalla
     private var bgAtStart = 0         // [TEMAS-2] fondo con el que se dibujó esta pantalla
     private var textAtStart = 1       // [TEXTO-TAM-1] tamaño de texto con el que se dibujó esta pantalla
@@ -3826,6 +3983,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             reqBackupIn -> {
                 val u = data?.data
                 if (resultCode == RESULT_OK && u != null) confirmImport(u)
+            }
+            reqLrc -> {   // [LRC-1]
+                val u = data?.data
+                val item = lrcPending
+                lrcPending = null
+                if (resultCode == RESULT_OK && u != null && item != null) importLrc(u, item)
             }
             reqSettings -> {
                 // [UI-1b] Ajustes pide abrir el respaldo o las redes
