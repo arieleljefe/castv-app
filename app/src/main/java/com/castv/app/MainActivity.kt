@@ -4337,7 +4337,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 } else if (okN == 1 && failN == 0) {
                     LinkJobNotifier.done(app, "🎵 Guardado en Descargas", lastName, lastUri)
                 } else {
-                    LinkJobNotifier.done(app, if (okN > 0) "🎵 Conversión terminada" else "🎵 No se pudo completar", summary.removePrefix("🎵 "), null)
+                    LinkJobNotifier.done(app, if (okN > 0) "🎵 Conversión terminada" else "🎵 No se pudo completar", summary.removePrefix("🎵 "), null, folder = okN > 0)   // [CARPETA-1]
                 }
             }
         }

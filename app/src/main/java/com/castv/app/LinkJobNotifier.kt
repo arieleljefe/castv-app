@@ -1,5 +1,6 @@
 package com.castv.app
 
+import android.app.DownloadManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -56,8 +57,9 @@ object LinkJobNotifier {
         } catch (e: Exception) { }
     }
 
-    /** Aviso final (sin barra). Con [uri], tocarlo abre el archivo; sin él, abre la app. */
-    fun done(ctx: Context, title: String, text: String, uri: Uri?) {
+    /** Aviso final (sin barra). Con [uri], tocarlo abre el archivo y salen los botones «Abrir» y «Abrir ubicación»;
+     *  sin él, abre la app. [CARPETA-1] [folder] = true sin [uri] (varios archivos): solo «Abrir ubicación». */
+    fun done(ctx: Context, title: String, text: String, uri: Uri?, folder: Boolean = false) {
         try {
             ensureChannel(ctx)
             val tap: Intent? = if (uri != null) {
@@ -71,6 +73,14 @@ object LinkJobNotifier {
                 .setAutoCancel(true)
                 .setOngoing(false)
             if (tap != null) b.setContentIntent(PendingIntent.getActivity(ctx, ID, tap, PendingIntent.FLAG_UPDATE_CURRENT or immutable()))
+            // [CARPETA-1] botones del aviso final: Abrir (el archivo) y Abrir ubicación (carpeta Descargas)
+            if (uri != null && tap != null) {
+                b.addAction(0, "Abrir", PendingIntent.getActivity(ctx, ID + 1, tap, PendingIntent.FLAG_UPDATE_CURRENT or immutable()))
+            }
+            if ((uri != null && SavedFile.inDownloads(ctx, uri)) || (uri == null && folder)) {
+                val view = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                b.addAction(0, "Abrir ubicación", PendingIntent.getActivity(ctx, ID + 2, view, PendingIntent.FLAG_UPDATE_CURRENT or immutable()))
+            }
             NotificationManagerCompat.from(ctx).notify(ID, b.build())
         } catch (e: Exception) { }
     }
