@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v509
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v510
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -204,3 +204,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - BUSCAR-X-1 · 27 nov · botón ✕ a la derecha del buscador de Ajustes (portada y subpantallas): solo se ve con texto y lo borra de un toque · `SettingsActivity.kt`
 - AVISO-COLA-1 · 27 nov · `MainActivity.toast()` guarda el último aviso y `onPause()` lo cancela, así «La cola está vacía…» no se ve dentro de Ajustes ni del reproductor · `MainActivity.kt` (`lastToast`, `toast`, `onPause`)
 - TAG-3.24 · 27 nov · etiqueta `v3.24` publicada e instalada desde Ajustes › Actualizaciones; incluye IMPORTAR-GRUPO-1, ACCESO-4, FAV-ARRASTRAR-1, BUSCAR-X-1 y AVISO-COLA-1
+- TEXTO-TAM-1 · 27 nov · Ajustes › Interfaz › «Tamaño del texto» (Pequeño ×0,9 · Normal = el del sistema · Grande ×1,15) para Principal, Ajustes, Canales, reproductor de video y Acerca de; clase base `CastvActivity` y `CastvTextSize`; clave `text_size` en `castv`; arreglos de llave TEXTO-TAM-1b y 1c · `CastvUtils.kt`, `SettingsActivity.kt`, `MainActivity.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `AboutActivity.kt`
