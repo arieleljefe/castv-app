@@ -25,4 +25,23 @@
     <color name="accent_purple">#7C3AED</color>
     <color name="accent_purple_soft">#337C3AED</color>
     <color name="accent_purple_bg">#E9E0FD</color>
+    <!-- [TEMAS-1] más colores de acento -->
+    <color name="accent_pink">#DB2777</color>
+    <color name="accent_pink_soft">#33DB2777</color>
+    <color name="accent_pink_bg">#FCE1EE</color>
+    <color name="accent_red">#DC2626</color>
+    <color name="accent_red_soft">#33DC2626</color>
+    <color name="accent_red_bg">#FDE0E0</color>
+    <color name="accent_blue">#2563EB</color>
+    <color name="accent_blue_soft">#332563EB</color>
+    <color name="accent_blue_bg">#DCE7FD</color>
+    <color name="accent_gold">#A16207</color>
+    <color name="accent_gold_soft">#33A16207</color>
+    <color name="accent_gold_bg">#F8EDC9</color>
+    <color name="accent_mint">#0D9488</color>
+    <color name="accent_mint_soft">#330D9488</color>
+    <color name="accent_mint_bg">#D5F3EF</color>
+    <color name="accent_indigo">#4F46E5</color>
+    <color name="accent_indigo_soft">#334F46E5</color>
+    <color name="accent_indigo_bg">#E0E0FC</color>
 </resources>

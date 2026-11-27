@@ -48,7 +48,7 @@ class SettingsActivity : AppCompatActivity() {
     private var mutedColor = Color.GRAY
     private var lineColor = Color.GRAY
 
-    private val accentNames = arrayOf("Cian", "Verde", "Naranja", "Morado")
+    private val accentNames get() = Themes.names
 
     // [AJUSTES-2a] buscador y estilo de subtítulos
     private lateinit var search: EditText
@@ -73,8 +73,8 @@ class SettingsActivity : AppCompatActivity() {
     /** Tema guardado: 0 = Sistema, 1 = Claro, 2 = Oscuro (por defecto Oscuro, igual que MainActivity). */
     private fun savedTheme(): Int = prefs().getInt("theme", 2)
 
-    /** Color de acento guardado: 0 Cian, 1 Verde, 2 Naranja, 3 Morado. */
-    private fun savedAccent(): Int = prefs().getInt("accent", 0)
+    /** Color de acento guardado (0 a 9, ver Themes.names). */
+    private fun savedAccent(): Int = Themes.saved(this)   // [TEMAS-1]
 
     private fun themeLabel(): String = when (savedTheme()) {
         0 -> "Sistema"
@@ -98,12 +98,7 @@ class SettingsActivity : AppCompatActivity() {
         applyThemeMode(savedTheme())
         super.onCreate(savedInstanceState)
         Store.init(this)   // [AJUSTES-2b] por si Android recrea Ajustes sin pasar por MainActivity
-        theme.applyStyle(when (savedAccent()) {
-            1 -> R.style.AccentOverlayGreen
-            2 -> R.style.AccentOverlayOrange
-            3 -> R.style.AccentOverlayPurple
-            else -> R.style.AccentOverlayCyan
-        }, true)
+        Themes.apply(this)   // [TEMAS-1]
 
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
         mutedColor = ContextCompat.getColor(this, R.color.vlc_muted)
@@ -222,7 +217,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun entries(): List<Entry> {
         val l = ArrayList<Entry>()
         l.add(Entry("Interfaz", "Tema", themeLabel(), { pickTheme() }))
-        l.add(Entry("Interfaz", "Color de acento", accentNames[savedAccent().coerceIn(0, 3)], { pickAccent() }))
+        l.add(Entry("Interfaz", "Color de acento", accentNames[savedAccent()], { pickAccent() }))
 
         l.add(Entry("Subtítulos", "Tamaño", subSizeNames[stSize()],
             { pickSub("Tamaño", subSizeNames, stSize(), "style_size") }))
@@ -519,14 +514,9 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun pickAccent() {
-        AlertDialog.Builder(this)
-            .setTitle("Color de acento")
-            .setSingleChoiceItems(accentNames, savedAccent().coerceIn(0, 3)) { d, which ->
-                prefs().edit().putInt("accent", which).apply()
-                d.dismiss()
-                recreate()   // esta pantalla se redibuja con el color; MainActivity lo hace al volver
-            }
-            .show()
+        Themes.pick(this) {
+            recreate()   // [TEMAS-1] esta pantalla se redibuja con el color; MainActivity lo hace al volver
+        }
     }
 
     private fun toggleTrash() {

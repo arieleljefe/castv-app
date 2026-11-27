@@ -41,4 +41,34 @@
         <item name="castvAccentSoft">@color/accent_purple_soft</item>
         <item name="castvPlayingBg">@color/accent_purple_bg</item>
     </style>
+    <style name="AccentOverlayPink">
+        <item name="castvAccent">@color/accent_pink</item>
+        <item name="castvAccentSoft">@color/accent_pink_soft</item>
+        <item name="castvPlayingBg">@color/accent_pink_bg</item>
+    </style>
+    <style name="AccentOverlayRed">
+        <item name="castvAccent">@color/accent_red</item>
+        <item name="castvAccentSoft">@color/accent_red_soft</item>
+        <item name="castvPlayingBg">@color/accent_red_bg</item>
+    </style>
+    <style name="AccentOverlayBlue">
+        <item name="castvAccent">@color/accent_blue</item>
+        <item name="castvAccentSoft">@color/accent_blue_soft</item>
+        <item name="castvPlayingBg">@color/accent_blue_bg</item>
+    </style>
+    <style name="AccentOverlayGold">
+        <item name="castvAccent">@color/accent_gold</item>
+        <item name="castvAccentSoft">@color/accent_gold_soft</item>
+        <item name="castvPlayingBg">@color/accent_gold_bg</item>
+    </style>
+    <style name="AccentOverlayMint">
+        <item name="castvAccent">@color/accent_mint</item>
+        <item name="castvAccentSoft">@color/accent_mint_soft</item>
+        <item name="castvPlayingBg">@color/accent_mint_bg</item>
+    </style>
+    <style name="AccentOverlayIndigo">
+        <item name="castvAccent">@color/accent_indigo</item>
+        <item name="castvAccentSoft">@color/accent_indigo_soft</item>
+        <item name="castvPlayingBg">@color/accent_indigo_bg</item>
+    </style>
 </resources>

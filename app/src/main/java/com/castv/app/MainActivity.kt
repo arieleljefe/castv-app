@@ -284,20 +284,13 @@ class MainActivity : AppCompatActivity() {
         return tv.data
     }
 
-    /** Color de acento guardado: 0 Cian, 1 Verde, 2 Naranja, 3 Morado. */
-    private fun savedAccent(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)
+    /** Color de acento guardado (0 a 9, ver Themes.names). */
+    private fun savedAccent(): Int = Themes.saved(this)   // [TEMAS-1]
 
-    private val accentNames = arrayOf("Cian", "Verde", "Naranja", "Morado")
+    private val accentNames get() = Themes.names
 
     private fun pickAccent() {
-        AlertDialog.Builder(this)
-            .setTitle("Color de acento")
-            .setSingleChoiceItems(accentNames, savedAccent()) { d, which ->
-                getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("accent", which).apply()
-                d.dismiss()
-                recreate() // vuelve a dibujar la pantalla con el color elegido
-            }
-            .show()
+        Themes.pick(this) { recreate() }   // [TEMAS-1] vuelve a dibujar la pantalla con el color elegido
     }
 
     /** Tema guardado: 0 = Sistema, 1 = Claro, 2 = Oscuro (por defecto Oscuro, como antes). */
@@ -332,12 +325,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applyThemeMode(savedTheme())
         super.onCreate(savedInstanceState)
-        theme.applyStyle(when (savedAccent()) {
-            1 -> R.style.AccentOverlayGreen
-            2 -> R.style.AccentOverlayOrange
-            3 -> R.style.AccentOverlayPurple
-            else -> R.style.AccentOverlayCyan
-        }, true)
+        Themes.apply(this)   // [TEMAS-1]
         accentAtStart = savedAccent()   // [UI-1b]
         setContentView(R.layout.activity_main)
         val night = (resources.configuration.uiMode and
@@ -1408,7 +1396,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 9, 8, "Ecualizador (teléfono)")
         menu.add(0, 10, 9, "Elegir TV")
         menu.add(0, 12, 10, "Tema: " + themeLabel())
-        menu.add(0, 13, 11, "Color: " + accentNames[savedAccent().coerceIn(0, 3)])
+        menu.add(0, 13, 11, "Color: " + accentNames[savedAccent()])
         if (Build.VERSION.SDK_INT >= 30) {
             menu.add(0, 14, 11, if (useTrash()) "Eliminado: a la papelera" else "Eliminado: permanente")
         }

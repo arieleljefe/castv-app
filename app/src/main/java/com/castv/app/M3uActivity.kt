@@ -196,12 +196,7 @@ class M3uActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // [ACENTO-1] aplica el color de acento elegido en Ajustes (igual que MainActivity)
-        theme.applyStyle(when (getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)) {
-            1 -> R.style.AccentOverlayGreen
-            2 -> R.style.AccentOverlayOrange
-            3 -> R.style.AccentOverlayPurple
-            else -> R.style.AccentOverlayCyan
-        }, true)
+        Themes.apply(this)   // [TEMAS-1]
         Store.init(this)
         favs = Store.chFavs()
         notes = Store.chNotes()   // [NOTA-CANAL-1]
