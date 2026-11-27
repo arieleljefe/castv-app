@@ -4027,6 +4027,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 menu.add(0, 7, 5, "📤 Compartir").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
                 menu.add(0, 8, 6, "👁 Marcar como visto").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [VISTO-1]
                 menu.add(0, 9, 7, "🎵 Convertir a MP3").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [MP3-LOTE-1]
+                menu.add(0, 10, 8, "🔗 Unir").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [UNIR-1]
                 mode.title = "1 seleccionado"
                 return true
             }
@@ -4039,6 +4040,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 val vids = sel.filter { !it.isMusic }   // [VISTO-1]
                 menu.findItem(8)?.title = if (vids.isNotEmpty() && vids.all { Store.isSeen(it) }) "👁 Marcar como no visto" else "👁 Marcar como visto"
                 menu.findItem(9)?.isVisible = vids.isNotEmpty()   // [MP3-LOTE-1] solo si hay videos en la selección
+                menu.findItem(10)?.isVisible = sel.size >= 2 && (sel.all { !it.isMusic } || sel.all { it.isMusic })   // [UNIR-1] 2 o más videos, o 2 o más audios
                 return true
             }
 
@@ -4058,6 +4060,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     7 -> bulkShare()     // [SEL-2]
                     8 -> bulkSeen()      // [VISTO-1]
                     9 -> bulkMp3()       // [MP3-LOTE-1]
+                    10 -> bulkJoin()     // [UNIR-1]
                 }
                 return true
             }
@@ -4331,6 +4334,83 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     LinkJobNotifier.done(app, "🎵 Guardado en Descargas", lastName, lastUri)
                 } else {
                     LinkJobNotifier.done(app, if (okN > 0) "🎵 Conversión terminada" else "🎵 No se pudo completar", summary.removePrefix("🎵 "), null)
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------- [UNIR-1] Varios videos (o audios) → uno solo
+
+    /** Une los videos (o audios .m4a/AAC) seleccionados en un solo archivo en Descargas, en el orden de la lista y sin recodificar. */
+    private fun bulkJoin() {
+        val sel = selectedItems()
+        val allVid = sel.all { !it.isMusic }
+        val allMus = sel.all { it.isMusic }
+        if (sel.size < 2 || (!allVid && !allMus)) { toast("Selecciona 2 o más videos, o 2 o más audios (no mezclados)"); return }
+        if (sel.size > VideoJoin.MAX_FILES) { toast("Máximo ${VideoJoin.MAX_FILES} archivos a la vez"); return }
+        if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return }
+        val order = sel.mapIndexed { i, m -> "${i + 1}. ${m.name}" }.joinToString("\n")
+        AlertDialog.Builder(this)
+            .setTitle("🔗 Unir " + sel.size + (if (allVid) " videos" else " audios"))
+            .setMessage("Se unirán en este orden (el de la lista; cámbialo con «Ordenar»):\n\n" + order +
+                "\n\nSin recodificar: no pierde calidad, pero solo funciona si todos son iguales (mismo códec, tamaño y giro)." +
+                (if (allMus) " Para audios, solo .m4a/AAC." else ""))
+            .setPositiveButton("Unir") { _, _ -> runJoin(sel, allVid) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun runJoin(sel: List<MediaItem>, video: Boolean) {
+        val app = applicationContext
+        val uris = sel.map { uriOf(it) }
+        val names = sel.map { it.name }
+        val title = "🔗 Unir"
+        batchCancel = false
+        LinkJobNotifier.cancel = false
+        actionMode?.finish()
+        val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage("Preparando…")
+            .setCancelable(false)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        if (dlg != null) {
+            dlg.show()
+            dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                batchCancel = true
+                dlg.setMessage("Cancelando…")
+            }
+        } else {
+            LinkJobNotifier.progress(app, title, "Preparando…", -1)
+            toast("En segundo plano: mira la notificación para ver el avance o cancelar")
+        }
+        val isCancelled = { batchCancel || LinkJobNotifier.cancel }
+        thread {
+            val r = try {
+                VideoJoin.join(app, uris, names, video, { pct ->
+                    val text = "Uniendo… $pct %"
+                    if (dlg == null) LinkJobNotifier.progress(app, title, text, pct)
+                    else runOnUiThread { if (!isFinishing && dlg.isShowing && !batchCancel) dlg.setMessage(text) }
+                }, isCancelled)
+            } catch (e: Throwable) {
+                VideoJoin.Result(false, "Error: " + e.javaClass.simpleName)
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (dlg != null) { try { dlg.dismiss() } catch (e: Exception) { } }
+                val front = !isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                if (r.cancelled) {
+                    if (dlg == null) LinkJobNotifier.clear(app)
+                    Toast.makeText(app, "Unión cancelada", Toast.LENGTH_LONG).show()
+                } else if (r.ok) {
+                    if (dlg != null || front) {
+                        if (dlg == null) LinkJobNotifier.clear(app)
+                        SavedFile.offer(this, "🔗", r.savedAs, r.uri)
+                    } else {
+                        LinkJobNotifier.done(app, "🔗 Guardado en Descargas", r.savedAs, r.uri)
+                    }
+                } else {
+                    if (dlg == null) LinkJobNotifier.done(app, "🔗 No se pudo unir", r.message, null)
+                    Toast.makeText(app, "No se pudo unir: " + r.message, Toast.LENGTH_LONG).show()
                 }
             }
         }
