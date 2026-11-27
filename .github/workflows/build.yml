@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # [VERSION-4] trae las etiquetas para nombrar los builds de main
 
       - name: Configurar Java 17
         uses: actions/setup-java@v4
@@ -64,6 +66,12 @@ jobs:
           echo "CASTV_VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "CASTV_VERSION_NAME=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else
+            # [VERSION-4] build de main: última etiqueta + número de build (ej. 3.21 (build 363))
+            LAST=$(git tag --list 'v[0-9]*' | sort -V | tail -1)
+            if [ -n "$LAST" ]; then
+              echo "CASTV_VERSION_NAME=${LAST#v} (build ${{ github.run_number }})" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Pruebas automaticas (TESTS-1)
