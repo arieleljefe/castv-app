@@ -570,6 +570,10 @@ object VideoSplit {
             .setMessage(summary(r) + (if (r.over) "\n\nOjo: alguna parte pasa el tope (un tramo entre fotogramas clave pesa demasiado)." else ""))
             .setNegativeButton("Cerrar", null)
         if (r.uris.isNotEmpty()) {
+            // [CARPETA-1b] «📂 Ubicación» reemplaza a «Cerrar» (Android solo admite 3 botones; tocar fuera cierra)
+            b.setNegativeButton("📂 Ubicación") { _, _ ->
+                if (!SavedFile.openFolder(act)) Toast.makeText(act.applicationContext, "No hay una app de archivos para abrir Descargas", Toast.LENGTH_SHORT).show()
+            }
             b.setPositiveButton("Compartir todas") { _, _ ->
                 try {
                     val list = ArrayList<Uri>(r.uris)
