@@ -3819,6 +3819,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 menu.add(0, 5, 4, "📃 Añadir a lista…").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
                 menu.add(0, 7, 5, "📤 Compartir").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [SEL-2]
                 menu.add(0, 8, 6, "👁 Marcar como visto").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [VISTO-1]
+                menu.add(0, 9, 7, "🎵 Convertir a MP3").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)   // [MP3-LOTE-1]
                 mode.title = "1 seleccionado"
                 return true
             }
@@ -3830,6 +3831,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 menu.findItem(4)?.title = if (allFav) "☆ Quitar de favoritos" else "★ Añadir a favoritos"
                 val vids = sel.filter { !it.isMusic }   // [VISTO-1]
                 menu.findItem(8)?.title = if (vids.isNotEmpty() && vids.all { Store.isSeen(it) }) "👁 Marcar como no visto" else "👁 Marcar como visto"
+                menu.findItem(9)?.isVisible = vids.isNotEmpty()   // [MP3-LOTE-1] solo si hay videos en la selección
                 return true
             }
 
@@ -3848,6 +3850,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     6 -> bulkPlay()      // [SEL-2]
                     7 -> bulkShare()     // [SEL-2]
                     8 -> bulkSeen()      // [VISTO-1]
+                    9 -> bulkMp3()       // [MP3-LOTE-1]
                 }
                 return true
             }
@@ -3885,6 +3888,63 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         actionMode?.finish()
         toast("➕ " + countText(added, "añadida", "añadidas") + " a la cola" +
             (if (skipped > 0) " · $skipped ya estaban" else ""))
+    }
+
+    // ------------------------------------------- [MP3-LOTE-1] Varios videos → MP3
+
+    @Volatile private var batchCancel = false
+
+    /** Convierte a MP3 los videos seleccionados, uno tras otro (Descargas). Si uno falla sigue con el siguiente; Cancelar corta el lote. */
+    private fun bulkMp3() {
+        val vids = selectedItems().filter { !it.isMusic }
+        if (vids.isEmpty()) { toast("Selecciona videos"); return }
+        if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return }
+        val app = applicationContext
+        val total = vids.size
+        val uris = vids.map { uriOf(it) }
+        batchCancel = false
+        actionMode?.finish()
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("🎵 Convertir a MP3")
+            .setMessage("Preparando… 1 de $total")
+            .setCancelable(false)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            batchCancel = true
+            dlg.setMessage("Cancelando…")
+        }
+        thread {
+            var okN = 0
+            var failN = 0
+            var cancelled = false
+            var lastName = ""
+            var lastUri: Uri? = null
+            for ((k, m) in vids.withIndex()) {
+                if (batchCancel) { cancelled = true; break }
+                val r = try {
+                    Mp3Converter.convert(app, uris[k], m.name, { pct ->
+                        runOnUiThread { if (!isFinishing && dlg.isShowing && !batchCancel) dlg.setMessage("Convirtiendo ${k + 1} de $total… $pct %") }
+                    }, { batchCancel })
+                } catch (e: Throwable) {
+                    Mp3Converter.Result(false, "Error: " + e.javaClass.simpleName)
+                }
+                if (r.cancelled) { cancelled = true; break }
+                if (r.ok) { okN++; lastName = r.savedAs; lastUri = r.uri } else failN++
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try { dlg.dismiss() } catch (e: Exception) { }
+                if (okN == 1 && failN == 0 && !cancelled) {
+                    SavedFile.offer(this, "🎵", lastName, lastUri)   // [MP3-ABRIR-1]
+                } else {
+                    val text = "🎵 $okN de $total en Descargas" +
+                        (if (failN > 0) " · $failN no se pudieron convertir (sin audio o formato no compatible)" else "") +
+                        (if (cancelled) " · cancelado" else "")
+                    Toast.makeText(app, text, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun bulkFav() {
