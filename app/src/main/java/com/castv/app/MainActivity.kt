@@ -108,7 +108,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private enum class Sort(val label: String) {
         NAME_ASC("↕ A-Z"), NAME_DESC("↕ Z-A"), NEWEST("↕ Recientes"),
         LONGEST("↕ Más largos"), SHORTEST("↕ Más cortos"),
-        MOST_PLAYED("↕ Más reproducidas"), RECENT_PLAYED("↕ Reproducidas hace poco")
+        MOST_PLAYED("↕ Más reproducidas"), RECENT_PLAYED("↕ Reproducidas hace poco"),
+        NEVER_PLAYED("↕ Sin reproducir primero")   // [LISTAS-INTEL-1] al final, para no mover los números ya guardados
     }
 
     private enum class Repeat { OFF, ALL, ONE }
@@ -1082,6 +1083,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             Sort.MOST_PLAYED -> list.sortedWith(
                 compareByDescending<MediaItem> { Store.playCount(it) }.thenBy { nameKey(it) })
             Sort.RECENT_PLAYED -> list.sortedByDescending { Store.lastPlayed(it) }
+            // [LISTAS-INTEL-1] primero lo que nunca se ha reproducido (lo más nuevo arriba); después, lo ya reproducido
+            Sort.NEVER_PLAYED -> list.sortedWith(
+                compareBy<MediaItem> { Store.playCount(it) > 0 }.thenByDescending { it.dateAdded })
         }
         refreshList()
         updateTabs()
@@ -5097,6 +5101,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     val c = Store.playCount(item)
                     if (c > 0) parts.add("▶ ${c}×")
                 }
+                if (sortMode == Sort.NEVER_PLAYED && Store.playCount(item) == 0) parts.add("🆕 sin reproducir")   // [LISTAS-INTEL-1]
                 action.text = (if (isFav) "★ " else "") + parts.joinToString("  ·  ")
                 action.setTextColor(if (saved >= 10) accentColor() else col(R.color.vlc_muted))
             }
