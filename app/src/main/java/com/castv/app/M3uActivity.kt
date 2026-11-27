@@ -44,7 +44,7 @@ import kotlin.concurrent.thread
  * Listas M3U (canales de TV por internet): se cargan por enlace, se buscan y se filtran por grupo.
  * Al tocar un canal se reproduce sin cerrar esta pantalla (📺 TV o 📱 móvil) y se puede marcar con ★.
  */
-class M3uActivity : CastvActivity()   // [TEXTO-TAM-1] {
+class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private lateinit var listBtn: TextView
     private lateinit var groupBtn: TextView
