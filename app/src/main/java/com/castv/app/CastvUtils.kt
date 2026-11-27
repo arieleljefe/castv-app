@@ -104,6 +104,11 @@ object CastvIcons {
     }
 }
 
+/** [COMPACTO-1] «Filas compactas» (Ajustes › Interfaz): filas más bajas en Pistas, Videos y Canales. Se guarda en `castv` › `compact` (apagado por defecto). */
+object CastvCompact {
+    fun on(ctx: Context): Boolean = ctx.getSharedPreferences("castv", Context.MODE_PRIVATE).getBoolean("compact", false)
+}
+
 /** [TEXTO-TAM-1] Tamaño del texto de la app: 0 = Pequeño, 1 = Normal (el del sistema, sin tocar), 2 = Grande. Se guarda en `castv` › `text_size`. */
 object CastvTextSize {
     val names = arrayOf("Pequeño", "Normal (el del sistema)", "Grande")

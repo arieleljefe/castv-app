@@ -4922,7 +4922,34 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             action.visibility = View.VISIBLE
             v.findViewById<View>(R.id.itemRow).setBackgroundResource(
                 if (isPlaying || sel) R.drawable.item_bg_playing else R.drawable.item_bg)
+            applyCompactRow(v, CastvCompact.on(this@MainActivity))   // [COMPACTO-1]
             return v
+        }
+    }
+
+    /** [COMPACTO-1] Fila de Pistas/Videos normal o compacta. Se pone en cada fila porque ListView reutiliza las vistas (y va después del fondo, que podría reiniciar el relleno). */
+    private fun applyCompactRow(v: View, compact: Boolean) {
+        fun dp(x: Int) = (x * resources.displayMetrics.density).toInt()
+        val row = v.findViewById<View>(R.id.itemRow)
+        row.minimumHeight = dp(if (compact) 50 else 68)
+        row.setPadding(dp(16), dp(if (compact) 3 else 8), dp(4), dp(if (compact) 3 else 8))
+        val box = v.findViewById<View>(R.id.itemThumbBox)
+        val side = dp(if (compact) 40 else 52)
+        val lp = box.layoutParams
+        if (lp.width != side || lp.height != side) {
+            lp.width = side
+            lp.height = side
+            box.layoutParams = lp
+        }
+        v.findViewById<TextView>(R.id.itemSection).setPadding(dp(16), dp(if (compact) 8 else 14), 0, dp(if (compact) 2 else 4))
+        v.findViewById<TextView>(R.id.itemName).textSize = if (compact) 15f else 16f
+        val act = v.findViewById<TextView>(R.id.itemAction)
+        act.textSize = if (compact) 12f else 13f
+        val alp = act.layoutParams as? ViewGroup.MarginLayoutParams
+        val top = dp(if (compact) 0 else 2)
+        if (alp != null && alp.topMargin != top) {
+            alp.topMargin = top
+            act.layoutParams = alp
         }
     }
 

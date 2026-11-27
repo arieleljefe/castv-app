@@ -3035,6 +3035,19 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val logo = v.getChildAt(1) as ImageView
             val box = v.getChildAt(2) as LinearLayout
             val handle = v.getChildAt(3) as TextView   // [FAV-ARRASTRAR-1]
+            // [COMPACTO-1] fila normal o compacta (se aplica en cada fila: ListView reutiliza las vistas)
+            val compact = CastvCompact.on(this@M3uActivity)
+            val padV = dp(if (compact) 3 else 8)
+            star.setPadding(dp(8), padV, dp(12), padV)
+            star.textSize = if (compact) 20f else 22f
+            handle.setPadding(dp(14), padV, dp(14), padV)
+            val logoLp = logo.layoutParams
+            val lw = dp(if (compact) 36 else 44)
+            val lh = dp(if (compact) 26 else 32)
+            if (logoLp.width != lw || logoLp.height != lh) { logoLp.width = lw; logoLp.height = lh; logo.layoutParams = logoLp }
+            box.setPadding(0, dp(if (compact) 4 else 10), dp(8), dp(if (compact) 4 else 10))
+            (box.getChildAt(0) as TextView).textSize = if (compact) 15f else 16f
+            (box.getChildAt(1) as TextView).textSize = if (compact) 11f else 12f
             if (dragEnabled()) {
                 handle.visibility = View.VISIBLE
                 handle.setTextColor(mutedColor)
