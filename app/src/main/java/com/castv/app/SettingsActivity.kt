@@ -102,7 +102,7 @@ class SettingsActivity : AppCompatActivity() {
 
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
         mutedColor = ContextCompat.getColor(this, R.color.vlc_muted)
-        lineColor = ContextCompat.getColor(this, R.color.vlc_stroke)
+        lineColor = Themes.color(this, R.attr.castvStroke)   // [TEMAS-2]
 
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -114,7 +114,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(ContextCompat.getColor(this, R.color.vlc_bg))
+        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom)
@@ -153,7 +153,7 @@ class SettingsActivity : AppCompatActivity() {
         search.setHintTextColor(mutedColor)
         search.setPadding(dp(16), dp(10), dp(16), dp(10))
         val boxBg = GradientDrawable()
-        boxBg.setColor(ContextCompat.getColor(this, R.color.vlc_surface))
+        boxBg.setColor(Themes.color(this, R.attr.castvSurface))   // [TEMAS-2]
         boxBg.cornerRadius = dp(10).toFloat()
         search.background = boxBg
         search.addTextChangedListener(object : TextWatcher {
@@ -218,6 +218,9 @@ class SettingsActivity : AppCompatActivity() {
         val l = ArrayList<Entry>()
         l.add(Entry("Interfaz", "Tema", themeLabel(), { pickTheme() }))
         l.add(Entry("Interfaz", "Color de acento", accentNames[savedAccent()], { pickAccent() }))
+        l.add(Entry("Interfaz", "Fondo oscuro",   // [TEMAS-2]
+            Themes.bgNames[Themes.savedBg(this)] + (if (Themes.isNight(this)) "" else " · solo en modo oscuro"),
+            { pickBg() }))
 
         l.add(Entry("Subtítulos", "Tamaño", subSizeNames[stSize()],
             { pickSub("Tamaño", subSizeNames, stSize(), "style_size") }))
@@ -362,7 +365,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema y color de acento"
+        "Interfaz" -> "Tema, color de acento y fondo oscuro"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -516,6 +519,12 @@ class SettingsActivity : AppCompatActivity() {
     private fun pickAccent() {
         Themes.pick(this) {
             recreate()   // [TEMAS-1] esta pantalla se redibuja con el color; MainActivity lo hace al volver
+        }
+    }
+
+    private fun pickBg() {   // [TEMAS-2]
+        Themes.pickBg(this) {
+            recreate()   // esta pantalla se redibuja con el fondo; MainActivity lo hace al volver
         }
     }
 

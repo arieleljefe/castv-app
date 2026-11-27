@@ -207,7 +207,7 @@ class M3uActivity : AppCompatActivity() {
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(ContextCompat.getColor(this, R.color.vlc_bg))
+        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
         root.setPadding(dp(12), dp(16), dp(12), 0)
 
         // [PULIDO-3e] Encabezado: ← Canales (igual que Ajustes)

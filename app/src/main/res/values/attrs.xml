@@ -3,4 +3,10 @@
     <attr name="castvAccent" format="color"/>
     <attr name="castvAccentSoft" format="color"/>
     <attr name="castvPlayingBg" format="color"/>
+    <!-- [TEMAS-2] fondos: pantalla, superficie, superficie 2, barra inferior y línea -->
+    <attr name="castvBg" format="color"/>
+    <attr name="castvSurface" format="color"/>
+    <attr name="castvSurface2" format="color"/>
+    <attr name="castvNav" format="color"/>
+    <attr name="castvStroke" format="color"/>
 </resources>

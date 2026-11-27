@@ -2,12 +2,12 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape>
-            <solid android:color="@color/vlc_nav"/>
+            <solid android:color="?attr/castvNav"/>
         </shape>
     </item>
     <item android:top="1dp">
         <shape>
-            <solid android:color="@color/vlc_surface"/>
+            <solid android:color="?attr/castvSurface"/>
         </shape>
     </item>
 </layer-list>

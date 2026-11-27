@@ -44,4 +44,26 @@
     <color name="accent_indigo">#4F46E5</color>
     <color name="accent_indigo_soft">#334F46E5</color>
     <color name="accent_indigo_bg">#E0E0FC</color>
+    <!-- [TEMAS-2] Fondos del modo oscuro (la opción Medianoche usa los vlc_* de values-night) -->
+    <color name="bgs_midnight_surface">#FF131A22</color>
+    <color name="bgs_amoled_bg">#FF000000</color>
+    <color name="bgs_amoled_surface">#FF0A0A0A</color>
+    <color name="bgs_amoled_surface2">#FF151515</color>
+    <color name="bgs_amoled_nav">#FF121212</color>
+    <color name="bgs_amoled_stroke">#FF262626</color>
+    <color name="bgs_slate_bg">#FF16181D</color>
+    <color name="bgs_slate_surface">#FF1E2127</color>
+    <color name="bgs_slate_surface2">#FF272B33</color>
+    <color name="bgs_slate_nav">#FF2A2E36</color>
+    <color name="bgs_slate_stroke">#FF3A3F49</color>
+    <color name="bgs_forest_bg">#FF0A130F</color>
+    <color name="bgs_forest_surface">#FF101D17</color>
+    <color name="bgs_forest_surface2">#FF17291F</color>
+    <color name="bgs_forest_nav">#FF1B2F24</color>
+    <color name="bgs_forest_stroke">#FF2A4535</color>
+    <color name="bgs_wine_bg">#FF140A10</color>
+    <color name="bgs_wine_surface">#FF1F1119</color>
+    <color name="bgs_wine_surface2">#FF2B1824</color>
+    <color name="bgs_wine_nav">#FF33202C</color>
+    <color name="bgs_wine_stroke">#FF4A2D3E</color>
 </resources>

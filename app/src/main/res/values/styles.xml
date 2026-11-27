@@ -2,21 +2,27 @@
 <resources>
     <style name="Theme.Castv" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">?attr/castvAccent</item>
-        <item name="colorPrimaryDark">@color/vlc_bg</item>
+        <item name="colorPrimaryDark">?attr/castvBg</item>
         <item name="colorAccent">?attr/castvAccent</item>
         <item name="castvAccent">@color/accent_cyan</item>
         <item name="castvAccentSoft">@color/accent_cyan_soft</item>
         <item name="castvPlayingBg">@color/accent_cyan_bg</item>
-        <item name="android:windowBackground">@color/vlc_bg</item>
-        <item name="android:statusBarColor">@color/vlc_bg</item>
-        <item name="android:navigationBarColor">@color/vlc_surface</item>
+        <!-- [TEMAS-2] fondos por defecto (los de siempre); BgOverlay* los cambian en modo oscuro -->
+        <item name="castvBg">@color/vlc_bg</item>
+        <item name="castvSurface">@color/vlc_surface</item>
+        <item name="castvSurface2">@color/vlc_surface2</item>
+        <item name="castvNav">@color/vlc_nav</item>
+        <item name="castvStroke">@color/vlc_stroke</item>
+        <item name="android:windowBackground">?attr/castvBg</item>
+        <item name="android:statusBarColor">?attr/castvBg</item>
+        <item name="android:navigationBarColor">?attr/castvSurface</item>
         <!-- [PULIDO-1] Todos los AlertDialog de la app usan el estilo de abajo -->
         <item name="alertDialogTheme">@style/ThemeOverlay.Castv.Dialog</item>
     </style>
     <style name="ThemeOverlay.Castv.Dialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
         <item name="android:windowBackground">@drawable/bg_dialog</item>
-        <item name="android:colorBackgroundFloating">@color/vlc_surface</item>
-        <item name="colorSurface">@color/vlc_surface</item>
+        <item name="android:colorBackgroundFloating">?attr/castvSurface</item>
+        <item name="colorSurface">?attr/castvSurface</item>
         <item name="colorOnSurface">@color/vlc_text</item>
         <item name="android:textColorPrimary">@color/vlc_text</item>
         <item name="android:textColorSecondary">@color/vlc_muted</item>
@@ -70,5 +76,33 @@
         <item name="castvAccent">@color/accent_indigo</item>
         <item name="castvAccentSoft">@color/accent_indigo_soft</item>
         <item name="castvPlayingBg">@color/accent_indigo_bg</item>
+    </style>
+    <style name="BgOverlayAmoled">
+        <item name="castvBg">@color/bgs_amoled_bg</item>
+        <item name="castvSurface">@color/bgs_amoled_surface</item>
+        <item name="castvSurface2">@color/bgs_amoled_surface2</item>
+        <item name="castvNav">@color/bgs_amoled_nav</item>
+        <item name="castvStroke">@color/bgs_amoled_stroke</item>
+    </style>
+    <style name="BgOverlaySlate">
+        <item name="castvBg">@color/bgs_slate_bg</item>
+        <item name="castvSurface">@color/bgs_slate_surface</item>
+        <item name="castvSurface2">@color/bgs_slate_surface2</item>
+        <item name="castvNav">@color/bgs_slate_nav</item>
+        <item name="castvStroke">@color/bgs_slate_stroke</item>
+    </style>
+    <style name="BgOverlayForest">
+        <item name="castvBg">@color/bgs_forest_bg</item>
+        <item name="castvSurface">@color/bgs_forest_surface</item>
+        <item name="castvSurface2">@color/bgs_forest_surface2</item>
+        <item name="castvNav">@color/bgs_forest_nav</item>
+        <item name="castvStroke">@color/bgs_forest_stroke</item>
+    </style>
+    <style name="BgOverlayWine">
+        <item name="castvBg">@color/bgs_wine_bg</item>
+        <item name="castvSurface">@color/bgs_wine_surface</item>
+        <item name="castvSurface2">@color/bgs_wine_surface2</item>
+        <item name="castvNav">@color/bgs_wine_nav</item>
+        <item name="castvStroke">@color/bgs_wine_stroke</item>
     </style>
 </resources>

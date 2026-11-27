@@ -41,16 +41,11 @@ class AboutActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        theme.applyStyle(when (getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)) {
-            1 -> R.style.AccentOverlayGreen
-            2 -> R.style.AccentOverlayOrange
-            3 -> R.style.AccentOverlayPurple
-            else -> R.style.AccentOverlayCyan
-        }, true)
+        Themes.apply(this)   // [TEMAS-2] antes solo conocía 4 colores; ahora acento y fondo guardados
 
         txtColor = ContextCompat.getColor(this, R.color.vlc_text)
         mutedColor = ContextCompat.getColor(this, R.color.vlc_muted)
-        lineColor = ContextCompat.getColor(this, R.color.vlc_stroke)
+        lineColor = Themes.color(this, R.attr.castvStroke)   // [TEMAS-2]
 
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -62,7 +57,7 @@ class AboutActivity : AppCompatActivity() {
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(ContextCompat.getColor(this, R.color.vlc_bg))
+        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom)
@@ -180,7 +175,7 @@ class AboutActivity : AppCompatActivity() {
         c.orientation = LinearLayout.VERTICAL
         c.setPadding(dp(16), dp(14), dp(16), dp(14))
         val bg = GradientDrawable()
-        bg.setColor(ContextCompat.getColor(this, R.color.vlc_surface))
+        bg.setColor(Themes.color(this, R.attr.castvSurface))   // [TEMAS-2]
         bg.cornerRadius = dp(14).toFloat()
         bg.setStroke(dp(1), lineColor)
         c.background = bg

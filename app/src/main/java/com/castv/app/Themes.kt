@@ -2,9 +2,12 @@ package com.castv.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
+import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.TextView
@@ -15,6 +18,10 @@ import androidx.core.content.ContextCompat
  * [TEMAS-1] Colores de acento: la lista, el estilo de cada uno y el selector con bolitas de color.
  * Los números 0 a 3 son los de siempre (Cian, Verde, Naranja, Morado); los nuevos siguen del 4 al 9.
  * El color se guarda en la clave `accent` de las preferencias `castv`.
+ *
+ * [TEMAS-2] Fondos del modo oscuro: Medianoche (el de siempre), AMOLED, Pizarra, Bosque y Vino.
+ * Se guarda en la clave `bgstyle` de `castv`. En modo claro no se aplica. Las pantallas leen los
+ * colores de fondo con los atributos castvBg, castvSurface, castvSurface2, castvNav y castvStroke.
  */
 object Themes {
     val names = arrayOf(
@@ -38,15 +45,89 @@ object Themes {
         R.color.accent_mint, R.color.accent_indigo
     )
 
+    val bgNames = arrayOf("Medianoche", "AMOLED (negro)", "Pizarra", "Bosque", "Vino")
+
+    // 0 = Medianoche: no lleva estilo propio (usa los colores de values-night)
+    private val bgOverlays = intArrayOf(
+        0, R.style.BgOverlayAmoled, R.style.BgOverlaySlate,
+        R.style.BgOverlayForest, R.style.BgOverlayWine
+    )
+
+    private val bgSwatches = intArrayOf(
+        R.color.bgs_midnight_surface, R.color.bgs_amoled_surface, R.color.bgs_slate_surface,
+        R.color.bgs_forest_surface, R.color.bgs_wine_surface
+    )
+
+    fun isNight(c: Context): Boolean =
+        (c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+    /** Color que tiene ahora un atributo del tema (castvBg, castvSurface...). */
+    fun color(c: Context, attr: Int): Int {
+        val tv = TypedValue()
+        c.theme.resolveAttribute(attr, tv, true)
+        return tv.data
+    }
+
+    /** Fondo guardado (un valor fuera de rango vuelve a Medianoche). */
+    fun savedBg(a: Context): Int {
+        val v = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("bgstyle", 0)
+        return if (v in bgNames.indices) v else 0
+    }
+
     /** Acento guardado (un valor fuera de rango vuelve al Cian). */
     fun saved(a: Activity): Int {
         val v = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("accent", 0)
         return if (v in names.indices) v else 0
     }
 
-    /** Aplica el acento guardado al tema de la pantalla (llamar en onCreate). */
-    fun apply(a: Activity) {
+    /**
+     * Aplica el acento y el fondo guardados al tema de la pantalla (llamar en onCreate, después de
+     * super.onCreate). Con [paintWindow] en false (reproductor de video) no toca la ventana.
+     */
+    fun apply(a: Activity, paintWindow: Boolean = true) {
         a.theme.applyStyle(overlays[saved(a)], true)
+        val b = savedBg(a)
+        if (b != 0 && isNight(a)) {   // [TEMAS-2] Medianoche = sin cambios; en modo claro no se usa
+            a.theme.applyStyle(bgOverlays[b], true)
+            if (paintWindow) {
+                a.window.setBackgroundDrawable(ColorDrawable(color(a, R.attr.castvBg)))
+                a.window.statusBarColor = color(a, R.attr.castvBg)
+                a.window.navigationBarColor = color(a, R.attr.castvSurface)
+            }
+        }
+    }
+
+    /** [TEMAS-2] Diálogo con una bolita por fondo; al elegir guarda y llama a [onPicked]. */
+    fun pickBg(a: Activity, onPicked: () -> Unit) {
+        val cur = savedBg(a)
+        val dp = a.resources.displayMetrics.density
+        val adapter = object : ArrayAdapter<String>(a, 0, bgNames) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val tv = (convertView as? TextView) ?: TextView(a)
+                val dot = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(ContextCompat.getColor(a, bgSwatches[position]))
+                    setStroke((2 * dp).toInt(), ContextCompat.getColor(a, R.color.vlc_muted))
+                    setSize((28 * dp).toInt(), (28 * dp).toInt())
+                }
+                tv.text = if (position == cur) bgNames[position] + "  ✓" else bgNames[position]
+                tv.textSize = 16f
+                tv.setTextColor(ContextCompat.getColor(a, R.color.vlc_text))
+                tv.gravity = Gravity.CENTER_VERTICAL
+                tv.compoundDrawablePadding = (16 * dp).toInt()
+                tv.setCompoundDrawablesRelativeWithIntrinsicBounds(dot, null, null, null)
+                tv.setPadding((24 * dp).toInt(), (12 * dp).toInt(), (24 * dp).toInt(), (12 * dp).toInt())
+                return tv
+            }
+        }
+        AlertDialog.Builder(a)
+            .setTitle(if (isNight(a)) "Fondo oscuro" else "Fondo oscuro (solo se ve en modo oscuro)")
+            .setAdapter(adapter) { d, which ->
+                a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit().putInt("bgstyle", which).apply()
+                d.dismiss()
+                onPicked()
+            }
+            .show()
     }
 
     /** Diálogo con una bolita de color por opción; al elegir guarda y llama a [onPicked]. */

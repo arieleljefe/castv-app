@@ -327,6 +327,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Themes.apply(this)   // [TEMAS-1]
         accentAtStart = savedAccent()   // [UI-1b]
+        bgAtStart = Themes.savedBg(this)   // [TEMAS-2]
         setContentView(R.layout.activity_main)
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -1491,7 +1492,7 @@ class MainActivity : AppCompatActivity() {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding(0, dp(12), 0, dp(20))
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(col(R.color.vlc_surface))
+                setColor(Themes.color(this@MainActivity, R.attr.castvSurface))   // [TEMAS-2]
                 cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
             }
         }
@@ -2296,6 +2297,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
+        if (Themes.savedBg(this) != bgAtStart) { recreate(); return }   // [TEMAS-2] fondo cambiado en Ajustes
         updateIncogBadge()   // [INCOG-2]
         if (::adapter.isInitialized) {   // refresca "Continuar" (y "No vistos") al volver del reproductor
             if (onlyUnseen && !showingMusic) applyFilters() else adapter.notifyDataSetChanged()
@@ -3361,6 +3363,7 @@ class MainActivity : AppCompatActivity() {
     private val reqBackupIn = 4717    // [Respaldo JSON] importar
     private val reqSettings = 4718    // [UI-1b] pantalla Ajustes
     private var accentAtStart = 0     // [UI-1b] color con el que se dibujó esta pantalla
+    private var bgAtStart = 0         // [TEMAS-2] fondo con el que se dibujó esta pantalla
     private var selecting = false
     private val selectedIds = HashSet<Long>()
     private var actionMode: ActionMode? = null

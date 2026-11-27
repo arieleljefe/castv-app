@@ -198,12 +198,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        theme.applyStyle(when (getSharedPreferences("castv", MODE_PRIVATE).getInt("accent", 0)) {   // [UI-2d] color de acento
-            1 -> R.style.AccentOverlayGreen
-            2 -> R.style.AccentOverlayOrange
-            3 -> R.style.AccentOverlayPurple
-            else -> R.style.AccentOverlayCyan
-        }, true)
+        Themes.apply(this, false)   // [UI-2d] color de acento; [TEMAS-2] ahora los 10 colores y el fondo de los diálogos
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
         Store.init(this)

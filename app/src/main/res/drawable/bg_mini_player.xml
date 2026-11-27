@@ -7,7 +7,7 @@
     </item>
     <item android:top="2dp">
         <shape>
-            <solid android:color="@color/vlc_surface"/>
+            <solid android:color="?attr/castvSurface"/>
         </shape>
     </item>
 </layer-list>
