@@ -771,6 +771,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         fullDialog?.dismiss()   // [UI-3b]
         monitoring = false
         // [SERVICIO-1b] con música del teléfono sonando, la música sigue sin pantalla (PlayerCore); si no, se detiene como siempre
+        abReset()   // [AB-MUSICA-1] sin pantalla no hay A-B
         var handedOff = false
         val curSong = playingItem
         if (localActive && localPrepared && localPlayer != null && curSong != null && curSong.isMusic) {
@@ -3268,6 +3269,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     @Suppress("DEPRECATION")
     private fun stopLocal() {
+        abReset()   // [AB-MUSICA-1] cambiar de pista, detener o pasar al TV apaga el A-B
         val mp = localPlayer
         localPlayer = null
         localActive = false
@@ -3556,6 +3558,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             visibility = View.GONE
         }
         row2.addView(cutBtn)
+        val abBtn = txtBtn("A-B") { }.apply {   // [AB-MUSICA-1] los toques se ponen más abajo; solo se ve con música en el teléfono
+            textSize = 14f
+            visibility = View.GONE
+        }
+        row2.addView(abBtn)
         root.addView(row2, android.widget.LinearLayout.LayoutParams(lin, wrap).apply { topMargin = dp(8) })
 
         // [REMOTO-1a] Fila 3: silencio + volumen (reflejan y mandan lo mismo que el mini reproductor)
@@ -3702,6 +3709,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         lyrBtn.setOnClickListener { haptic(it); onLyrTap() }
         lyrBtn.setOnLongClickListener { onLyrMenu(); true }
         cutBtn.setOnClickListener { haptic(it); cutPlaying() }   // [CORTAR-1a]
+        fun paintAb() {   // [AB-MUSICA-1]
+            abBtn.text = when (abMode) { 0 -> "A-B"; 1 -> "A·"; else -> "A⇄B" }
+            abBtn.setTextColor(if (abMode == 0) col(R.color.vlc_text) else accentColor())
+            val it0 = playingItem
+            abBtn.visibility = if (it0 != null && it0.isMusic && localActive) View.VISIBLE else View.GONE
+        }
+        abBtn.setOnClickListener { haptic(it); abTap(); paintAb() }
         art.setOnClickListener { if (lyrDoc != null) showLyrics(true) }
         lyrScroll.setOnClickListener { showLyrics(false) }
 
@@ -3739,6 +3753,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 }
                 lyrBtn.visibility = if (lk != null) View.VISIBLE else View.GONE
                 cutBtn.visibility = if (curLy != null) View.VISIBLE else View.GONE   // [CORTAR-1a]
+                paintAb()   // [AB-MUSICA-1]
                 if (lyrDoc != null && lyrScroll.visibility == View.VISIBLE) {
                     var posMs = seekBar.progress * 1000
                     withLocal { posMs = it.currentPosition }
@@ -4038,6 +4053,65 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         actionMode?.finish()
         toast("➕ " + countText(added, "añadida", "añadidas") + " a la cola" +
             (if (skipped > 0) " · $skipped ya estaban" else ""))
+    }
+
+    // ------------------------------------------- [AB-MUSICA-1] Repetir un tramo (A-B) de la música del teléfono
+
+    private var abMode = 0      // 0 apagado · 1 marcado A · 2 repitiendo de A a B
+    private var abA = 0         // ms
+    private var abB = 0         // ms
+    private val abHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val abTick = object : Runnable {
+        override fun run() {
+            if (abMode != 2) return
+            val mp = localPlayer
+            if (!localActive || mp == null) { abReset(); return }
+            try { if (localPrepared && mp.currentPosition >= abB) seekMs(mp, abA) } catch (e: Exception) { }
+            abHandler.postDelayed(this, 80)
+        }
+    }
+
+    private fun seekMs(mp: MediaPlayer, ms: Int) {
+        if (Build.VERSION.SDK_INT >= 26) mp.seekTo(ms.toLong(), MediaPlayer.SEEK_CLOSEST) else mp.seekTo(ms)
+    }
+
+    private fun abReset() {
+        abMode = 0
+        abHandler.removeCallbacks(abTick)
+    }
+
+    /** Un toque en «A-B»: 1.º marca A (donde va ahora), 2.º marca B y repite el tramo, 3.º lo apaga. */
+    private fun abTap() {
+        val item = playingItem
+        if (item == null || !item.isMusic || !localActive || !localPrepared) {
+            toast("A-B solo funciona con música en el teléfono")
+            return
+        }
+        var pos = 0
+        withLocal { pos = it.currentPosition }
+        when (abMode) {
+            0 -> {
+                abA = pos
+                abMode = 1
+                toast("A marcado en ${fmt(pos / 1000)}. Toca A-B otra vez para marcar B")
+            }
+            1 -> {
+                if (pos < abA + 1000) {
+                    toast("B debe ir al menos 1 s después de A")
+                    return
+                }
+                abB = pos
+                abMode = 2
+                withLocal { seekMs(it, abA) }
+                abHandler.removeCallbacks(abTick)
+                abHandler.post(abTick)
+                toast("🔁 Repitiendo de ${fmt(abA / 1000)} a ${fmt(abB / 1000)}")
+            }
+            else -> {
+                abReset()
+                toast("A-B apagado")
+            }
+        }
     }
 
     // ------------------------------------------- [CORTAR-1a] Cortar audio de lo que suena
