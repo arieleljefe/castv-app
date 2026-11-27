@@ -502,6 +502,7 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 query = s?.toString()?.trim() ?: ""
+                if (query.isNotEmpty()) recentPop?.dismiss()   // [BUSQ-RECIENTES-1]
                 btnClearSearch.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
                 tvSearchChannels.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE   // [BUSCA-1]
                 tvSearchChannels.text = "📡 Buscar «$query» en Canales ›"
@@ -510,6 +511,7 @@ class MainActivity : AppCompatActivity() {
         })
         etSearch.setOnEditorActionListener { v, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                Store.addRecentSearch(query)   // [BUSQ-RECIENTES-1]
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
                     .hideSoftInputFromWindow(v.windowToken, 0)
                 v.clearFocus()
@@ -517,6 +519,9 @@ class MainActivity : AppCompatActivity() {
             } else false
         }
         btnClearSearch.setOnClickListener { etSearch.setText("") }
+        // [BUSQ-RECIENTES-1] Al tocar el buscador vacío salen las últimas búsquedas
+        etSearch.setOnClickListener { showRecentSearches() }
+        etSearch.setOnFocusChangeListener { _, has -> if (has) etSearch.post { showRecentSearches() } }
 
         btnNowFav.setOnClickListener {   // [FAV-REPRO-3] con un canal en el TV, la ★ marca el canal
             val cur = playingItem
@@ -1355,9 +1360,39 @@ class MainActivity : AppCompatActivity() {
         tab(tabResume, viewMode == ViewMode.LISTS)
     }
 
+    private var recentPop: android.widget.ListPopupWindow? = null
+
+    /** [BUSQ-RECIENTES-1] Lista flotante bajo el buscador con las últimas búsquedas y «Borrar historial». */
+    private fun showRecentSearches() {
+        if (searchBar.visibility != View.VISIBLE || etSearch.text.isNotEmpty()) return
+        val list = Store.recentSearches()
+        if (list.isEmpty()) return
+        recentPop?.dismiss()
+        val rows = list + "🗑 Borrar historial de búsquedas"
+        val pop = android.widget.ListPopupWindow(this)
+        pop.anchorView = etSearch
+        pop.setAdapter(android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, rows))
+        pop.isModal = true
+        pop.inputMethodMode = android.widget.ListPopupWindow.INPUT_METHOD_NEEDED
+        pop.setOnItemClickListener { _, _, pos, _ ->
+            pop.dismiss()
+            if (pos < list.size) {
+                etSearch.setText(list[pos])
+                etSearch.setSelection(etSearch.text.length)
+            } else {
+                Store.clearRecentSearches()
+                toast("Historial de búsquedas borrado")
+            }
+        }
+        recentPop = pop
+        try { pop.show() } catch (e: Exception) { recentPop = null }
+    }
+
     private fun toggleSearch() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         if (searchBar.visibility == View.VISIBLE) {
+            Store.addRecentSearch(etSearch.text.toString())   // [BUSQ-RECIENTES-1]
+            recentPop?.dismiss()
             etSearch.setText("")
             searchBar.visibility = View.GONE
             imm.hideSoftInputFromWindow(etSearch.windowToken, 0)

@@ -271,6 +271,32 @@ object Store {
 
     // ------------------------------------------------- Listas M3U
 
+    // ------------------------------------------------- [BUSQ-RECIENTES-1] Búsquedas recientes
+
+    /** Las últimas 8 búsquedas de la biblioteca. Van en castv_top (fuera de respaldos); el modo incógnito no las guarda. */
+    fun recentSearches(): List<String> {
+        val raw = topPrefs.getString("recentsearch", null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    fun addRecentSearch(q: String) {
+        val t = q.trim()
+        if (incognito || t.length < 2 || t.length > 60) return
+        val out = ArrayList<String>()
+        out.add(t)
+        for (s in recentSearches()) if (!s.equals(t, ignoreCase = true) && out.size < 8) out.add(s)
+        val arr = JSONArray()
+        for (s in out) arr.put(s)
+        topPrefs.edit().putString("recentsearch", arr.toString()).apply()
+    }
+
+    fun clearRecentSearches() {
+        topPrefs.edit().remove("recentsearch").apply()
+    }
+
     fun m3uLists(): List<M3uList> {
         val out = ArrayList<M3uList>()
         val raw = prefs.getString("m3u", null) ?: return out

@@ -332,6 +332,11 @@ class SettingsActivity : AppCompatActivity() {
         l.add(Entry("Historial", "Historial de enlaces",
             if (recentLinks == 0) "Vacío (los favoritos se conservan)"
             else "$recentLinks recientes (los favoritos se conservan)", onLinks))
+        val nSearch = Store.recentSearches().size   // [BUSQ-RECIENTES-1]
+        val onSearch: (() -> Unit)? = if (nSearch == 0) null else ({ confirmClearSearches(nSearch) })
+        l.add(Entry("Historial", "Búsquedas recientes",
+            if (nSearch == 0) "Vacío (salen al tocar el buscador de la biblioteca)"
+            else "$nSearch guardadas (tocar para borrarlas)", onSearch))
         val resumes = Store.resumeCount()
         val onResume: (() -> Unit)? = if (resumes == 0) null else ({ confirmClearResume(resumes) })
         l.add(Entry("Historial", "Continuar donde lo dejé",
@@ -388,7 +393,7 @@ class SettingsActivity : AppCompatActivity() {
         "Audio" -> "Ecualizador"
         "Control parental" -> "PIN de bloqueo"
         "Emisión al TV" -> "Salida al abrir, calidad en TV, TV detectada e IP del teléfono"
-        "Historial" -> "Enlaces, puntos guardados y canales ocultos"
+        "Historial" -> "Enlaces, búsquedas, puntos guardados y canales ocultos"
         "Almacenamiento" -> "Eliminado: papelera o permanente"
         "Avanzado" -> "Registro de la app y pruebas"
         "Actualizaciones" -> "Buscar versiones nuevas, instalarlas y avisos"
@@ -1582,6 +1587,20 @@ class SettingsActivity : AppCompatActivity() {
                 toast("Se aplica la próxima vez que abras la app")
                 render()
             }
+            .show()
+    }
+
+    /** [BUSQ-RECIENTES-1] Confirma antes de borrar las búsquedas guardadas. */
+    private fun confirmClearSearches(n: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("Borrar búsquedas recientes")
+            .setMessage("Se borran las $n búsquedas guardadas.")
+            .setPositiveButton("Borrar") { _, _ ->
+                Store.clearRecentSearches()
+                toast("Búsquedas borradas")
+                render()
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 
