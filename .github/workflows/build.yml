@@ -71,6 +71,9 @@ jobs:
             LAST=$(git tag --list 'v[0-9]*' | sort -V | tail -1)
             if [ -n "$LAST" ]; then
               echo "CASTV_VERSION_NAME=${LAST#v} (build ${{ github.run_number }})" >> $GITHUB_ENV
+              echo "CASTV_PUSH_APK=CASTV-${LAST}-build-${{ github.run_number }}.apk" >> $GITHUB_ENV
+            else
+              echo "CASTV_PUSH_APK=CASTV-build-${{ github.run_number }}.apk" >> $GITHUB_ENV
             fi
           fi
 
@@ -106,4 +109,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: CASTV-${{ github.ref_name }}.apk
+          generate_release_notes: true
+
+      # [RELEASE-PUSH-1] cada subida a main deja su propio Release (pre-release: "latest" sigue siendo la etiqueta v*)
+      - name: Preparar APK del build de main (RELEASE-PUSH-1)
+        if: github.ref == 'refs/heads/main'
+        run: cp app/build/outputs/apk/release/app-release.apk "$CASTV_PUSH_APK"
+
+      - name: Publicar Release del build de main (RELEASE-PUSH-1)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Build ${{ github.run_number }} (${{ env.CASTV_VERSION_NAME }})
+          prerelease: true
+          files: ${{ env.CASTV_PUSH_APK }}
           generate_release_notes: true
