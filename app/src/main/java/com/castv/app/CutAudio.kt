@@ -10,13 +10,18 @@ import android.os.Looper
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.content.Intent
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -36,6 +41,42 @@ object CutAudio {
      * en CASTV). `show` lo toma una sola vez y lo borra; si nadie lo pone, no se pausa nada.
      */
     @Volatile var pauseHook: (() -> Unit)? = null
+
+    /** [TONO-1] Nombres de los destinos, en el mismo orden que Mp3Converter.DEST_*. */
+    private val destLabels = arrayOf("Descargas", "Tonos de llamada", "Notificaciones", "Alarmas")
+
+    /** [TONO-1] Dónde se elige el sonido ya guardado (nombres de Android; pueden variar según la marca). */
+    private fun destHint(dest: Int): String = when (dest) {
+        Mp3Converter.DEST_RINGTONE -> "Para usarlo: Ajustes de Android › Sonido › Tono del teléfono."
+        Mp3Converter.DEST_NOTIFICATION -> "Para usarlo: Ajustes de Android › Sonido › Sonido de notificación."
+        else -> "Para usarlo: en la app Reloj, al editar una alarma › Sonido (o Ajustes de Android › Sonido)."
+    }
+
+    /** [TONO-1] Aviso al terminar un corte guardado como tono, notificación o alarma: Abrir / Compartir y dónde elegirlo. */
+    private fun offerTone(act: Activity, dest: Int, savedAs: String, uri: Uri?) {
+        if (act.isFinishing || act.isDestroyed) return
+        val b = AlertDialog.Builder(act)
+            .setTitle("✂️ Guardado en " + destLabels[dest])
+            .setMessage(savedAs + "\n\n" + destHint(dest))
+            .setNegativeButton("Cerrar", null)
+        if (uri != null) {
+            b.setPositiveButton("Abrir") { _, _ ->
+                try {
+                    act.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "audio/mpeg").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                } catch (e: Exception) {
+                    Toast.makeText(act.applicationContext, "No hay una app para abrirlo", Toast.LENGTH_SHORT).show()
+                }
+            }
+            b.setNeutralButton("Compartir") { _, _ ->
+                try {
+                    val send = Intent(Intent.ACTION_SEND).setType("audio/mpeg").putExtra(Intent.EXTRA_STREAM, uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    act.startActivity(Intent.createChooser(send, "Compartir"))
+                } catch (e: Exception) { }
+            }
+        }
+        b.show()
+    }
 
     /** [CORTAR-2] Vista previa del tramo: un MediaPlayer propio sobre el mismo archivo; salta al inicio y para al llegar al fin. */
     private class Preview(val act: Activity, val uri: Uri, val onStop: (Boolean) -> Unit) {
@@ -184,6 +225,26 @@ object CutAudio {
         val sbStart = addBar(0)
         val etEnd = row("Fin", fmt(durationMs))
         val sbEnd = addBar(maxSec)
+
+        // [TONO-1] «Guardar en»: solo para audio y con Android 10 o más (antes no hay MediaStore de sonidos)
+        var dest = Mp3Converter.DEST_DOWNLOADS
+        if (!video && Build.VERSION.SDK_INT >= 29) {
+            val dr = LinearLayout(act)
+            dr.orientation = LinearLayout.HORIZONTAL
+            dr.gravity = Gravity.CENTER_VERTICAL
+            val dl = TextView(act)
+            dl.text = "Guardar en"
+            dl.textSize = 16f
+            val sp = Spinner(act)
+            sp.adapter = ArrayAdapter(act, android.R.layout.simple_spinner_dropdown_item, destLabels)
+            sp.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, v: View?, position: Int, id: Long) { dest = position }
+                override fun onNothingSelected(parent: AdapterView<*>?) { }
+            }
+            dr.addView(dl, LinearLayout.LayoutParams(wrap, wrap))
+            dr.addView(sp, LinearLayout.LayoutParams(0, wrap, 1f).apply { leftMargin = dp(12) })
+            box.addView(dr, LinearLayout.LayoutParams(match, wrap))
+        }
         val res = TextView(act)
         res.textSize = 14f
         box.addView(res, LinearLayout.LayoutParams(match, wrap))
@@ -284,13 +345,13 @@ object CutAudio {
                 refresh()
             } else {
                 dlg.dismiss()
-                start(act, uri, name, r.first, r.second, video)
+                start(act, uri, name, r.first, r.second, video, dest)   // [TONO-1]
             }
         }
     }
 
     /** Corta [startMs]..[endMs] y lo guarda en Descargas; avance y Cancelar por notificación (o recuadro si están apagadas). */
-    fun start(act: Activity, uri: Uri, name: String, startMs: Long, endMs: Long, video: Boolean = false) {   // [CORTAR-1b]
+    fun start(act: Activity, uri: Uri, name: String, startMs: Long, endMs: Long, video: Boolean = false, dest: Int = Mp3Converter.DEST_DOWNLOADS) {   // [CORTAR-1b] [TONO-1] dest
         if (Mp3Converter.running.get() || LinkDownload.running.get()) {
             Toast.makeText(act.applicationContext, "Ya hay una conversión o descarga en curso", Toast.LENGTH_SHORT).show()
             return
@@ -323,7 +384,7 @@ object CutAudio {
                 }
                 val stop = { cancelFlag.get() || LinkJobNotifier.cancel }
                 if (video) VideoCut.cut(app, uri, name, startMs * 1000L, endMs * 1000L, prog, stop)   // [CORTAR-1b]
-                else Mp3Converter.convert(app, uri, name, prog, stop, startMs * 1000L, endMs * 1000L, " (corte)")
+                else Mp3Converter.convert(app, uri, name, prog, stop, startMs * 1000L, endMs * 1000L, " (corte)", dest)   // [TONO-1]
             } catch (e: Throwable) {
                 Mp3Converter.Result(false, "Error: " + e.javaClass.simpleName)
             }
@@ -340,9 +401,10 @@ object CutAudio {
                 } else if (res.ok) {
                     if (dlg != null || front) {
                         if (dlg == null) LinkJobNotifier.clear(app)
-                        SavedFile.offer(act, "✂️", res.savedAs, res.uri)
+                        if (!video && dest != Mp3Converter.DEST_DOWNLOADS) offerTone(act, dest, res.savedAs, res.uri)   // [TONO-1]
+                        else SavedFile.offer(act, "✂️", res.savedAs, res.uri)
                     } else {
-                        LinkJobNotifier.done(app, "✂️ Guardado en Descargas", res.savedAs, res.uri)
+                        LinkJobNotifier.done(app, "✂️ Guardado en " + (if (video) destLabels[0] else destLabels[dest]), res.savedAs, res.uri)   // [TONO-1]
                     }
                 } else {
                     if (dlg == null) LinkJobNotifier.done(app, "✂️ No se pudo completar", res.message, null)

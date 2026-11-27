@@ -28,6 +28,12 @@ object Mp3Converter {
 
     val running = AtomicBoolean(false)
 
+    // [TONO-1] a dónde va el MP3 (Android 10+; antes de eso siempre Descargas)
+    const val DEST_DOWNLOADS = 0
+    const val DEST_RINGTONE = 1
+    const val DEST_NOTIFICATION = 2
+    const val DEST_ALARM = 3
+
     private const val CHUNK = 4096   // cuadros por vuelta a LAME
 
     private fun toS16(f: Float): Short {
@@ -97,16 +103,30 @@ object Mp3Converter {
         }
     }
 
-    fun openSink(context: Context, displayName: String, mime: String = "audio/mpeg"): Sink {   // [VIDEO-MP3-1b] también lo usa LinkDownload
+    fun openSink(context: Context, displayName: String, mime: String = "audio/mpeg", dest: Int = DEST_DOWNLOADS): Sink {   // [VIDEO-MP3-1b] también lo usa LinkDownload; [TONO-1] dest
         if (Build.VERSION.SDK_INT >= 29) {
             val cr = context.contentResolver
             val cv = ContentValues()
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
             cv.put(MediaStore.MediaColumns.MIME_TYPE, mime)
-            cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            val audioDest = dest == DEST_RINGTONE || dest == DEST_NOTIFICATION || dest == DEST_ALARM
+            if (audioDest) {   // [TONO-1] colección de audio, carpeta y marca del tipo (sin permisos nuevos: el archivo lo crea CASTV)
+                cv.put(MediaStore.MediaColumns.RELATIVE_PATH, when (dest) {
+                    DEST_RINGTONE -> Environment.DIRECTORY_RINGTONES
+                    DEST_NOTIFICATION -> Environment.DIRECTORY_NOTIFICATIONS
+                    else -> Environment.DIRECTORY_ALARMS
+                })
+                cv.put(MediaStore.Audio.Media.TITLE, displayName.substringBeforeLast('.'))
+                cv.put(MediaStore.Audio.Media.IS_MUSIC, 0)
+                cv.put(MediaStore.Audio.Media.IS_RINGTONE, if (dest == DEST_RINGTONE) 1 else 0)
+                cv.put(MediaStore.Audio.Media.IS_NOTIFICATION, if (dest == DEST_NOTIFICATION) 1 else 0)
+                cv.put(MediaStore.Audio.Media.IS_ALARM, if (dest == DEST_ALARM) 1 else 0)
+            } else {
+                cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
             cv.put(MediaStore.MediaColumns.IS_PENDING, 1)
-            val u = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)
-                ?: throw IllegalStateException("No se pudo crear el archivo en Descargas")
+            val u = cr.insert(if (audioDest) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)
+                ?: throw IllegalStateException(if (audioDest) "No se pudo crear el archivo de sonido" else "No se pudo crear el archivo en Descargas")
             val s = cr.openOutputStream(u)
             if (s == null) {
                 try { cr.delete(u, null, null) } catch (e: Exception) { }
@@ -145,7 +165,8 @@ object Mp3Converter {
         isCancelled: () -> Boolean,
         startUs: Long = 0L,      // [CORTAR-1a] inicio del tramo en microsegundos (0 = desde el principio)
         endUs: Long = -1L,       // [CORTAR-1a] fin del tramo en microsegundos (<= 0 = hasta el final)
-        suffix: String = ""      // [CORTAR-1a] se agrega al nombre y al título ID3, p. ej. « (corte)»
+        suffix: String = "",     // [CORTAR-1a] se agrega al nombre y al título ID3, p. ej. « (corte)»
+        dest: Int = DEST_DOWNLOADS   // [TONO-1] Descargas, Tonos de llamada, Notificaciones o Alarmas
     ): Result {
         if (!running.compareAndSet(false, true)) return Result(false, "Ya hay una conversión en curso")
         val title = cleanTitle(videoName) + suffix
@@ -183,7 +204,7 @@ object Mp3Converter {
             dec.configure(fmt, null, null, 0)
             dec.start()
 
-            val s = openSink(context, "$title.mp3")
+            val s = openSink(context, "$title.mp3", dest = dest)   // [TONO-1]
             sink = s
 
             val info = MediaCodec.BufferInfo()
