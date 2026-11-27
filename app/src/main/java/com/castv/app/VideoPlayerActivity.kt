@@ -1150,6 +1150,8 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (cutVidIdx >= 0) labels.add("✂️ Cortar video…")
         val splitIdx = if (mp3Idx >= 0) labels.size else -1   // [DIVIDIR-1] «Dividir por tamaño…» (mismos videos que «Cortar video…»)
         if (splitIdx >= 0) labels.add("📦 Dividir por tamaño…")
+        val reduceIdx = if (mp3Idx >= 0) labels.size else -1   // [REDUCIR-1] «Reducir peso…» (mismos videos que «Dividir»)
+        if (reduceIdx >= 0) labels.add("📉 Reducir peso…")
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
         if (ch != null && Epg.nowNext(ch) != null) labels.add(CastvIcons.item(ic, R.drawable.ic_event, "Guía: ahora y lo que sigue"))
         b
@@ -1160,7 +1162,7 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     2 -> showSleepMenu()
                     3 -> showToolsMenu()
                     4 -> showSubtitleMenu()
-                    else -> if (which == mp3Idx) startMp3() else if (which == cutIdx) startCut(false) else if (which == cutVidIdx) startCut(true) else if (which == splitIdx) startSplit() else showGuideNow()   // [VIDEO-MP3-1] / [CORTAR-1a/1b] / [DIVIDIR-1] / [EPG-1]
+                    else -> if (which == mp3Idx) startMp3() else if (which == cutIdx) startCut(false) else if (which == cutVidIdx) startCut(true) else if (which == splitIdx) startSplit() else if (which == reduceIdx) startReduce() else showGuideNow()   // [VIDEO-MP3-1] / [CORTAR-1a/1b] / [DIVIDIR-1] / [REDUCIR-1] / [EPG-1]
                 }
             }
             .show()
@@ -1189,6 +1191,13 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val cur = items.getOrNull(index) ?: return
         if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
         VideoSplit.show(this, Uri.parse(cur.uriString), cur.name)
+    }
+
+    /** [REDUCIR-1] Recodifica el video actual para que pese cerca de un objetivo en MB (pierde algo de calidad). */
+    private fun startReduce() {
+        val cur = items.getOrNull(index) ?: return
+        if (cur.id == 0L) { toast("Solo videos del teléfono"); return }
+        VideoReduce.show(this, Uri.parse(cur.uriString), cur.name)
     }
 
     // ------------------------------------------------------------ [VIDEO-MP3-1] Convertir a MP3
