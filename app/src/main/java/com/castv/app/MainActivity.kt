@@ -3314,7 +3314,20 @@ class MainActivity : AppCompatActivity() {
         navQueue.compoundDrawableTintList = ColorStateList.valueOf(c)
     }
 
-    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private var lastToast: Toast? = null   // [AVISO-COLA-1] el último aviso, para quitarlo al salir de esta pantalla
+
+    private fun toast(msg: String) {
+        val t = Toast.makeText(this, msg, Toast.LENGTH_SHORT)
+        lastToast = t
+        t.show()
+    }
+
+    /** [AVISO-COLA-1] Un aviso (ej. «La cola está vacía…») no se queda encima de otra pantalla (Ajustes, reproductor de video…). */
+    override fun onPause() {
+        lastToast?.cancel()
+        lastToast = null
+        super.onPause()
+    }
 
     /** Guarda el punto de reproducción de videos largos / mezclas de audio. */
     private fun saveProgress() {
