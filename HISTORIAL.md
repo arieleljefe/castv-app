@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v494
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v495
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -44,6 +44,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - OCULTAR-1 · 19 nov · quitar/restaurar canales · AVISO-HLS y AVISO-HLS-2 · aviso si el canal no se puede preparar.
 - GRUPOS-1 + PULIDO-3 · 19 nov · grupos en español, etiquetas, icono sin logo · `M3uActivity.kt`.
 - RED-1/RED-1b · 19 nov · aviso con datos móviles · `MainActivity.kt`, `M3uActivity.kt`.
+- DESHACER-UNIR-1 · 27 nov · «Unir repetidos» de ★ Favs da 10 s para DESHACER: devuelve favoritos, nombres, grupos, fechas, orden, notas y respaldos (foto de `chfav`, `chfavmeta`, `chnotes`, `chalts`); si en esos 10 s se cambia otro favorito, también se revierte · `Store.kt`, `M3uActivity.kt`
 
 ## Interfaz y Ajustes
 - VOCABULARIO-1 · 23 nov · lista de referencia de términos y diferencias de texto de la app, sin cambiar código · `VOCABULARIO.md`.
@@ -65,6 +66,7 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VERSION-4 · 27 nov · los builds de `main` se llaman «última etiqueta (build N)» (ej. `3.21 (build 363)`; con etiqueta, solo el número); el código de versión sigue siendo el número de ejecución · `.github/workflows/build.yml`
 - VERSION-5 · 27 nov · la cabecera de Principal muestra solo el número (`3.21`); Acerca de y Ajustes › Actualizaciones siguen con `(build N)` · `MainActivity.kt`
 - TEMAS-2 · 27 nov · fondos del modo oscuro: Medianoche (el de siempre), AMOLED, Pizarra, Bosque y Vino en Ajustes › Interfaz › «Fondo oscuro» (clave `bgstyle`; en modo claro no se aplica); atributos `castvBg/Surface/Surface2/Nav/Stroke` y estilos `BgOverlay*`; arregla que Acerca de y el reproductor de video solo conocían 4 acentos · `Themes.kt`, `styles.xml`, `attrs.xml`, `colors.xml`, 8 drawables, `activity_main.xml`, 6 Kotlin (commit `d05b3f6`)
+- LISTAS-1 · 27 nov · menú de una lista (mantener pulsada en Audio › LISTAS): Abrir, ▶ Reproducir, 🔀 Mezclar, ➕ Añadir a la cola, ✏ Renombrar y Quitar lista (ahora con confirmación); `Store.renameList` conserva el lugar y las pistas; el orden de reproducir es el de Ordenar · `Store.kt`, `MainActivity.kt`
 
 ## Reproductor de video
 - Gestos (17 nov), GESTO-1/GESTO-2/NOVEDADES-1, GESTOS-AJ-1 · 19 nov · deslizar para adelantar, mantener pulsado (velocidad rápida), doble toque al centro, zoom con pellizco, guardar brillo, temporizador de apagado, "Qué hay de nuevo" · `VideoPlayerActivity.kt`.
