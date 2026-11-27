@@ -81,6 +81,11 @@
                 android:resource="@xml/widget_favs_info" />
         </receiver>
 
+        <!-- [CANAL-HORA-1] aviso de un canal a una hora elegida -->
+        <receiver
+            android:name=".ChannelAlarmReceiver"
+            android:exported="false" />
+
         <!-- [EPG-RECORDA-1] avisos de programas («⏰ Avisarme» en la guía del reproductor) -->
         <receiver
             android:name=".ReminderReceiver"

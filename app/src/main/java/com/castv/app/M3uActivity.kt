@@ -1912,6 +1912,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }   // [ENVIAR-CANAL-1]
         opts.add("📌 Añadir al inicio"); acts.add { pinShortcut(c) }   // [ACCESO-1]
         opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
+        if (alarmAllowed(c)) { opts.add(alarmLabel(c)); acts.add { alarmMenu(c) } }   // [CANAL-HORA-1]
         opts.add("🔁 Buscar otra fuente…"); acts.add { findAltSource(c) }   // [FUENTE-ALT-1]
         opts.add("🛟 Respaldos (${Store.chAlts(c.url).size})…"); acts.add { showAlts(c) }   // [FUENTES-FAV-1]
         opts.add("📁 Mover a grupo…"); acts.add { pickFavGroup(c) }   // [FAV-GRUPOS-1]
@@ -1937,13 +1938,48 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun channelMenu(i: Int) {
         if (i !in shown.indices) return
         val c = shown[i]
+        val opts = ArrayList<String>()
+        val acts = ArrayList<() -> Unit>()
+        opts.add("↗ Compartir canal"); acts.add { shareChannel(c) }
+        opts.add(noteLabel(c)); acts.add { editNote(c) }   // [NOTA-CANAL-1]
+        if (alarmAllowed(c)) { opts.add(alarmLabel(c)); acts.add { alarmMenu(c) } }   // [CANAL-HORA-1]
+        opts.add("🔁 Buscar otra fuente…"); acts.add { findAltSource(c) }   // [FUENTE-ALT-1]
+        opts.add("Ocultar…"); acts.add { confirmHide(c) }
         AlertDialog.Builder(this)
             .setTitle(c.name)
-            .setItems(arrayOf("↗ Compartir canal", noteLabel(c), "🔁 Buscar otra fuente…", "Ocultar…")) { _, which ->
-                when (which) { 0 -> shareChannel(c); 1 -> editNote(c); 2 -> findAltSource(c); else -> confirmHide(c) }   // [NOTA-CANAL-1] [FUENTE-ALT-1]
-            }
+            .setItems(opts.toTypedArray()) { _, which -> if (which in acts.indices) acts[which]() }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ------------------------------------------------------------ [CANAL-HORA-1] Avisarme a una hora
+
+    /** No se ofrece para canales con usuario y clave (Xtream): el enlace se guardaría en el archivo de avisos (R9). */
+    private fun alarmAllowed(c: M3uChannel): Boolean = !(Xtream.isXtream(c.url) || Xtream.leakFilter(this)(c.url))
+
+    private fun alarmHhmm(at: Long): String = "%tR".format(java.util.Date(at))
+
+    private fun alarmLabel(c: M3uChannel): String {
+        val a = ChannelAlarm.find(this, c.url)
+        return if (a == null) "⏰ Avisarme a una hora…" else "⏰ Aviso a las ${alarmHhmm(a.at)} (quitar)"
+    }
+
+    /** Sin aviso: pide la hora (si ya pasó hoy, es mañana). Con aviso: lo quita. */
+    private fun alarmMenu(c: M3uChannel) {
+        if (!alarmAllowed(c)) return
+        val cur = ChannelAlarm.find(this, c.url)
+        if (cur != null) { ChannelAlarm.cancel(this, cur.id); toast("⏰ Aviso quitado"); return }
+        val now = java.util.Calendar.getInstance()
+        android.app.TimePickerDialog(this, { _, h, m ->
+            val t = java.util.Calendar.getInstance()
+            t.set(java.util.Calendar.HOUR_OF_DAY, h); t.set(java.util.Calendar.MINUTE, m)
+            t.set(java.util.Calendar.SECOND, 0); t.set(java.util.Calendar.MILLISECOND, 0)
+            if (t.timeInMillis <= System.currentTimeMillis() + 30000L) t.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            val tomorrow = t.get(java.util.Calendar.DAY_OF_YEAR) != java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+            if (ChannelAlarm.schedule(this, c.url, c.name, t.timeInMillis))
+                toast("⏰ Te aviso " + (if (tomorrow) "mañana " else "") + "a las " + alarmHhmm(t.timeInMillis))
+            else toast("No se pudo programar el aviso (máximo 20)")
+        }, now.get(java.util.Calendar.HOUR_OF_DAY), now.get(java.util.Calendar.MINUTE), android.text.format.DateFormat.is24HourFormat(this)).show()
     }
 
     // ------------------------------------------------------------ [FUENTE-ALT-1] Buscar otra fuente de un canal
