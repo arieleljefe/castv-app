@@ -3106,7 +3106,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             } else {
                 star.text = if (on) "★" else "☆"
                 star.setTextColor(if (on) accent() else mutedColor)
-                star.setOnClickListener { toggleFav(c) }
+                star.setOnClickListener { toggleFav(c); if (favs.contains(c.url)) StarPop.pop(it) }   // [ANIM-1]
             }
             v.setBackgroundColor(if (sel) ((accent() and 0x00FFFFFF) or 0x33000000) else dragBg(position))   // [FAV-ARRASTRAR-1]
             logo.visibility = View.VISIBLE

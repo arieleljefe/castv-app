@@ -535,6 +535,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         btnNowFav.setOnClickListener {   // [FAV-REPRO-3] con un canal en el TV, la ★ marca el canal
             val cur = playingItem
             if (cur != null) toggleFav(cur) else tvChannelNow()?.let { ch -> toggleTvChannelFav(ch) }
+            if (btnNowFav.text.toString() == "★") StarPop.pop(btnNowFav)   // [ANIM-1]
         }
         btnPlay.setOnClickListener {
             if (playingItem == null && !linkOnTv) step(+1) else togglePlayPause()
@@ -3403,8 +3404,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             findViewById<View>(R.id.btnStop).performClick()
             dlg.dismiss()
         })
-        val fav = txtBtn("☆") { btnNowFav.performClick() }.apply { textSize = 24f }
+        val fav = txtBtn("☆") { }.apply { textSize = 24f }
         row2.addView(fav)
+        fav.setOnClickListener {   // [ANIM-1] igual que antes (vibración + ★ del mini reproductor), y la ★ grande también «late»
+            haptic(it)
+            btnNowFav.performClick()
+            if (btnNowFav.text.toString() == "★") StarPop.pop(fav)
+        }
         val auto = imgBtn(R.drawable.ic_repeat, "Auto-avance", 48) { btnAuto.performClick() }
         row2.addView(auto)
         val lyrBtn = txtBtn("🎤") { }.apply {   // [LRC-1] los toques se ponen más abajo, cuando ya existen las funciones de la letra

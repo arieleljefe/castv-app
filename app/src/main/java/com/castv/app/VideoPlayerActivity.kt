@@ -1295,6 +1295,7 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val on = Store.toggleChFav(c.url)
         if (on) Store.rememberChFav(c) else Store.forgetChFav(c.url)   // igual que en la lista de canales
         refreshFavChip()
+        if (on) StarPop.pop(favChip)   // [ANIM-1]
         toast(if (on) "★ En Favoritos: " + c.name else "☆ Quitado de Favoritos")
     }
 
