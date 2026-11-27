@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v512
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v514
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -205,3 +205,11 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - AVISO-COLA-1 · 27 nov · `MainActivity.toast()` guarda el último aviso y `onPause()` lo cancela, así «La cola está vacía…» no se ve dentro de Ajustes ni del reproductor · `MainActivity.kt` (`lastToast`, `toast`, `onPause`)
 - TAG-3.24 · 27 nov · etiqueta `v3.24` publicada e instalada desde Ajustes › Actualizaciones; incluye IMPORTAR-GRUPO-1, ACCESO-4, FAV-ARRASTRAR-1, BUSCAR-X-1 y AVISO-COLA-1
 - TEXTO-TAM-1 · 27 nov · Ajustes › Interfaz › «Tamaño del texto» (Pequeño ×0,9 · Normal = el del sistema · Grande ×1,15) para Principal, Ajustes, Canales, reproductor de video y Acerca de; clase base `CastvActivity` y `CastvTextSize`; clave `text_size` en `castv`; arreglos de llave TEXTO-TAM-1b y 1c · `CastvUtils.kt`, `SettingsActivity.kt`, `MainActivity.kt`, `M3uActivity.kt`, `VideoPlayerActivity.kt`, `AboutActivity.kt`
+- LRC-1 · 27 nov · «Reproduciendo»: botón 🎤 (carátula ↔ letra `.lrc` sincronizada, línea que suena resaltada y con desplazamiento solo; el `.lrc` se elige con el selector del sistema y se guarda en `files/lrc/`, fuera de respaldos; pulsación larga = otro archivo o quitar) · `Lrc.kt` (nuevo), `MainActivity.kt`
+- COMPACTO-1 · 27 nov · Ajustes › Interfaz › «Filas compactas» (clave `compact`, `CastvCompact`): filas más bajas en Pistas, Videos y Canales · `CastvUtils.kt`, `item_file.xml`, `MainActivity.kt`, `M3uActivity.kt`, `SettingsActivity.kt`
+- RELEASE-PUSH-1 · 27 nov · cada subida a `main` publica un Release `build-<N>` marcado Pre-release con su APK (el actualizador de la app solo ve las etiquetas `v*`) · `.github/workflows/build.yml`
+- BUSQ-RECIENTES-1 · 27 nov · al tocar el buscador salen las últimas 8 búsquedas, con opción de borrarlas (clave `recentsearch` en `castv_top`, fuera de respaldos; incógnito no guarda) · `Store.kt`, `MainActivity.kt`, `SettingsActivity.kt`
+- VIBRA-1 · 27 nov · vibración suave en ▶, ⏮ ⏭ y ★, con interruptor en Ajustes › Interfaz (clave `haptic`) · `MainActivity.kt`, `SettingsActivity.kt`
+- TITULO-BAL-1 · 27 nov · títulos largos de Pistas y «Reproduciendo» repartidos en líneas parejas (`BREAK_STRATEGY_BALANCED`) · `MainActivity.kt`
+- MINI-GESTOS-1 · 27 nov · en el mini reproductor, ← siguiente, → anterior, ↑ abre el panel, ↓ lo cierra · `MainActivity.kt`
+- UI-ART-1 · 27 nov · «Reproduciendo»: fondo y barras toman el color dominante de la carátula · `MainActivity.kt`
