@@ -31,7 +31,7 @@ import kotlin.concurrent.thread
 
 /**
  * [DIVIDIR-1] Parte un video del teléfono en varios .mp4 que pesan menos de un tope en MB (p. ej. 28 MB para subirlos
- * a sitios con límite), SIN recodificar (MediaExtractor + MediaMuxer): rápido y sin pérdida de calidad. Los cortes caen
+ * a sitios con límite) o en partes de una duración elegida [DIVIDIR-2], SIN recodificar (MediaExtractor + MediaMuxer): rápido y sin pérdida de calidad. Los cortes caen
  * en fotogramas clave, así las partes quedan seguidas, sin huecos ni solapes. Primero se suma el peso real de cada
  * muestra para decidir dónde cortar (con ~3 % de margen por el contenedor .mp4) y luego se escribe cada parte.
  * Usa el mismo candado (Mp3Converter.running), destino (Mp3Converter.openSink) y avisos (LinkJobNotifier) que VideoCut.
@@ -147,6 +147,70 @@ object VideoSplit {
         } finally {
             try { ex.release() } catch (e: Exception) { }
         }
+    }
+
+    /**
+     * [DIVIDIR-2] Cortes por duración: cada parte dura cerca de [segUs] microsegundos. Corta en el ÚLTIMO fotograma
+     * clave que no pasa de ese tiempo; si entre dos fotogramas clave hay más que [segUs], corta en el siguiente.
+     * Solo mira los fotogramas del video (no lee el audio). No sabe el peso de cada parte ([Part.estBytes] = 0).
+     */
+    fun planByTime(context: Context, src: Uri, segUs: Long, isCancelled: () -> Boolean): Plan? {
+        val ex = MediaExtractor()
+        try {
+            ex.setDataSource(context, src, null)
+            var videoTrack = -1
+            for (i in 0 until ex.trackCount) {
+                val mt = ex.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
+                if (mt.startsWith("video/") && videoTrack < 0) videoTrack = i
+            }
+            if (videoTrack < 0) return null
+            ex.selectTrack(videoTrack)
+            val parts = ArrayList<Part>()
+            var partStart = -1L   // fotograma clave donde empieza la parte en curso
+            var cand = -1L        // último fotograma clave que aún cabe en la parte en curso
+            var lastT = 0L
+            while (true) {
+                if (isCancelled()) return null
+                if (ex.sampleTrackIndex < 0) break
+                val t = ex.sampleTime
+                if (t < 0L) break
+                if (t > lastT) lastT = t
+                if ((ex.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                    if (partStart < 0L) {
+                        partStart = 0L
+                    } else {
+                        while (t - partStart > segUs) {
+                            val cut = if (cand > partStart) cand else t
+                            parts.add(Part(partStart, cut, 0L))
+                            partStart = cut
+                            cand = -1L
+                        }
+                        if (t > partStart) cand = t
+                    }
+                }
+                if (!ex.advance()) break
+            }
+            if (partStart < 0L) return null
+            parts.add(Part(partStart, -1L, 0L))
+            return Plan(parts, false, lastT)
+        } catch (e: Throwable) {
+            return null
+        } finally {
+            try { ex.release() } catch (e: Exception) { }
+        }
+    }
+
+    private fun durationMs(context: Context, src: Uri): Long = try {
+        val mr = MediaMetadataRetriever()
+        try {
+            mr.setDataSource(context, src)
+            mr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: -1L
+        } finally { try { mr.release() } catch (e: Exception) { } }
+    } catch (e: Exception) { -1L }
+
+    private fun fmtTime(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0L)
+        return (s / 60).toString() + ":" + (s % 60).toString().padStart(2, '0')
     }
 
     // ------------------------------------------------------------ Escribir una parte
@@ -297,17 +361,19 @@ object VideoSplit {
         src: Uri,
         videoName: String,
         limitBytes: Long,
+        segUs: Long,   // [DIVIDIR-2] > 0 = dividir por duración (limitBytes no se usa)
         onStatus: (String, Int) -> Unit,
         isCancelled: () -> Boolean
     ): SplitResult {
         if (!Mp3Converter.running.compareAndSet(false, true)) return SplitResult(false, "Ya hay una conversión en curso")
         try {
             onStatus("Calculando las partes…", -1)
-            val plan = plan(context, src, limitBytes, isCancelled)
+            val plan = if (segUs > 0L) planByTime(context, src, segUs, isCancelled) else plan(context, src, limitBytes, isCancelled)
             if (isCancelled()) return SplitResult(false, "Cancelado", cancelled = true)
             if (plan == null) return SplitResult(false, "No se pudo leer este video (¿tiene imagen?)")
             val total = plan.parts.size
-            if (total < 2) return SplitResult(false, "Ya pesa menos de ese tope: no hace falta dividirlo")
+            if (total < 2) return SplitResult(false, if (segUs > 0L) "Ya dura menos que eso: no hace falta dividirlo" else "Ya pesa menos de ese tope: no hace falta dividirlo")
+            if (total > 100) return SplitResult(false, "Saldrían $total partes (el máximo es 100): elige un tope o una duración mayor")
             val rot = rotationOf(context, src)
             val base = Mp3Converter.cleanTitle(videoName)
             val width = total.toString().length
@@ -330,7 +396,7 @@ object VideoSplit {
                 names.add(o.name)
                 sizes.add(o.size)
                 if (o.uri != null) uris.add(o.uri)
-                if (o.size > limitBytes) over = true
+                if (segUs <= 0L && o.size > limitBytes) over = true
             }
             return SplitResult(true, "OK", names, sizes, uris, over = over)
         } catch (e: Throwable) {
@@ -342,7 +408,7 @@ object VideoSplit {
 
     // ------------------------------------------------------------ Pantalla
 
-    /** Recuadro para elegir el tope (MB); al aceptar, divide el video [uri]. */
+    /** Recuadro para elegir cómo dividir [uri]: por tamaño (tope en MB) o por duración (segundos por parte). */
     fun show(act: Activity, uri: Uri, name: String) {
         if (act.isFinishing || act.isDestroyed) return
         if (Mp3Converter.running.get() || LinkDownload.running.get()) {
@@ -354,6 +420,7 @@ object VideoSplit {
             Toast.makeText(act.applicationContext, "No pude leer el peso de este video", Toast.LENGTH_SHORT).show()
             return
         }
+        val durMs = durationMs(act.applicationContext, uri)
         val dens = act.resources.displayMetrics.density
         fun dp(v: Int): Int = (v * dens).toInt()
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -363,9 +430,18 @@ object VideoSplit {
         box.orientation = LinearLayout.VERTICAL
         box.setPadding(dp(20), dp(8), dp(20), dp(4))
 
+        var byTime = false   // [DIVIDIR-2] false = por tamaño (como DIVIDIR-1)
+        val modes = LinearLayout(act)
+        modes.orientation = LinearLayout.HORIZONTAL
+        val btSize = Button(act)
+        btSize.text = "Por tamaño"
+        val btTime = Button(act)
+        btTime.text = "Por duración"
+        modes.addView(btSize, LinearLayout.LayoutParams(0, wrap, 1f))
+        modes.addView(btTime, LinearLayout.LayoutParams(0, wrap, 1f))
+        box.addView(modes, LinearLayout.LayoutParams(match, wrap))
+
         val info = TextView(act)
-        info.text = "Peso del video: " + fmtMb(total) + "\nCada parte pesará menos del tope (1 MB = 1.000.000 bytes). " +
-            "Sin recodificar: no pierde calidad, pero tampoco se hace más liviano; solo se parte en fotogramas clave."
         info.textSize = 14f
         box.addView(info, LinearLayout.LayoutParams(match, wrap))
 
@@ -373,10 +449,8 @@ object VideoSplit {
         row.orientation = LinearLayout.HORIZONTAL
         row.gravity = Gravity.CENTER_VERTICAL
         val lb = TextView(act)
-        lb.text = "Tope en MB"
         lb.textSize = 16f
         val et = EditText(act)
-        et.setText("28")
         et.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         et.setSingleLine(true)
         et.setSelectAllOnFocus(true)
@@ -386,12 +460,6 @@ object VideoSplit {
 
         val chips = LinearLayout(act)
         chips.orientation = LinearLayout.HORIZONTAL
-        for (v in intArrayOf(10, 25, 28, 49)) {
-            val bt = Button(act)
-            bt.text = v.toString()
-            bt.setOnClickListener { et.setText(v.toString()) }
-            chips.addView(bt, LinearLayout.LayoutParams(0, wrap, 1f))
-        }
         box.addView(chips, LinearLayout.LayoutParams(match, wrap))
 
         val res = TextView(act)
@@ -402,35 +470,91 @@ object VideoSplit {
             val v = et.text.toString().trim().replace(',', '.').toDoubleOrNull() ?: return null
             return if (v >= 1.0) (v * 1_000_000.0).toLong() else null
         }
+        fun secs(): Double? {
+            val v = et.text.toString().trim().replace(',', '.').toDoubleOrNull() ?: return null
+            return if (v >= 5.0) v else null
+        }
         fun refresh() {
-            val lim = limit()
-            res.text = if (lim == null) "Escribe un tope de 1 MB o más."
-            else if (total <= (lim * MARGIN).toLong()) "Este video ya pesa menos de ese tope: no hace falta dividirlo."
-            else "Saldrán unas " + Math.ceil(total / (lim * MARGIN)).toInt() + " partes de menos de " + fmtMb(lim) + " (cálculo aproximado)."
+            if (!byTime) {
+                val lim = limit()
+                res.text = if (lim == null) "Escribe un tope de 1 MB o más."
+                else if (total <= (lim * MARGIN).toLong()) "Este video ya pesa menos de ese tope: no hace falta dividirlo."
+                else "Saldrán unas " + Math.ceil(total / (lim * MARGIN)).toInt() + " partes de menos de " + fmtMb(lim) + " (cálculo aproximado)."
+            } else {
+                val sec = secs()
+                res.text = if (sec == null) "Escribe 5 segundos o más."
+                else if (durMs <= 0L) "No pude leer la duración: se calculará al dividir."
+                else if (durMs <= (sec * 1000.0).toLong()) "Este video dura menos que eso: no hace falta dividirlo."
+                else "Saldrán unas " + Math.ceil(durMs / (sec * 1000.0)).toInt() + " partes de unos " + sec.toLong() + " s (cálculo aproximado)."
+            }
+        }
+        fun setMode(t: Boolean) {
+            byTime = t
+            btSize.isEnabled = t
+            btTime.isEnabled = !t
+            chips.removeAllViews()
+            if (!t) {
+                info.text = "Peso del video: " + fmtMb(total) + "\nCada parte pesará menos del tope (1 MB = 1.000.000 bytes). " +
+                    "Sin recodificar: no pierde calidad, pero tampoco se hace más liviano; solo se parte en fotogramas clave."
+                lb.text = "Tope en MB"
+                et.setText("28")
+                for (v in intArrayOf(10, 25, 28, 49)) {
+                    val bt = Button(act)
+                    bt.text = v.toString()
+                    bt.setOnClickListener { et.setText(v.toString()) }
+                    chips.addView(bt, LinearLayout.LayoutParams(0, wrap, 1f))
+                }
+            } else {
+                info.text = (if (durMs > 0L) "Duración del video: " + fmtTime(durMs) + "\n" else "") +
+                    "Cada parte durará cerca de lo que elijas; los cortes caen en fotogramas clave y pueden variar unos segundos. " +
+                    "Sin recodificar: no pierde calidad, pero el peso de cada parte no se controla."
+                lb.text = "Segundos por parte"
+                et.setText("60")
+                val opts = arrayOf("30 s" to 30, "1 min" to 60, "2 min" to 120, "5 min" to 300)
+                for (o in opts) {
+                    val bt = Button(act)
+                    bt.text = o.first
+                    bt.setOnClickListener { et.setText(o.second.toString()) }
+                    chips.addView(bt, LinearLayout.LayoutParams(0, wrap, 1f))
+                }
+            }
+            refresh()
         }
         et.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) { refresh() }
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) { }
             override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) { }
         })
-        refresh()
+        btSize.setOnClickListener { setMode(false) }
+        btTime.setOnClickListener { setMode(true) }
+        setMode(false)
 
         val scroll = ScrollView(act)
         scroll.addView(box, ViewGroup.LayoutParams(match, wrap))
         val dlg = AlertDialog.Builder(act)
-            .setTitle("✂️ Dividir por tamaño")
+            .setTitle("✂️ Dividir el video")
             .setView(scroll)
             .setPositiveButton("Dividir", null)
             .setNegativeButton("Cancelar", null)
             .create()
         dlg.show()
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val lim = limit()
-            if (lim == null || total <= (lim * MARGIN).toLong()) {
-                refresh()
+            if (byTime) {
+                val sec = secs()
+                if (sec == null || (durMs > 0L && durMs <= (sec * 1000.0).toLong())) {
+                    refresh()
+                } else {
+                    dlg.dismiss()
+                    start(act, uri, name, 0L, (sec * 1_000_000.0).toLong())
+                }
             } else {
-                dlg.dismiss()
-                start(act, uri, name, lim)
+                val lim = limit()
+                if (lim == null || total <= (lim * MARGIN).toLong()) {
+                    refresh()
+                } else {
+                    dlg.dismiss()
+                    start(act, uri, name, lim, 0L)
+                }
             }
         }
     }
@@ -467,13 +591,13 @@ object VideoSplit {
     }
 
     /** Divide y guarda; avance y Cancelar por notificación (o recuadro si Android las tiene apagadas). */
-    private fun start(act: Activity, uri: Uri, name: String, limitBytes: Long) {
+    private fun start(act: Activity, uri: Uri, name: String, limitBytes: Long, segUs: Long) {
         if (Mp3Converter.running.get() || LinkDownload.running.get()) {
             Toast.makeText(act.applicationContext, "Ya hay una conversión o descarga en curso", Toast.LENGTH_SHORT).show()
             return
         }
         val app = act.applicationContext
-        val title = "✂️ Dividir por tamaño"
+        val title = "✂️ Dividir el video"
         cancelFlag.set(false)
         LinkJobNotifier.cancel = false
         val dlg: AlertDialog? = if (LinkJobNotifier.enabled(app)) null else AlertDialog.Builder(act)
@@ -499,7 +623,7 @@ object VideoSplit {
                     else act.runOnUiThread { if (!act.isFinishing && !act.isDestroyed) dlg.setMessage(text) }
                 }
                 val stop: () -> Boolean = { cancelFlag.get() || LinkJobNotifier.cancel }
-                split(app, uri, name, limitBytes, status, stop)
+                split(app, uri, name, limitBytes, segUs, status, stop)
             } catch (e: Throwable) {
                 SplitResult(false, "Error: " + e.javaClass.simpleName)
             }
