@@ -2886,6 +2886,106 @@ class M3uActivity : AppCompatActivity() {
         }
     }
 
+    // ------------------------------------------------------------ [FAV-ARRASTRAR-1] Arrastrar un favorito para ordenarlo
+
+    private var dragFrom = -1   // posición (en lo que se ve) del favorito que se arrastra; -1 = nada
+    private var dragTo = -1     // posición sobre la que va el dedo
+    private var dragLastY = 0f  // y del dedo en pantalla
+    private val dragHandler = Handler(Looper.getMainLooper())
+    private val dragTick = object : Runnable {   // desplaza la lista sola cuando el dedo está cerca de un borde
+        override fun run() {
+            if (dragFrom < 0) return
+            val loc = IntArray(2)
+            channelList.getLocationOnScreen(loc)
+            val y = dragLastY - loc[1]
+            val edge = dp(64).toFloat()
+            if (y < edge) channelList.scrollListBy(-dp(12))
+            else if (y > channelList.height - edge) channelList.scrollListBy(dp(12))
+            updateDragTarget()
+            dragHandler.postDelayed(this, 30)
+        }
+    }
+
+    /** El asa solo se ofrece con ★ Favs, sin selección, sin búsqueda y sin 🆕 / 🔥 / A–Z (en esas vistas el orden mostrado no es el guardado). */
+    private fun dragEnabled(): Boolean = favOnly && !selecting && !favNew && !favTop && !favAz && searchBox.text.isNullOrBlank()
+
+    private fun dragBg(i: Int): Int = when {
+        dragFrom < 0 -> Color.TRANSPARENT
+        i == dragFrom -> (accent() and 0x00FFFFFF) or 0x44000000
+        i == dragTo -> (accent() and 0x00FFFFFF) or 0x77000000
+        else -> Color.TRANSPARENT
+    }
+
+    private fun paintDrag() {
+        val first = channelList.firstVisiblePosition
+        val hc = channelList.headerViewsCount
+        for (k in 0 until channelList.childCount) {
+            val i = first + k - hc
+            if (i in shown.indices) channelList.getChildAt(k).setBackgroundColor(dragBg(i))
+        }
+    }
+
+    private fun updateDragTarget() {
+        if (shown.isEmpty()) return
+        val loc = IntArray(2)
+        channelList.getLocationOnScreen(loc)
+        val y = (dragLastY - loc[1]).toInt()
+        val hc = channelList.headerViewsCount
+        val pos = channelList.pointToPosition(channelList.width / 2, y.coerceIn(0, maxOf(channelList.height - 1, 0)))
+        val t = if (pos == android.widget.AdapterView.INVALID_POSITION) {
+            if (y < channelList.height / 2) channelList.firstVisiblePosition - hc else channelList.lastVisiblePosition - hc
+        } else pos - hc
+        dragTo = t.coerceIn(0, shown.size - 1)
+        paintDrag()
+    }
+
+    private fun onHandleTouch(hv: View, ev: android.view.MotionEvent, position: Int): Boolean {
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                if (!dragEnabled() || position !in shown.indices) return false
+                dragFrom = position
+                dragTo = position
+                dragLastY = ev.rawY
+                hv.parent?.requestDisallowInterceptTouchEvent(true)
+                hv.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                paintDrag()
+                dragHandler.removeCallbacks(dragTick)
+                dragHandler.postDelayed(dragTick, 30)
+                return true
+            }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                if (dragFrom < 0) return false
+                dragLastY = ev.rawY
+                updateDragTarget()
+                return true
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                if (dragFrom < 0) return false
+                finishDrag(ev.actionMasked == android.view.MotionEvent.ACTION_UP)
+                return true
+            }
+        }
+        return false
+    }
+
+    /** Al soltar: el favorito queda justo antes (si sube) o justo después (si baja) del favorito sobre el que se soltó. */
+    private fun finishDrag(commit: Boolean) {
+        val from = dragFrom
+        val to = dragTo
+        dragFrom = -1
+        dragTo = -1
+        dragHandler.removeCallbacks(dragTick)
+        if (commit && from != to && from in shown.indices && to in shown.indices) {
+            if (Store.moveChFavNear(shown[from].url, shown[to].url, to > from)) {
+                reloadFavChannels()
+                applyFilter()
+                toast("↕ Movido")
+                return
+            }
+        }
+        chAdapter.notifyDataSetChanged()   // quita el resaltado
+    }
+
     private inner class ChannelAdapter : BaseAdapter() {
         override fun getCount() = shown.size
         override fun getItem(position: Int) = shown[position]
@@ -2921,11 +3021,28 @@ class M3uActivity : AppCompatActivity() {
                         ellipsize = TextUtils.TruncateAt.END
                     })
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(TextView(this@M3uActivity).apply {   // [FAV-ARRASTRAR-1] asa para arrastrar (solo se ve con ★ Favs en orden propio)
+                    text = "≡"
+                    textSize = 24f
+                    gravity = Gravity.CENTER
+                    isFocusable = false
+                    visibility = View.GONE
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                })
             }
             val c = shown[position]
             val star = v.getChildAt(0) as TextView
             val logo = v.getChildAt(1) as ImageView
             val box = v.getChildAt(2) as LinearLayout
+            val handle = v.getChildAt(3) as TextView   // [FAV-ARRASTRAR-1]
+            if (dragEnabled()) {
+                handle.visibility = View.VISIBLE
+                handle.setTextColor(mutedColor)
+                handle.setOnTouchListener { hv, ev -> onHandleTouch(hv, ev, position) }
+            } else {
+                handle.visibility = View.GONE
+                handle.setOnTouchListener(null)
+            }
             val on = favs.contains(c.url)
             val sel = selecting && picked.containsKey(c.url)   // [MULTI-FAV-1]
             if (selecting) {
@@ -2937,7 +3054,7 @@ class M3uActivity : AppCompatActivity() {
                 star.setTextColor(if (on) accent() else mutedColor)
                 star.setOnClickListener { toggleFav(c) }
             }
-            v.setBackgroundColor(if (sel) ((accent() and 0x00FFFFFF) or 0x33000000) else Color.TRANSPARENT)
+            v.setBackgroundColor(if (sel) ((accent() and 0x00FFFFFF) or 0x33000000) else dragBg(position))   // [FAV-ARRASTRAR-1]
             logo.visibility = View.VISIBLE
             Logos.load(logo, c.logo)
             if (c.logo.isEmpty()) {   // [PULIDO-3d] sin logo: icono genérico de TV en gris
