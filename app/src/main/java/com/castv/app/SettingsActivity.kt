@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Tema, color y borrado se cambian aquí mismo. Respaldo y "Mis redes y contacto" le piden a
  * MainActivity que los abra (extra "action": "backup" o "socials") y esta pantalla se cierra.
  */
-class SettingsActivity : CastvActivity()   // [TEXTO-TAM-1] {
+class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private lateinit var content: LinearLayout
     private lateinit var headerTitle: TextView

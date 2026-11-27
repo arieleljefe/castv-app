@@ -56,7 +56,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import kotlin.concurrent.thread
 
-class MainActivity : CastvActivity()   // [TEXTO-TAM-1] {
+class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private lateinit var listFiles: ListView
     private lateinit var adapter: FileAdapter
