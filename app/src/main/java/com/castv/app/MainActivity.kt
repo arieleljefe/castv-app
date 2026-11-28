@@ -1710,7 +1710,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 setTextColor(accentColor())
                 setPadding(dp(20), dp(14), dp(20), dp(4))
             })
-            for (id in shown) {
+            for (pairIds in shown.chunked(2)) {   // [MENUS-2] dos opciones por fila: la hoja ocupa la mitad de alto
+              val pair = android.widget.LinearLayout(this).apply {
+                  orientation = android.widget.LinearLayout.HORIZONTAL
+                  setPadding(dp(8), 0, dp(8), 0)
+              }
+              for (id in pairIds) {
                 // [MAS-1] Fila con icono propio, título y estado en texto gris pequeño debajo.
                 val full = (titles[id] ?: "").removePrefix("📁 ")
                 val cut = full.indexOf(": ")
@@ -1743,7 +1748,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     orientation = android.widget.LinearLayout.HORIZONTAL
                     gravity = android.view.Gravity.CENTER_VERTICAL
                     minimumHeight = dp(56)
-                    setPadding(dp(20), dp(8), dp(20), dp(8))
+                    setPadding(dp(12), dp(8), dp(8), dp(8))   // [MENUS-2]
                     setBackgroundResource(sel.resourceId)
                     setOnClickListener {
                         sheet.dismiss()
@@ -1758,22 +1763,29 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 val texts = android.widget.LinearLayout(this).apply {
                     orientation = android.widget.LinearLayout.VERTICAL
                     layoutParams = android.widget.LinearLayout.LayoutParams(
-                        0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(18) }
+                        0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(12) }   // [MENUS-2]
                 }
                 texts.addView(TextView(this).apply {
                     text = label
-                    textSize = 16f
+                    textSize = 14f   // [MENUS-2]
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                     setTextColor(col(R.color.vlc_text))
                 })
                 if (state.isNotEmpty()) {
                     texts.addView(TextView(this).apply {
                         text = state
-                        textSize = 12f
+                        textSize = 11f   // [MENUS-2]
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
                         setTextColor(col(R.color.vlc_muted))
                     })
                 }
                 row.addView(texts)
-                root.addView(row)
+                pair.addView(row, android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))   // [MENUS-2]
+              }
+              if (pairIds.size == 1) pair.addView(View(this), android.widget.LinearLayout.LayoutParams(0, 1, 1f))   // [MENUS-2] hueco para que la opción suelta no se estire
+              root.addView(pair)
             }
         }
 

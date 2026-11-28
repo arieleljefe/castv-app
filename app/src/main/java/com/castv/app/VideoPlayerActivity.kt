@@ -1141,19 +1141,9 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
             if (sl.isEmpty()) CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador de apagado") else CastvIcons.item(ic, R.drawable.ic_vp_sleep, "Temporizador · $sl"),
             CastvIcons.item(ic, R.drawable.ic_vp_build, "Herramientas"),
             CastvIcons.item(ic, R.drawable.ic_vp_subs, "Subtítulos"))
-        // [VIDEO-MP3-1] «Convertir a MP3» solo en videos del teléfono (no en canales ni enlaces)
-        val mp3Idx = if (items.getOrNull(index)?.let { it.id != 0L } == true) labels.size else -1
-        if (mp3Idx >= 0) labels.add(CastvIcons.item(ic, R.drawable.ic_vp_mp3, "Convertir a MP3"))
-        val cutIdx = if (mp3Idx >= 0) labels.size else -1   // [CORTAR-1a] «Cortar audio…» (mismos videos que «Convertir a MP3»)
-        if (cutIdx >= 0) labels.add("✂️ Cortar audio…")
-        val cutVidIdx = if (mp3Idx >= 0) labels.size else -1   // [CORTAR-1b] «Cortar video…» sin recodificar
-        if (cutVidIdx >= 0) labels.add("✂️ Cortar video…")
-        val splitIdx = if (mp3Idx >= 0) labels.size else -1   // [DIVIDIR-1] «Dividir por tamaño…» (mismos videos que «Cortar video…»)
-        if (splitIdx >= 0) labels.add("📦 Dividir por tamaño…")
-        val reduceIdx = if (mp3Idx >= 0) labels.size else -1   // [REDUCIR-1] «Reducir peso…» (mismos videos que «Dividir»)
-        if (reduceIdx >= 0) labels.add("📉 Reducir peso…")
-        val muteIdx = if (mp3Idx >= 0) labels.size else -1   // [QUITAR-AUDIO-1] «Quitar audio…» (mismos videos que «Reducir peso»)
-        if (muteIdx >= 0) labels.add("🔇 Quitar audio…")
+        // [MENUS-2] Convertir a MP3, Cortar, Dividir, Reducir y Quitar audio (solo videos del teléfono) pasan a un submenú «Editar este video…»
+        val editIdx = if (items.getOrNull(index)?.let { it.id != 0L } == true) labels.size else -1
+        if (editIdx >= 0) labels.add("✂️ Editar este video…")
         val ch = currentChannel()   // [EPG-1] solo si la guía tiene este canal
         if (ch != null && Epg.nowNext(ch) != null) labels.add(CastvIcons.item(ic, R.drawable.ic_event, "Guía: ahora y lo que sigue"))
         b
@@ -1164,7 +1154,29 @@ class VideoPlayerActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     2 -> showSleepMenu()
                     3 -> showToolsMenu()
                     4 -> showSubtitleMenu()
-                    else -> if (which == mp3Idx) startMp3() else if (which == cutIdx) startCut(false) else if (which == cutVidIdx) startCut(true) else if (which == splitIdx) startSplit() else if (which == reduceIdx) startReduce() else if (which == muteIdx) startMute() else showGuideNow()   // [VIDEO-MP3-1] / [CORTAR-1a/1b] / [DIVIDIR-1] / [REDUCIR-1] / [EPG-1]
+                    else -> if (which == editIdx) showEditMenu() else showGuideNow()   // [MENUS-2] / [EPG-1]
+                }
+            }
+            .show()
+        keepControls()
+    }
+
+    /** [MENUS-2] Submenú del ⋯: las herramientas que crean un archivo nuevo a partir de este video (el video no se toca). */
+    private fun showEditMenu() {
+        val b = AlertDialog.Builder(this)
+        val ic = b.context
+        val labels = arrayOf<CharSequence>(
+            CastvIcons.item(ic, R.drawable.ic_vp_mp3, "Convertir a MP3"),
+            "✂️ Cortar audio…", "✂️ Cortar video…", "📦 Dividir por tamaño…", "📉 Reducir peso…", "🔇 Quitar audio…")
+        b.setTitle("Editar este video")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> startMp3()
+                    1 -> startCut(false)
+                    2 -> startCut(true)
+                    3 -> startSplit()
+                    4 -> startReduce()
+                    else -> startMute()
                 }
             }
             .show()
