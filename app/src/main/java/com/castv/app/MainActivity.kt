@@ -25,6 +25,7 @@ import android.content.res.ColorStateList
 import android.net.Uri
 import android.media.PlaybackParams
 import android.media.audiofx.BassBoost
+import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Equalizer
 import android.view.KeyEvent
 import android.widget.AbsListView
@@ -243,6 +244,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private val speedLabels = arrayOf("0.5x", "0.75x", "1x (normal)", "1.25x", "1.5x", "1.75x", "2x")
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
+    private var loudness: LoudnessEnhancer? = null   // [VOLUMEN-1]
     private var eqPreset = -1
     private var bassOn = false
     private var eqNames: List<String> = emptyList()
@@ -1696,6 +1698,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         menu.add(0, 7, 6, sleepLabel())
         menu.add(0, 8, 7, "Velocidad: " + speedShort() + " (teléfono)")
         menu.add(0, 9, 8, "Ecualizador (teléfono)")
+        if (showingMusic) menu.add(0, 28, 8, "🔊 Volumen extra: " + gainLabel())   // [VOLUMEN-1]
         menu.add(0, 10, 9, "Elegir TV")
         menu.add(0, 12, 10, "Tema: " + themeLabel())
         menu.add(0, 13, 11, "Color: " + accentNames[savedAccent()])
@@ -1792,6 +1795,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             23 -> { groupReturn = null; viewMode = ViewMode.RESUME; applyFilters() }   // [TABS-1]
             24 -> showDiagReport()   // [DIAG-1]
             27 -> showWelcome(0)   // [BIENVENIDA-1]
+            28 -> cycleGain()   // [VOLUMEN-1]
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
                 else { onlyUnseen = !onlyUnseen; applyFilters() }
@@ -1875,6 +1879,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     21 -> R.drawable.ic_mas_trending   // [TOP-1] [ICONOS-MAS-1]
                     24 -> R.drawable.ic_vp_info   // [ICONOS-MAS-1] Informe de diagnóstico
                     27 -> R.drawable.ic_vp_info   // [BIENVENIDA-1]
+                    28 -> R.drawable.ic_vol_on   // [VOLUMEN-1]
                     26 -> R.drawable.ic_mas_chart   // [RESUMEN-1] [ICONOS-MAS-1]
                     22 -> R.drawable.ic_vp_star   // [TABS-1]
                     23 -> R.drawable.ic_vp_play   // [TABS-1]
@@ -6377,11 +6382,28 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .show()
     }
 
+    // [VOLUMEN-1] Volumen extra de la música del teléfono: 0 / +3 / +6 / +9 dB (LoudnessEnhancer). Sube TODAS las pistas por igual;
+    // no es una normalización pista por pista. Un toque pasa al siguiente nivel; vive en las preferencias `castv` (entra en el respaldo).
+    private val gainSteps = intArrayOf(0, 300, 600, 900)
+    private fun musicGain(): Int = getSharedPreferences("castv", MODE_PRIVATE).getInt("music_gain", 0)
+    private fun gainLabel(): String = if (musicGain() <= 0) "Apagado" else "+${musicGain() / 100} dB"
+
+    private fun cycleGain() {
+        val i = gainSteps.indexOf(musicGain()).let { if (it < 0) 0 else it }
+        val next = gainSteps[(i + 1) % gainSteps.size]
+        getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("music_gain", next).apply()
+        if (localActive && localPrepared) localPlayer?.let { attachEffects(it) }
+        toast(if (next == 0) "🔊 Volumen extra apagado"
+              else "🔊 Volumen extra: +${next / 100} dB (música del teléfono). Si se oye distorsionado, baja un nivel")
+    }
+
     private fun releaseEffects() {
         try { equalizer?.release() } catch (e: Exception) { }
         try { bassBoost?.release() } catch (e: Exception) { }
+        try { loudness?.release() } catch (e: Exception) { }   // [VOLUMEN-1]
         equalizer = null
         bassBoost = null
+        loudness = null
     }
 
     private fun attachEffects(mp: MediaPlayer) {
@@ -6419,6 +6441,17 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             bassBoost = bb
         } catch (e: Exception) {
             bassBoost = null
+        }
+        try {   // [VOLUMEN-1]
+            val g = musicGain()
+            if (g > 0) {
+                val le = LoudnessEnhancer(mp.audioSessionId)
+                le.setTargetGain(g)
+                le.setEnabled(true)
+                loudness = le
+            }
+        } catch (e: Exception) {
+            loudness = null
         }
     }
 
