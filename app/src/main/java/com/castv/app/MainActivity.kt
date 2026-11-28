@@ -1136,6 +1136,24 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (ParentalPin.guardsChannels(this)) ParentalPin.ask(this, "PIN para abrir Canales") { open() } else open()
     }
 
+    /** [BUSCA-OTRA-1] Sin resultados: ofrece seguir la búsqueda en Canales o en la otra biblioteca (Música / Videos), conservando lo escrito. */
+    private fun searchElsewhere() {
+        val other = if (showingMusic) "🎬 Videos" else "🎵 Música"
+        AlertDialog.Builder(this)
+            .setTitle("Buscar «$query»")
+            .setItems(arrayOf<CharSequence>("📡 En Canales", "En $other")) { _, which ->
+                if (which == 0) openChannelsSearch()
+                else {
+                    resetFilters()
+                    viewMode = ViewMode.ALL
+                    groupReturn = null
+                    if (showingMusic) showMovies() else showMusic()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     /** Mensaje en el centro de la lista cuando no hay nada que mostrar (ya no ensucia la línea de estado). */
     private fun updateEmptyState() {
         if (currentList.isNotEmpty()) {
@@ -1166,7 +1184,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 viewMode == ViewMode.FAVS -> setEmptyAction("Ver todos") { viewMode = ViewMode.ALL; applyFilters() }
                 viewMode == ViewMode.RESUME -> setEmptyAction("📡 Abrir Canales") { runMenuAction(16) }
                 onlyUnseen && !showingMusic -> tvEmptyAction.visibility = View.GONE
-                query.isNotEmpty() -> setEmptyAction("📡 Buscar en Canales") { openChannelsSearch() }   // [BUSCA-1]
+                query.isNotEmpty() -> setEmptyAction("🔎 Buscar en otro sitio…") { searchElsewhere() }   // [BUSCA-1] [BUSCA-OTRA-1]
                 else -> tvEmptyAction.visibility = View.GONE
             }
         } else tvEmptyAction.visibility = View.GONE
