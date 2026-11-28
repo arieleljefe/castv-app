@@ -237,17 +237,22 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             leftMargin = 0
         }
         header.addView(listBtn)   // [CANALES-1]
+        // [CANALES-2] ★ Favs va en la cabecera (se usa a cada rato); 👁, ＋ Lista y 🗑 Quitar pasan a la cabecera de la lista y se van al bajar
+        favBtn = chip("☆ Favs") { toggleFavOnly() }
+        favBtn.textSize = 13f
+        favBtn.maxLines = 1
+        favBtn.setPadding(dp(10), dp(8), dp(10), dp(8))
+        header.addView(favBtn)
         root.addView(header)
-        // [VISTA-3] Fila 1b: acciones con texto, repartidas a partes iguales
+        // [VISTA-3] Fila de acciones con texto, repartidas a partes iguales ([CANALES-2] ahora dentro de la lista)
         val row1 = LinearLayout(this)
         row1.gravity = Gravity.CENTER_VERTICAL
-        row1.setPadding(0, dp(8), 0, 0)
-        favBtn = chip("☆ Favs") { toggleFavOnly() }
+        row1.setPadding(0, dp(2), 0, dp(2))
         hiddenBtn = chip("👁") { showHiddenDialog() }   // [OCULTAR-1]
         hiddenBtn.contentDescription = "Canales ocultos"
         val addBtn = chip("＋ Lista") { addListDialog() }
         val delBtn = chip("🗑 Quitar") { removeCurrent() }
-        for (b in listOf(favBtn, hiddenBtn, addBtn, delBtn)) {
+        for (b in listOf(hiddenBtn, addBtn, delBtn)) {   // [CANALES-2] favBtn ya está en la cabecera
             b.textSize = 13f
             b.maxLines = 1
             b.setPadding(dp(6), dp(8), dp(6), dp(8))
@@ -257,7 +262,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             }
             row1.addView(b)
         }
-        (favBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0
+        (hiddenBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0   // [CANALES-2]
         iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         favBtn.setOnLongClickListener { favStartMenu(); true }   // [FAV-INICIO-1]
         iconLabel(addBtn, R.drawable.ic_add, "Lista")
@@ -273,14 +278,13 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             weight = 1f
         }
         exportBtn.visibility = View.GONE
-        row1.addView(exportBtn, 1)
+        row1.addView(exportBtn, 0)   // [CANALES-2] 📤 va primero en la fila (solo se ve con ★ Favs)
         updateHiddenBtn()
-        root.addView(row1)
 
         // Fila 2: buscador y grupo
         val row2 = LinearLayout(this)
         row2.gravity = Gravity.CENTER_VERTICAL
-        row2.setPadding(0, dp(10), 0, 0)
+        row2.setPadding(0, dp(6), 0, 0)   // [CANALES-2]
         searchBox = EditText(this)
         searchBox.hint = "Buscar canal…"
         searchBox.setSingleLine(true)
@@ -309,6 +313,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         moodScroll.addView(moodRow)
         val moodHolder = LinearLayout(this)   // [CANALES-1] los ánimos van dentro de la lista: se van al bajar y dejan más sitio a los canales
         moodHolder.orientation = LinearLayout.VERTICAL
+        moodHolder.addView(row1)   // [CANALES-2] acciones de la lista arriba de los ánimos
         moodHolder.addView(moodScroll)
 
         statusView = TextView(this)
