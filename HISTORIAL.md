@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v584
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v587
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -238,3 +238,12 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - CARPETA-RUTA-1 · 28 nov · las carpetas se muestran con nombre legible («WhatsApp Business Video», «… › Sent»; duplicadas con ruta legible); filtrar y ocultar siguen con la ruta cruda · `MainActivity.kt`
 - AVISO-MINI-1 · 28 nov · los avisos de `toast()` salen como pastilla con borde de acento justo encima del mini reproductor (fundido, se quita sola o al tocarla; Toast normal si la pantalla no está lista) · `MainActivity.kt`
 - AJUSTES-ICONOS-1 · 28 nov · portada de Ajustes con 15 tarjetas redondeadas, icono en círculo de acento, resumen y flecha · `SettingsActivity.kt`
+- PLAYER-ART-1 + PLAYER-TIPS-1 · 28 nov · carátula del panel expandido centrada (190 dp, sombra) y pulsación larga en los botones del reproductor muestra su nombre (repetir cambia su texto según el modo) · `player_bar.xml`, `MainActivity.kt`
+- CANALES-2 · 28 nov · Canales con 3 filas fijas (☆ Favs en la cabecera); 👁 · ＋ Lista · 🗑 Quitar · 📤 pasan a la cabecera de la lista · `M3uActivity.kt`
+- MENUS-2 · 28 nov · hoja Más en 2 columnas y ⋯ del video con submenú «✂️ Editar este video…» · `MainActivity.kt`, `VideoPlayerActivity.kt`
+- LISTA-NOMBRE-1 · 28 nov · «＋ Lista M3U» en Canales y «Listas de reproducción» en Más · `M3uActivity.kt`, `MainActivity.kt`
+- AJUSTES-FILAS-1 · 28 nov · icono en círculo de acento en cada fila de Ajustes y de su buscador · `SettingsActivity.kt`
+- VER-DESPUES-1 · 28 nov · «Ver más tarde» en el ⋮ de un video (lista «🕓 Ver más tarde», se quita al terminar o pasar del 90 %) · `Store.kt`, `MainActivity.kt`, `VideoPlayerActivity.kt`
+- BUSCA-OTRA-1 · 28 nov · «🔎 Buscar en otro sitio…» cuando la búsqueda no da resultados (Canales o la otra biblioteca) · `MainActivity.kt`
+- TRAER-1 · 28 nov · al cambiar la salida de TV a Teléfono pregunta «¿Seguir escuchando/viendo aquí?» y sigue desde el mismo segundo · `MainActivity.kt`
+- TAG-3.40 · 28 nov · etiqueta `v3.40` publicada e instalada (la app muestra 3.40); incluye el lote visual 3
