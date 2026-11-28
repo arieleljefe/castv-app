@@ -1224,7 +1224,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val byFolder = base.groupBy { it.folder }
             for (f in byFolder.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }) {
                 val items = byFolder[f] ?: continue
-                rows.add(GroupRow(1, f.substringAfterLast('/'), countLabel(items.size, unit1, unitN) + "  ·  " + f, items.first(), f))
+                rows.add(GroupRow(1, folderLabel(f), countLabel(items.size, unit1, unitN) + "  ·  " + folderPathPretty(f), items.first(), f))   // [CARPETA-RUTA-1]
             }
         }
         val q = norm(query).trim()
@@ -1292,7 +1292,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val parts = ArrayList<String>()
         if (viewMode == ViewMode.FAVS) parts.add("⭐ Favoritos")   // [TABS-1]
         if (viewMode == ViewMode.RESUME) parts.add("⏩ Continuar")   // [TABS-1]
-        selectedFolder?.let { parts.add("📁 " + it.substringAfterLast('/')) }
+        selectedFolder?.let { parts.add("📁 " + folderLabel(it)) }   // [CARPETA-RUTA-1]
         selectedArtist?.let { parts.add("🎤 $it") }
         selectedAlbum?.let { parts.add("💿 $it") }
         selectedPlaylist?.let { parts.add("📃 $it") }
@@ -1360,10 +1360,16 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun pickFolder() {
         if (allItems.isEmpty()) return
         val counts = allItems.groupingBy { it.folder }.eachCount()
-        val folders = counts.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }
+        // [CARPETA-RUTA-1] nombres legibles (la ruta cruda solo se usa por dentro para filtrar y ocultar)
+        val folders = counts.keys.sortedWith { a, b -> naturalCompare(norm(folderLabel(a)), norm(folderLabel(b))) }
+        val shown = folders.map { folderLabel(it) }
+        val repeated = shown.groupingBy { it }.eachCount()
         val labels = ArrayList<String>()
         labels.add("📁 Todas (${allItems.size})")
-        folders.forEach { labels.add("📁 $it (${counts[it]})") }
+        folders.forEachIndexed { i, f ->
+            val name = if ((repeated[shown[i]] ?: 0) > 1) folderPathPretty(f) else shown[i]   // dos con el mismo nombre: se ve la ruta
+            labels.add("📁 $name (${counts[f]})")
+        }
         val picker = AlertDialog.Builder(this)
             .setTitle("Carpeta")
             .setItems(labels.toTypedArray()) { _, which ->
@@ -1378,10 +1384,42 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
     }
 
+    // [CARPETA-RUTA-1] Nombre legible de una carpeta. «Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Video»
+    // se ve como «WhatsApp Business Video»; si termina en un nombre genérico (Sent, Private, Video…) se le suma lo que lo explica.
+    private val folderGeneric = setOf("sent", "private", "enviados", "privado", "video", "videos", "audio", "audios", "media", "files", "archivos")
+
+    private fun folderNiceName(seg: String): String = when (seg.lowercase()) {
+        "com.whatsapp.w4b" -> "WhatsApp Business"
+        "com.whatsapp" -> "WhatsApp"
+        else -> seg
+    }
+
+    private fun folderLabel(path: String): String {
+        val segs = path.split('/').filter { it.isNotBlank() }
+        if (segs.isEmpty() || path.trim().trim('/') == "(raíz)") return "Raíz del almacenamiento"
+        var i = segs.size - 1
+        while (i > 0 && segs[i].lowercase() in folderGeneric) i--
+        val base = folderNiceName(segs[i])
+        val tail = segs.drop(i + 1).filter { it.lowercase() != "media" }
+        return if (tail.isEmpty()) base else base + " › " + tail.joinToString(" › ")
+    }
+
+    /** Ruta completa pero legible (sin «Android/media», con «›»), para distinguir carpetas que se llaman igual. */
+    private fun folderPathPretty(path: String): String {
+        val segs = path.split('/').filter { it.isNotBlank() }.toMutableList()
+        if (segs.isEmpty() || path.trim().trim('/') == "(raíz)") return "Raíz del almacenamiento"
+        if (segs.size > 2 && segs[0] == "Android" && segs[1].lowercase() == "media") {
+            segs.removeAt(0)
+            segs.removeAt(0)
+        }
+        segs[0] = folderNiceName(segs[0])
+        return segs.joinToString(" › ")
+    }
+
     private fun confirmHideFolder(folder: String, picker: AlertDialog) {
         AlertDialog.Builder(this)
             .setTitle("¿Ocultar esta carpeta?")
-            .setMessage("📁 $folder dejará de salir en la biblioteca de CASTV. Los archivos no se borran. Se puede mostrar de nuevo en Ajustes › Biblioteca › Carpetas ocultas.")
+            .setMessage("📁 ${folderLabel(folder)} dejará de salir en la biblioteca de CASTV. Los archivos no se borran. Se puede mostrar de nuevo en Ajustes › Biblioteca › Carpetas ocultas.")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Ocultar") { _, _ ->
                 val sp = getSharedPreferences("castv", MODE_PRIVATE)
@@ -4545,7 +4583,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val name = if (p.parts.size > 1) p.base + " (" + p.parts.size + " archivos)" else first.name
             var info = p.tool + "  ·  " + shortDate(workMs(p.newest) / 1000)
             if (p.bytes > 0) info += "  ·  " + android.text.format.Formatter.formatShortFileSize(this@MainActivity, p.bytes)
-            val folders = p.parts.map { it.folder }.distinct().joinToString(", ")
+            val folders = p.parts.map { folderLabel(it.folder) }.distinct().joinToString(", ")   // [CARPETA-RUTA-1]
             (row.getChildAt(1) as TextView).text = name + "\n" + info + "\n📁 " + folders
             (row.getChildAt(2) as android.widget.CheckBox).isChecked = p.key in chosen
             return row
@@ -4919,7 +4957,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             h.time.visibility = if (item.durationSec > 0) View.VISIBLE else View.GONE
             h.name.text = prettyTitle(item)
             val info = ArrayList<String>()
-            if (item.folder != "(raíz)") info.add(item.folder.substringAfterLast('/'))
+            if (item.folder != "(raíz)") info.add(folderLabel(item.folder))   // [CARPETA-RUTA-1]
             if (item.dateAdded > 0) info.add(shortDate(item.dateAdded))
             h.info.text = info.joinToString("  ·  ")
             val n = chosen.indexOf(item) + 1
