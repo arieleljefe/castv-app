@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v550
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v551
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -214,3 +214,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - MINI-GESTOS-1 · 27 nov · en el mini reproductor, ← siguiente, → anterior, ↑ abre el panel, ↓ lo cierra · `MainActivity.kt`
 - UI-ART-1 · 27 nov · «Reproduciendo»: fondo y barras toman el color dominante de la carátula · `MainActivity.kt`
 - VIDEO-MP3-1 · 27 nov · «🎵 Convertir a MP3» en el ⋯ del reproductor (solo videos del teléfono): Android decodifica y LAME 3.100 propio codifica (192 kbps, 128 si es mono, título ID3), guardado en Descargas por MediaStore, con % y Cancelar; arreglos de build `lame-fix1` (tipo `ieee754_float32_t` y cabeceras `vector/`) · `Mp3Converter.kt`, `LameEncoder.kt`, `cpp/jni_lame.cpp`, `cpp/lame/`, `CMakeLists.txt`, `VideoPlayerActivity.kt`
+- TALLER-1 · 28 nov · pestaña «TALLER» (Video y Audio): «＋ Nuevo proyecto» (Cortar, Dividir, Unir, Reducir peso, Quitar audio, MP3, Tono, Enlace → MP3) que lleva a la biblioteca para tocar el archivo, y tarjetas de lo que CASTV generó (reconocido por el nombre: « (corte)», « (unido)», « (reducido)», « (sin audio)», « (parte N de M)») con Reproducir, Compartir, Ubicación y Quitar de la lista; los «quitados» van en `castv_work` · `Workshop.kt`, `MainActivity.kt`, `activity_main.xml`
+- TALLER-1b · 28 nov · MP3 convertidos y descargas de enlace también salen en el Taller (registro en `castv_work`, clave `records`, últimos 100, sin enlace de origen; Android 10+) · `Workshop.kt`, `SavedFile.kt`, `LinkJobNotifier.kt`, `MainActivity.kt`
+- TALLER-2 · 28 nov · peso en cada tarjeta y total en «Nuevo proyecto» (2a), «🔁 Usar con otra herramienta» (2b), «❌ Eliminar el archivo» con la confirmación, papelera y PIN de siempre (2c) y Unir con lista para marcar en orden (2d) · `Workshop.kt`, `MainActivity.kt`
