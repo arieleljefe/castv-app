@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v560
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v562
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -225,3 +225,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - DIVIDIR-1 y 2 · 27 nov · dividir un video por tamaño o por duración · `VideoSplit.kt`
 - CARPETA-1 y 1b · 27 nov · al terminar, botones para abrir el resultado y su ubicación
 - CORTAR-3 · 27 nov · «▶ Oír el tramo» pausa el video del reproductor antes de sonar · `CutAudio.kt`
+- UNIR-ORDEN-1 · 27 nov · antes de unir, lista con miniaturas y ↑ ↓; «Volver» conserva marcas y orden · `MainActivity.kt`
+- UNIR-VER-1 · 27 nov · mantener pulsado un archivo en Unir para verlo u oírlo sin perder marcas · `MainActivity.kt`
+- TALLER-ORDENAR-1 · 27 nov · ordenar proyectos (Recientes, Antiguos, Más pesados, Nombre), se recuerda; fechas unificadas · `MainActivity.kt`
