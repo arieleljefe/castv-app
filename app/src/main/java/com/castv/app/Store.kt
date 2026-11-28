@@ -124,6 +124,76 @@ object Store {
         if (prefs.contains("bm|$k")) prefs.edit().remove("bm|$k").apply()   // [MARCAS-1]
     }
 
+    /** [RENOMBRAR-1] Clave que tendría [item] con otro nombre (misma regla que [key]). */
+    fun keyFor(item: MediaItem, newName: String): String =
+        (if (item.isMusic) "a" else "v") + "|" + newName.lowercase() + "|" + item.durationSec
+
+    /**
+     * [RENOMBRAR-1] Un archivo cambió de nombre: pasa a la clave nueva todo lo que estaba guardado con la vieja (favorito, listas,
+     * punto de «continuar», vistas y reproducciones, tiempo visto, marcadores y reproducciones por mes). Si la clave nueva ya
+     * tenía algo, se conserva lo que ya había.
+     */
+    @Synchronized
+    fun renameKey(oldK: String, newK: String) {
+        if (oldK == newK) return
+        if (favs.remove(oldK)) { favs.add(newK); prefs.edit().putStringSet("fav", HashSet(favs)).apply() }
+        var changed = false
+        for (l in lists.values) {
+            val i = l.indexOf(oldK)
+            if (i < 0) continue
+            if (l.contains(newK)) l.removeAt(i) else l[i] = newK
+            changed = true
+        }
+        if (changed) saveLists()
+        if (resumePrefs.contains(oldK)) {
+            val v = resumePrefs.getInt(oldK, 0)
+            val ed = resumePrefs.edit().remove(oldK)
+            if (!resumePrefs.contains(newK)) ed.putInt(newK, v)
+            ed.apply()
+        }
+        val all = statsPrefs.all
+        val se = statsPrefs.edit()
+        for (pre in arrayOf("c|", "t|", "v|", "w|")) {
+            val ov = all[pre + oldK] ?: continue
+            se.remove(pre + oldK)
+            if (all.containsKey(pre + newK)) continue
+            when (ov) {
+                is Int -> se.putInt(pre + newK, ov)
+                is Long -> se.putLong(pre + newK, ov)
+                is Boolean -> se.putBoolean(pre + newK, ov)
+                is String -> se.putString(pre + newK, ov)
+                else -> { }
+            }
+        }
+        se.apply()
+        val bm = prefs.getString("bm|$oldK", null)
+        if (bm != null) {
+            val e = prefs.edit().remove("bm|$oldK")
+            if (!prefs.contains("bm|$newK")) e.putString("bm|$newK", bm)
+            e.apply()
+        }
+        if (::topPrefs.isInitialized) {
+            try {
+                val data = monthData()
+                var ch = false
+                for (h in data.values) {
+                    val c = h.remove(oldK) ?: continue
+                    h[newK] = (h[newK] ?: 0) + c
+                    ch = true
+                }
+                if (ch) {
+                    val o = JSONObject()
+                    for ((m, mh) in data) {
+                        val mo = JSONObject()
+                        for ((kk, v) in mh) mo.put(kk, v)
+                        o.put(m, mo)
+                    }
+                    topPrefs.edit().putString("mp", o.toString()).apply()
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
     // ------------------------------------------------- [VISTO-1] Marca "visto"
 
     fun isSeen(item: MediaItem): Boolean = statsPrefs.getBoolean("v|" + key(item), false)

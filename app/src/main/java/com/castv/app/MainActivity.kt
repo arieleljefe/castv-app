@@ -4630,6 +4630,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (many) "📤 Compartir todas" else "📤 Compartir",
                 "📂 Ubicación",
                 "🔁 Usar con otra herramienta…",
+                "✏️ Cambiar el nombre…",   // [RENOMBRAR-1]
                 "🗑 Quitar de la lista",
                 if (many) "❌ Eliminar los archivos…" else "❌ Eliminar el archivo…")) { _, which ->
                 when (which) {
@@ -4642,7 +4643,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     1 -> workShare(p)
                     2 -> workFolder(p)
                     3 -> workReuse(p)   // [TALLER-2]
-                    5 -> {   // [TALLER-2] usa la misma confirmación, papelera y PIN que Eliminar de siempre
+                    4 -> workRename(p)   // [RENOMBRAR-1]
+                    6 -> {   // [TALLER-2] usa la misma confirmación, papelera y PIN que Eliminar de siempre
                         workLastScan = 0L
                         confirmDelete(p.parts)
                     }
@@ -5081,6 +5083,138 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             toast("No se pudo compartir")
         }
     }
+
+    // ------------------------------------------- [RENOMBRAR-1] cambiar el nombre de un proyecto
+
+    private val workPartRe = Regex(" \\(parte (\\d+) de (\\d+)\\)")
+    private val workReservedRe = Regex(" ?\\((corte|unido|reducido|sin audio)\\)| ?\\(parte \\d+ de \\d+\\)")
+
+    /** Nombre nuevo de un archivo: la base nueva + lo que iba después de la base (sufijo y extensión, o « (parte N de M)»). null si no se puede calcular. */
+    private fun workNewName(kind: String, oldBase: String, m: MediaItem, newBase: String): String? {
+        val n = m.name
+        val rest: String? = when (kind) {
+            "p" -> workPartRe.find(n)?.let { n.substring(it.range.first) }
+            "r" -> n.lastIndexOf('.').let { if (it > 0) n.substring(it) else null }
+            else -> if (n.startsWith(oldBase) && n.length > oldBase.length) n.substring(oldBase.length) else null
+        }
+        return if (rest.isNullOrEmpty()) null else newBase + rest
+    }
+
+    /** ✏️ en la tarjeta: cambia el nombre del archivo (o de todas las partes). Conserva el sufijo que el Taller reconoce y la extensión. */
+    private fun workRename(p: Workshop.Project) {
+        if (Build.VERSION.SDK_INT < 29) { toast("Cambiar el nombre necesita Android 10 o más"); return }
+        val cur = playingItem
+        if (cur != null && p.parts.any { it.id == cur.id && it.isMusic == cur.isMusic }) {
+            toast("Detén la reproducción de este archivo antes de cambiarle el nombre")
+            return
+        }
+        val kind = p.key.substringBefore('|')
+        val first = p.parts[0]
+        val oldBase = if (kind == "r") first.name.substringBeforeLast('.') else p.base
+        if (p.parts.any { workNewName(kind, oldBase, it, "x") == null }) { toast("No se puede cambiar el nombre de este proyecto"); return }
+        val sample = workNewName(kind, oldBase, first, "") ?: ""
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        val side = (20 * resources.displayMetrics.density).toInt()
+        val et = EditText(ctx).apply {
+            setText(oldBase)
+            setSingleLine(true)
+            hint = "Nombre"
+            setSelection(text.length)
+        }
+        val box = android.widget.LinearLayout(ctx).apply {
+            setPadding(side, side / 2, side, 0)
+            addView(et, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        val dlg = builder
+            .setTitle("✏️ Cambiar el nombre")
+            .setMessage("Se guardará como «nombre" + sample + "»" +
+                (if (p.parts.size > 1) " (y las otras " + (p.parts.size - 1) + " partes igual)." else ".") +
+                "\nLa app conserva el final para reconocer el proyecto. Favoritos, listas y marcadores se mantienen.")
+            .setView(box)
+            .setPositiveButton("Cambiar") { _, _ ->
+                var nb = et.text.toString().replace(Regex("[\\\\/:*?\"<>|\\r\\n]+"), "_").replace(workReservedRe, "").trim()
+                val ext = first.name.substringAfterLast('.', "")
+                if (ext.isNotEmpty() && nb.endsWith("." + ext, ignoreCase = true)) nb = nb.dropLast(ext.length + 1)
+                nb = nb.trim().trimEnd('.', ' ').take(100).trim()
+                if (nb.isEmpty()) { toast("Escribe un nombre"); return@setPositiveButton }
+                if (nb == oldBase) { toast("Es el mismo nombre"); return@setPositiveButton }
+                workRenameRun(p, kind, oldBase, nb)
+            }
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dlg.show()
+        et.requestFocus()
+    }
+
+    private fun workRenameRun(p: Workshop.Project, kind: String, oldBase: String, newBase: String) {
+        val pairs = ArrayList<Pair<MediaItem, String>>()
+        for (m in p.parts) pairs.add(m to (workNewName(kind, oldBase, m, newBase) ?: return))
+        val recUri = if (kind == "r") p.key.removePrefix("r|") else null
+        thread {
+            val err = workRenameFiles(pairs, recUri)
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                if (err != null) { toast(err); return@runOnUiThread }
+                toast("Nombre cambiado")
+                workLastScan = 0L
+                loadMedia(showingMusic, true)   // la biblioteca también ve el nombre nuevo
+                if (viewMode == ViewMode.WORKSHOP) showWorkshop()
+            }
+        }
+    }
+
+    /** Renombra en MediaStore (Android 10+; solo archivos que CASTV creó) y pasa a la clave nueva lo guardado. null = bien; si no, el mensaje. Si uno falla, deshace los anteriores. */
+    private fun workRenameFiles(pairs: List<Pair<MediaItem, String>>, recUri: String?): String? {
+        for ((m, nn) in pairs) if (workNameTaken(m, nn)) return "Ya hay un archivo llamado «$nn» en esa carpeta"
+        val done = ArrayList<MediaItem>()
+        for ((m, nn) in pairs) {
+            try {
+                val v = android.content.ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, nn) }
+                if (contentResolver.update(uriOf(m), v, null, null) <= 0) throw IllegalStateException()
+                done.add(m)
+            } catch (e: Exception) {
+                for (dm in done) {
+                    try {
+                        val b = android.content.ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, dm.name) }
+                        contentResolver.update(uriOf(dm), b, null, null)
+                    } catch (x: Exception) { }
+                }
+                return if (e is SecurityException) "Android no deja cambiar el nombre de este archivo (no lo creó CASTV)"
+                       else "No se pudo cambiar el nombre"
+            }
+        }
+        for ((m, nn) in pairs) {
+            val fin = workDisplayName(m) ?: nn
+            val oldK = Store.key(m)
+            val newK = Store.keyFor(m, fin)
+            Store.renameKey(oldK, newK)
+            Lrc.moveSaved(this, oldK, newK)
+            if (recUri != null) Workshop.renameRecord(this, recUri, fin)
+        }
+        return null
+    }
+
+    /** ¿Ya hay otro archivo (de cualquier tipo) con ese nombre en la misma carpeta? */
+    private fun workNameTaken(m: MediaItem, name: String): Boolean {
+        if (name.equals(m.name, ignoreCase = true)) return false
+        if (Build.VERSION.SDK_INT < 29) return false
+        return try {
+            val rel = if (m.folder == "(raíz)") "" else m.folder.trimEnd('/') + "/"
+            contentResolver.query(MediaStore.Files.getContentUri("external"), arrayOf(MediaStore.MediaColumns._ID),
+                MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+                arrayOf(name, rel), null)?.use { it.count > 0 } ?: false
+        } catch (e: Exception) { false }
+    }
+
+    /** Nombre que Android dejó al archivo tras renombrarlo (puede ajustarlo). */
+    private fun workDisplayName(m: MediaItem): String? = try {
+        contentResolver.query(uriOf(m), arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (e: Exception) { null }
 
     private fun workFolder(p: Workshop.Project) {
         val folder = p.parts[0].folder

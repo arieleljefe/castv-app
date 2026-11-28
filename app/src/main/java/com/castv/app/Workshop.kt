@@ -78,6 +78,18 @@ object Workshop {
         } catch (e: Exception) { }
     }
 
+    /** [RENOMBRAR-1] El archivo anotado cambió de nombre: se actualiza el nombre del registro (el enlace y la clave no cambian). */
+    @Synchronized
+    fun renameRecord(ctx: Context, uri: String, newName: String) {
+        try {
+            val list = records(ctx)
+            if (list.none { it.uri == uri }) return
+            val a = JSONArray()
+            for (r in list) a.put(JSONObject().put("u", r.uri).put("t", r.tool).put("n", if (r.uri == uri) newName else r.name).put("d", r.ms))
+            prefs(ctx).edit().putString("records", a.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
     /** [TALLER-2] Peso en bytes de todas las partes de un proyecto (0 si no se puede leer). */
     fun sizeOf(ctx: Context, p: Project): Long {
         var sum = 0L

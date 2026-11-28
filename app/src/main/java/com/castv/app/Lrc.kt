@@ -105,6 +105,16 @@ object Lrc {
         try { saved(ctx, item).delete() } catch (e: Exception) { }
     }
 
+    /** [RENOMBRAR-1] Si el archivo cambió de nombre, su letra guardada pasa a la clave nueva (si la nueva no tenía ya otra). */
+    fun moveSaved(ctx: Context, oldKey: String, newKey: String) {
+        try {
+            val dir = File(ctx.filesDir, "lrc")
+            val from = File(dir, hash(oldKey) + ".lrc")
+            val to = File(dir, hash(newKey) + ".lrc")
+            if (from.isFile && !to.exists()) from.renameTo(to)
+        } catch (e: Exception) { }
+    }
+
     /** Letra de [item]: primero la guardada; si no hay, un `.lrc` con el mismo nombre junto a la canción (si Android lo deja leer). */
     fun load(ctx: Context, item: MediaItem): Doc? {
         try {
