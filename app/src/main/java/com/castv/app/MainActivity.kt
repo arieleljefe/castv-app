@@ -4688,17 +4688,96 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             if (chosen.size < 2) { toast("Marca 2 o más, en el orden en que quieres unirlos"); return@setOnClickListener }
             if (chosen.size > VideoJoin.MAX_FILES) { toast("Máximo ${VideoJoin.MAX_FILES} archivos a la vez"); return@setOnClickListener }
             if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return@setOnClickListener }
-            dlg.dismiss()
-            val sel = ArrayList(chosen)
-            val order = sel.mapIndexed { i, m -> "${i + 1}. ${m.name}" }.joinToString("\n")
-            AlertDialog.Builder(this)
-                .setTitle("🔗 Unir " + sel.size + (if (showingMusic) " audios" else " videos"))
-                .setMessage("Se unirán en este orden (el que marcaste):\n\n" + order +
-                    "\n\nSin recodificar: solo funciona si todos son iguales (mismo códec, tamaño y giro).")
-                .setPositiveButton("Unir") { _, _ -> runJoin(sel, !showingMusic) }
-                .setNegativeButton("Cancelar", null)
-                .show()
+            // [UNIR-ORDEN-1] la lista de marcar sigue abierta detrás: «Volver» regresa sin perder las marcas
+            workJoinOrder(chosen, onClose = { rows.notifyDataSetChanged() }) {
+                if (Mp3Converter.running.get() || LinkDownload.running.get()) {
+                    toast("Ya hay una conversión o descarga en curso")
+                } else {
+                    dlg.dismiss()
+                    runJoin(ArrayList(chosen), !showingMusic)
+                }
+            }
         }
+    }
+
+    /** [UNIR-ORDEN-1] Revisar y cambiar el orden con ↑ ↓ antes de unir. Cambia directamente la lista `order`. */
+    private fun workJoinOrder(order: ArrayList<MediaItem>, onClose: () -> Unit, onJoin: () -> Unit) {
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+        val wrap = android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        val rows = object : BaseAdapter() {
+            override fun getCount() = order.size
+            override fun getItem(position: Int) = order[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val adapterRef = this
+                val item = order[position]
+                // filas nuevas cada vez: son 20 como mucho y así los botones nunca apuntan a otra posición
+                val thumb = ImageView(ctx).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+                val pic = FrameLayout(ctx).apply {
+                    setBackgroundResource(R.drawable.bg_thumb)
+                    clipToOutline = true
+                    addView(ImageView(ctx).apply {
+                        setImageResource(if (item.isMusic) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
+                    }, FrameLayout.LayoutParams(dp(24), dp(24), android.view.Gravity.CENTER))
+                    addView(thumb, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                }
+                bindThumb(item, thumb)
+                val name = TextView(ctx).apply {
+                    textSize = 13f
+                    maxLines = 3
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(dp(8), 0, dp(4), 0)
+                    text = "${position + 1}. " + prettyTitle(item) +
+                        (if (item.durationSec > 0) "  ·  " + fmt(item.durationSec) else "")
+                }
+                fun arrow(label: String, to: Int, desc: String) = TextView(ctx).apply {
+                    text = label
+                    textSize = 22f
+                    gravity = android.view.Gravity.CENTER
+                    contentDescription = desc
+                    setTextColor(accentColor())
+                    val can = to >= 0 && to < order.size
+                    isEnabled = can
+                    alpha = if (can) 1f else 0.25f
+                    setOnClickListener {
+                        java.util.Collections.swap(order, position, to)
+                        adapterRef.notifyDataSetChanged()
+                    }
+                }
+                return android.widget.LinearLayout(ctx).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(0, dp(6), 0, dp(6))
+                    addView(pic, android.widget.LinearLayout.LayoutParams(dp(if (item.isMusic) 48 else 72), dp(48)))
+                    addView(name, android.widget.LinearLayout.LayoutParams(0, wrap, 1f))
+                    addView(arrow("↑", position - 1, "Subir"), android.widget.LinearLayout.LayoutParams(dp(44), dp(48)))
+                    addView(arrow("↓", position + 1, "Bajar"), android.widget.LinearLayout.LayoutParams(dp(44), dp(48)))
+                }
+            }
+        }
+        val note = TextView(ctx).apply {
+            text = "Se unirán de arriba abajo. Sin recodificar: solo funciona si todos son iguales (mismo códec, tamaño y giro)."
+            textSize = 13f
+        }
+        val list = ListView(ctx).apply { adapter = rows }
+        val box = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), 0)
+            addView(note)
+            addView(list, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.5f).toInt(), 1f))
+        }
+        val d = builder
+            .setTitle("🔗 Unir " + order.size + (if (showingMusic) " audios" else " videos"))
+            .setView(box)
+            .setPositiveButton("Unir") { _, _ -> onJoin() }
+            .setNegativeButton("Volver", null)
+            .create()
+        d.setOnDismissListener { onClose() }
+        d.show()
     }
 
     /** [UNIR-MINI-1] Filas de «Unir»: miniatura con duración, nombre, carpeta y fecha, y el número de orden al marcar. */
