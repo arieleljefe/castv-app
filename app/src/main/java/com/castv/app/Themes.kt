@@ -49,31 +49,37 @@ object Themes {
 
     val bgNames = arrayOf(
         "Medianoche", "AMOLED (negro)", "Pizarra", "Bosque", "Vino",
-        "Papel (modo claro)", "Neón", "Cassette", "Quisqueya"   // [TEMAS-3b]
+        "Papel (modo claro)", "Neón", "Cassette", "Quisqueya",   // [TEMAS-3b]
+        "Sakura (modo claro)", "Tokio", "Acero", "Kawaii (modo claro)"   // [TEMAS-5]
     )
 
     /** [TEMAS-3b] Papel es el único fondo para modo claro; el resto, para modo oscuro. */
     const val PAPER_BG = 5
 
+    /** [TEMAS-5] Fondos pensados para modo claro: Papel (5), Sakura (9) y Kawaii (12). */
+    private val lightBgs = setOf(5, 9, 12)
+
     // 0 = Medianoche: no lleva estilo propio (usa los colores de values-night)
     private val bgOverlays = intArrayOf(
         0, R.style.BgOverlayAmoled, R.style.BgOverlaySlate,
         R.style.BgOverlayForest, R.style.BgOverlayWine,
-        R.style.BgOverlayPaper, R.style.BgOverlayNeon, R.style.BgOverlayCassette, R.style.BgOverlayQuisqueya
+        R.style.BgOverlayPaper, R.style.BgOverlayNeon, R.style.BgOverlayCassette, R.style.BgOverlayQuisqueya,
+        R.style.BgOverlaySakura, R.style.BgOverlayTokio, R.style.BgOverlayAcero, R.style.BgOverlayKawaii
     )
 
     private val bgSwatches = intArrayOf(
         R.color.bgs_midnight_surface, R.color.bgs_amoled_surface, R.color.bgs_slate_surface,
         R.color.bgs_forest_surface, R.color.bgs_wine_surface,
-        R.color.bgs_paper_surface, R.color.bgs_neon_surface, R.color.bgs_cassette_surface, R.color.bgs_quisqueya_surface
+        R.color.bgs_paper_surface, R.color.bgs_neon_surface, R.color.bgs_cassette_surface, R.color.bgs_quisqueya_surface,
+        R.color.bgs_sakura_surface, R.color.bgs_tokio_surface, R.color.bgs_acero_surface, R.color.bgs_kawaii_surface
     )
 
     // [TEMAS-3a] Forma y letra. 0 = la de siempre (sin estilo). Claves `shape` y `font` en `castv`.
     val shapeNames = arrayOf("Redondeada (la de siempre)", "Cuadrada", "Píldora")
     private val shapeOverlays = intArrayOf(0, R.style.ShapeOverlaySquare, R.style.ShapeOverlayPill)
-    val fontNames = arrayOf("Normal", "Serif", "Monoespaciada", "Condensada")
+    val fontNames = arrayOf("Normal", "Serif", "Monoespaciada", "Condensada", "Divertida")
     private val fontOverlays = intArrayOf(
-        0, R.style.FontOverlaySerif, R.style.FontOverlayMono, R.style.FontOverlayCondensed
+        0, R.style.FontOverlaySerif, R.style.FontOverlayMono, R.style.FontOverlayCondensed, R.style.FontOverlayCasual
     )
 
     fun savedShape(a: Context): Int {
@@ -91,13 +97,13 @@ object Themes {
 
     /** [TEMAS-3b] ¿Este fondo se pinta con el modo actual? (Papel en claro; los demás en oscuro; 0 = el de siempre.) */
     fun bgApplies(c: Context, b: Int): Boolean =
-        b != 0 && (if (b == PAPER_BG) !isNight(c) else isNight(c))
+        b != 0 && (if (b in lightBgs) !isNight(c) else isNight(c))
 
     /** Aviso para Ajustes cuando el fondo elegido no se ve con el modo actual. */
     fun bgNote(c: Context): String {
         val b = savedBg(c)
         if (b == 0 || bgApplies(c, b)) return ""
-        return if (b == PAPER_BG) " · solo en modo claro" else " · solo en modo oscuro"
+        return if (b in lightBgs) " · solo en modo claro" else " · solo en modo oscuro"
     }
 
     fun isNight(c: Context): Boolean =
@@ -157,7 +163,15 @@ object Themes {
         Pack("Neón", "Morado oscuro, rosa y esquinas de píldora", 2, 4, 6, 2, 3, 0xFF0D0620.toInt(), 0xFFF472B6.toInt()),
         Pack("Cassette", "Marrón oscuro, naranja y letra de máquina", 2, 2, 7, 1, 2, 0xFF1A120B.toInt(), 0xFFFB923C.toInt()),
         Pack("Papel", "Claro y cálido, tinta índigo y serif", 1, 9, 5, 0, 1, 0xFFF5EFE0.toInt(), 0xFF4F46E5.toInt()),
-        Pack("Quisqueya", "Azul marino y rojo", 2, 5, 8, 0, 0, 0xFF0A1226.toInt(), 0xFFEF4444.toInt())
+        Pack("Quisqueya", "Azul marino y rojo", 2, 5, 8, 0, 0, 0xFF0A1226.toInt(), 0xFFEF4444.toInt()),
+        // [TEMAS-5] Estilo anime (solo colores, formas y letra; sin personajes ni marcas)
+        Pack("Sakura", "🌸 Claro, rosa de cerezo y esquinas de píldora", 1, 4, 9, 2, 0, 0xFFFFF1F5.toInt(), 0xFFDB2777.toInt()),
+        Pack("Neo Tokio", "🌃 Noche de ciudad, cian y letra condensada", 2, 0, 10, 1, 3, 0xFF070A1F.toInt(), 0xFF22D3EE.toInt()),
+        Pack("Shonen", "⚡ Pizarra oscura, naranja de energía y esquinas rectas", 2, 2, 2, 1, 3, 0xFF16181D.toInt(), 0xFFFB923C.toInt()),
+        Pack("Mecha", "🤖 Acero oscuro, rojo y letra de consola", 2, 5, 11, 1, 2, 0xFF101417.toInt(), 0xFFEF4444.toInt()),
+        Pack("Kawaii", "🍬 Claro lavanda, morado y letra divertida", 1, 3, 12, 2, 4, 0xFFF5F0FF.toInt(), 0xFF7C3AED.toInt()),
+        Pack("Samurái", "⚔️ Vino oscuro, rojo y serif", 2, 5, 4, 1, 1, 0xFF140A10.toInt(), 0xFFEF4444.toInt()),
+        Pack("Espíritu del bosque", "🍃 Bosque oscuro, menta y esquinas suaves", 2, 8, 3, 0, 0, 0xFF0A130F.toInt(), 0xFF2DD4BF.toInt())
     )
 
     private fun savedMode(a: Context): Int = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("theme", 2)
@@ -173,6 +187,7 @@ object Themes {
         1 -> Typeface.SERIF
         2 -> Typeface.MONOSPACE
         3 -> Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        4 -> Typeface.create("casual", Typeface.NORMAL)
         else -> Typeface.DEFAULT
     }
 

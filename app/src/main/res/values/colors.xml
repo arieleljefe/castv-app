@@ -87,4 +87,25 @@
     <color name="bgs_quisqueya_surface2">#FF182650</color>
     <color name="bgs_quisqueya_nav">#FF1E2F60</color>
     <color name="bgs_quisqueya_stroke">#FF2B3F7A</color>
+    <!-- [TEMAS-5] fondos de los temas de anime: Sakura y Kawaii (modo claro), Tokio y Acero (oscuro) -->
+    <color name="bgs_sakura_bg">#FFFFF1F5</color>
+    <color name="bgs_sakura_surface">#FFFFF8FA</color>
+    <color name="bgs_sakura_surface2">#FFFBE0E8</color>
+    <color name="bgs_sakura_nav">#FFF3CCD8</color>
+    <color name="bgs_sakura_stroke">#FFF0C4D2</color>
+    <color name="bgs_tokio_bg">#FF070A1F</color>
+    <color name="bgs_tokio_surface">#FF0E1530</color>
+    <color name="bgs_tokio_surface2">#FF161F42</color>
+    <color name="bgs_tokio_nav">#FF1B2650</color>
+    <color name="bgs_tokio_stroke">#FF2A3A78</color>
+    <color name="bgs_acero_bg">#FF101417</color>
+    <color name="bgs_acero_surface">#FF181D22</color>
+    <color name="bgs_acero_surface2">#FF222930</color>
+    <color name="bgs_acero_nav">#FF2A323A</color>
+    <color name="bgs_acero_stroke">#FF3A444E</color>
+    <color name="bgs_kawaii_bg">#FFF5F0FF</color>
+    <color name="bgs_kawaii_surface">#FFFDFBFF</color>
+    <color name="bgs_kawaii_surface2">#FFE9DEFB</color>
+    <color name="bgs_kawaii_nav">#FFDACBF5</color>
+    <color name="bgs_kawaii_stroke">#FFD6C7F2</color>
 </resources>

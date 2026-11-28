@@ -162,4 +162,36 @@
         <item name="castvNav">@color/bgs_quisqueya_nav</item>
         <item name="castvStroke">@color/bgs_quisqueya_stroke</item>
     </style>
+    <!-- [TEMAS-5] fondos de los temas de anime y letra Divertida -->
+    <style name="BgOverlaySakura">
+        <item name="castvBg">@color/bgs_sakura_bg</item>
+        <item name="castvSurface">@color/bgs_sakura_surface</item>
+        <item name="castvSurface2">@color/bgs_sakura_surface2</item>
+        <item name="castvNav">@color/bgs_sakura_nav</item>
+        <item name="castvStroke">@color/bgs_sakura_stroke</item>
+    </style>
+    <style name="BgOverlayTokio">
+        <item name="castvBg">@color/bgs_tokio_bg</item>
+        <item name="castvSurface">@color/bgs_tokio_surface</item>
+        <item name="castvSurface2">@color/bgs_tokio_surface2</item>
+        <item name="castvNav">@color/bgs_tokio_nav</item>
+        <item name="castvStroke">@color/bgs_tokio_stroke</item>
+    </style>
+    <style name="BgOverlayAcero">
+        <item name="castvBg">@color/bgs_acero_bg</item>
+        <item name="castvSurface">@color/bgs_acero_surface</item>
+        <item name="castvSurface2">@color/bgs_acero_surface2</item>
+        <item name="castvNav">@color/bgs_acero_nav</item>
+        <item name="castvStroke">@color/bgs_acero_stroke</item>
+    </style>
+    <style name="BgOverlayKawaii">
+        <item name="castvBg">@color/bgs_kawaii_bg</item>
+        <item name="castvSurface">@color/bgs_kawaii_surface</item>
+        <item name="castvSurface2">@color/bgs_kawaii_surface2</item>
+        <item name="castvNav">@color/bgs_kawaii_nav</item>
+        <item name="castvStroke">@color/bgs_kawaii_stroke</item>
+    </style>
+    <style name="FontOverlayCasual">
+        <item name="android:fontFamily">casual</item>
+    </style>
 </resources>
