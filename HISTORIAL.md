@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v571
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v573
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -231,3 +231,5 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TALLER-COMPARTIR-1 · 27 nov · Taller › «📤 Compartir varios»: marcar varios proyectos y enviarlos juntos (máx. 50 archivos) · `MainActivity.kt`
 - UNIR-NOMBRE-1 · 27 nov · antes de unir se pide el nombre del resultado (la app añade « (unido)» y la extensión); vacío = el del primero · `MainActivity.kt`
 - RENOMBRAR-1 · 27 nov · Taller › «✏️ Cambiar el nombre…»: renombra el archivo o todas las partes conservando sufijo y extensión; migra favoritos, listas, continuar, estadísticas, marcadores, letra y registros · `MainActivity.kt`, `Store.kt`, `Lrc.kt`, `Workshop.kt`
+- MEMORIA-1 · 28 nov · el build de `v3.35` fallaba con `OutOfMemoryError` al empaquetar el APK; `gradle.properties` limpio (sin líneas repetidas) con `org.gradle.jvmargs=-Xmx4g …` y `kotlin.daemon.jvmargs=-Xmx2g` · `gradle.properties`
+- TAG-3.38 · 28 nov · etiqueta `v3.38` publicada (commit `d9ab00c`) e instalada desde Ajustes › Actualizaciones; `v3.36` y `v3.37` quedaron saltadas; incluye todo lo posterior a `v3.35` (RENOMBRAR-1, TALLER-COMPARTIR-1, UNIR-NOMBRE-1, MEMORIA-1, etc.)
