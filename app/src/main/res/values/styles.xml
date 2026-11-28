@@ -133,4 +133,33 @@
     <style name="FontOverlayCondensed">
         <item name="android:fontFamily">sans-serif-condensed</item>
     </style>
+    <!-- [TEMAS-3b] fondos de los temas -->
+    <style name="BgOverlayPaper">
+        <item name="castvBg">@color/bgs_paper_bg</item>
+        <item name="castvSurface">@color/bgs_paper_surface</item>
+        <item name="castvSurface2">@color/bgs_paper_surface2</item>
+        <item name="castvNav">@color/bgs_paper_nav</item>
+        <item name="castvStroke">@color/bgs_paper_stroke</item>
+    </style>
+    <style name="BgOverlayNeon">
+        <item name="castvBg">@color/bgs_neon_bg</item>
+        <item name="castvSurface">@color/bgs_neon_surface</item>
+        <item name="castvSurface2">@color/bgs_neon_surface2</item>
+        <item name="castvNav">@color/bgs_neon_nav</item>
+        <item name="castvStroke">@color/bgs_neon_stroke</item>
+    </style>
+    <style name="BgOverlayCassette">
+        <item name="castvBg">@color/bgs_cassette_bg</item>
+        <item name="castvSurface">@color/bgs_cassette_surface</item>
+        <item name="castvSurface2">@color/bgs_cassette_surface2</item>
+        <item name="castvNav">@color/bgs_cassette_nav</item>
+        <item name="castvStroke">@color/bgs_cassette_stroke</item>
+    </style>
+    <style name="BgOverlayQuisqueya">
+        <item name="castvBg">@color/bgs_quisqueya_bg</item>
+        <item name="castvSurface">@color/bgs_quisqueya_surface</item>
+        <item name="castvSurface2">@color/bgs_quisqueya_surface2</item>
+        <item name="castvNav">@color/bgs_quisqueya_nav</item>
+        <item name="castvStroke">@color/bgs_quisqueya_stroke</item>
+    </style>
 </resources>

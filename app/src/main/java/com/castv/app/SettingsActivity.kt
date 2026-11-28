@@ -231,10 +231,11 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private fun entries(): List<Entry> {
         val l = ArrayList<Entry>()
-        l.add(Entry("Interfaz", "Tema", themeLabel(), { pickTheme() }))
+        l.add(Entry("Interfaz", "Tema", Themes.packLabel(this), { pickPack() }))   // [TEMAS-3b]
+        l.add(Entry("Interfaz", "Modo", themeLabel(), { pickTheme() }))   // [TEMAS-3b] Sistema / Claro / Oscuro
         l.add(Entry("Interfaz", "Color de acento", accentNames[savedAccent()], { pickAccent() }))
-        l.add(Entry("Interfaz", "Fondo oscuro",   // [TEMAS-2]
-            Themes.bgNames[Themes.savedBg(this)] + (if (Themes.isNight(this)) "" else " · solo en modo oscuro"),
+        l.add(Entry("Interfaz", "Fondo",   // [TEMAS-2]
+            Themes.bgNames[Themes.savedBg(this)] + Themes.bgNote(this),
             { pickBg() }))
 
         l.add(Entry("Interfaz", "Forma", Themes.shapeNames[Themes.savedShape(this)], { pickShape() }))   // [TEMAS-3a]
@@ -409,7 +410,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema, color de acento, fondo oscuro, forma, letra, tamaño del texto, filas compactas, botones grandes y vibración"
+        "Interfaz" -> "Tema, modo, color de acento, fondo, forma, letra, tamaño del texto, filas compactas, botones grandes y vibración"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -642,7 +643,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun pickTheme() {
         val labels = arrayOf("Sistema", "Claro", "Oscuro")
         AlertDialog.Builder(this)
-            .setTitle("Tema")
+            .setTitle("Modo")
             .setSingleChoiceItems(labels, savedTheme()) { d, which ->
                 prefs().edit().putInt("theme", which).apply()
                 d.dismiss()
@@ -650,6 +651,14 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 applyThemeMode(which)   // recrea las pantallas con el tema elegido
             }
             .show()
+    }
+
+    private fun pickPack() {   // [TEMAS-3b]
+        val before = savedTheme()
+        Themes.pickPack(this) {
+            applyThemeMode(savedTheme())   // si cambia el modo, Android recrea las pantallas
+            if (savedTheme() == before) recreate()   // si no, esta pantalla se redibuja; MainActivity lo hace al volver
+        }
     }
 
     private fun pickAccent() {

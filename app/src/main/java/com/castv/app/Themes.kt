@@ -9,7 +9,9 @@ import android.view.Gravity
 import android.view.View
 import android.util.TypedValue
 import android.view.ViewGroup
+import android.graphics.Typeface
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -45,17 +47,25 @@ object Themes {
         R.color.accent_mint, R.color.accent_indigo
     )
 
-    val bgNames = arrayOf("Medianoche", "AMOLED (negro)", "Pizarra", "Bosque", "Vino")
+    val bgNames = arrayOf(
+        "Medianoche", "AMOLED (negro)", "Pizarra", "Bosque", "Vino",
+        "Papel (modo claro)", "Neón", "Cassette", "Quisqueya"   // [TEMAS-3b]
+    )
+
+    /** [TEMAS-3b] Papel es el único fondo para modo claro; el resto, para modo oscuro. */
+    const val PAPER_BG = 5
 
     // 0 = Medianoche: no lleva estilo propio (usa los colores de values-night)
     private val bgOverlays = intArrayOf(
         0, R.style.BgOverlayAmoled, R.style.BgOverlaySlate,
-        R.style.BgOverlayForest, R.style.BgOverlayWine
+        R.style.BgOverlayForest, R.style.BgOverlayWine,
+        R.style.BgOverlayPaper, R.style.BgOverlayNeon, R.style.BgOverlayCassette, R.style.BgOverlayQuisqueya
     )
 
     private val bgSwatches = intArrayOf(
         R.color.bgs_midnight_surface, R.color.bgs_amoled_surface, R.color.bgs_slate_surface,
-        R.color.bgs_forest_surface, R.color.bgs_wine_surface
+        R.color.bgs_forest_surface, R.color.bgs_wine_surface,
+        R.color.bgs_paper_surface, R.color.bgs_neon_surface, R.color.bgs_cassette_surface, R.color.bgs_quisqueya_surface
     )
 
     // [TEMAS-3a] Forma y letra. 0 = la de siempre (sin estilo). Claves `shape` y `font` en `castv`.
@@ -78,6 +88,17 @@ object Themes {
 
     /** Un solo número con forma y letra, para que MainActivity sepa si cambiaron en Ajustes. */
     fun styleKey(a: Context): Int = savedShape(a) * 10 + savedFont(a)
+
+    /** [TEMAS-3b] ¿Este fondo se pinta con el modo actual? (Papel en claro; los demás en oscuro; 0 = el de siempre.) */
+    fun bgApplies(c: Context, b: Int): Boolean =
+        b != 0 && (if (b == PAPER_BG) !isNight(c) else isNight(c))
+
+    /** Aviso para Ajustes cuando el fondo elegido no se ve con el modo actual. */
+    fun bgNote(c: Context): String {
+        val b = savedBg(c)
+        if (b == 0 || bgApplies(c, b)) return ""
+        return if (b == PAPER_BG) " · solo en modo claro" else " · solo en modo oscuro"
+    }
 
     fun isNight(c: Context): Boolean =
         (c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -112,7 +133,7 @@ object Themes {
         val fo = savedFont(a)
         if (fo != 0) a.theme.applyStyle(fontOverlays[fo], true)
         val b = savedBg(a)
-        if (b != 0 && isNight(a)) {   // [TEMAS-2] Medianoche = sin cambios; en modo claro no se usa
+        if (bgApplies(a, b)) {   // [TEMAS-2] Medianoche = sin cambios; en modo claro no se usa
             a.theme.applyStyle(bgOverlays[b], true)
             if (paintWindow) {
                 a.window.setBackgroundDrawable(ColorDrawable(color(a, R.attr.castvBg)))
@@ -120,6 +141,100 @@ object Themes {
                 a.window.navigationBarColor = color(a, R.attr.castvSurface)
             }
         }
+    }
+
+    // ------------------------------------------------------------------ [TEMAS-3b] Temas
+    /** Un tema = modo + acento + fondo + forma + letra. Los tres últimos números son colores solo para la vista previa. */
+    class Pack(
+        val name: String, val desc: String,
+        val mode: Int, val accent: Int, val bg: Int, val shape: Int, val font: Int,
+        val pBg: Int, val pAccent: Int
+    )
+
+    val packs = listOf(
+        Pack("CASTV", "El de siempre: azul noche y cian", 2, 0, 0, 0, 0, 0xFF0B0F14.toInt(), 0xFF22D3EE.toInt()),
+        Pack("Cine", "Negro total, dorado y letra serif", 2, 7, 1, 1, 1, 0xFF000000.toInt(), 0xFFE5B93C.toInt()),
+        Pack("Neón", "Morado oscuro, rosa y esquinas de píldora", 2, 4, 6, 2, 3, 0xFF0D0620.toInt(), 0xFFF472B6.toInt()),
+        Pack("Cassette", "Marrón oscuro, naranja y letra de máquina", 2, 2, 7, 1, 2, 0xFF1A120B.toInt(), 0xFFFB923C.toInt()),
+        Pack("Papel", "Claro y cálido, tinta índigo y serif", 1, 9, 5, 0, 1, 0xFFF5EFE0.toInt(), 0xFF4F46E5.toInt()),
+        Pack("Quisqueya", "Azul marino y rojo", 2, 5, 8, 0, 0, 0xFF0A1226.toInt(), 0xFFEF4444.toInt())
+    )
+
+    private fun savedMode(a: Context): Int = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("theme", 2)
+
+    private fun matches(a: Context, p: Pack): Boolean =
+        savedMode(a) == p.mode && a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("accent", 0) == p.accent &&
+            savedBg(a) == p.bg && savedShape(a) == p.shape && savedFont(a) == p.font
+
+    /** Nombre del tema que coincide con lo guardado, o «Personalizado» si se retocó algo a mano. */
+    fun packLabel(a: Context): String = packs.firstOrNull { matches(a, it) }?.name ?: "Personalizado"
+
+    private fun typefaceOf(font: Int): Typeface = when (font) {
+        1 -> Typeface.SERIF
+        2 -> Typeface.MONOSPACE
+        3 -> Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        else -> Typeface.DEFAULT
+    }
+
+    /** Galería de temas con vista previa; al elegir guarda los cinco ajustes y llama a [onPicked]. */
+    fun pickPack(a: Activity, onPicked: () -> Unit) {
+        val cur = packs.indexOfFirst { matches(a, it) }
+        val dp = a.resources.displayMetrics.density
+        val adapter = object : ArrayAdapter<Pack>(a, 0, packs) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val p = packs[position]
+                val tf = typefaceOf(p.font)
+                val prev = TextView(a).apply {
+                    text = "Aa"
+                    textSize = 18f
+                    typeface = tf
+                    gravity = Gravity.CENTER
+                    setTextColor(p.pAccent)
+                    background = GradientDrawable().apply {
+                        setColor(p.pBg)
+                        cornerRadius = (when (p.shape) { 1 -> 3f; 2 -> 22f; else -> 12f }) * dp
+                        setStroke((2 * dp).toInt(), p.pAccent)
+                    }
+                    layoutParams = LinearLayout.LayoutParams((64 * dp).toInt(), (44 * dp).toInt())
+                }
+                val name = TextView(a).apply {
+                    text = if (position == cur) p.name + "  ✓" else p.name
+                    textSize = 16f
+                    typeface = tf
+                    setTextColor(ContextCompat.getColor(a, R.color.vlc_text))
+                }
+                val desc = TextView(a).apply {
+                    text = p.desc
+                    textSize = 13f
+                    setTextColor(ContextCompat.getColor(a, R.color.vlc_muted))
+                }
+                val box = LinearLayout(a).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding((16 * dp).toInt(), 0, 0, 0)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    addView(name)
+                    addView(desc)
+                }
+                return LinearLayout(a).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((24 * dp).toInt(), (10 * dp).toInt(), (24 * dp).toInt(), (10 * dp).toInt())
+                    addView(prev)
+                    addView(box)
+                }
+            }
+        }
+        AlertDialog.Builder(a)
+            .setTitle("Tema")
+            .setAdapter(adapter) { d, which ->
+                val p = packs[which]
+                a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit()
+                    .putInt("theme", p.mode).putInt("accent", p.accent).putInt("bgstyle", p.bg)
+                    .putInt("shape", p.shape).putInt("font", p.font).apply()
+                d.dismiss()
+                onPicked()
+            }
+            .show()
     }
 
     /** [TEMAS-2] Diálogo con una bolita por fondo; al elegir guarda y llama a [onPicked]. */
@@ -146,7 +261,7 @@ object Themes {
             }
         }
         AlertDialog.Builder(a)
-            .setTitle(if (isNight(a)) "Fondo oscuro" else "Fondo oscuro (solo se ve en modo oscuro)")
+            .setTitle("Fondo")
             .setAdapter(adapter) { d, which ->
                 a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit().putInt("bgstyle", which).apply()
                 d.dismiss()

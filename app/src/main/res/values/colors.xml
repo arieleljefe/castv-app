@@ -66,4 +66,25 @@
     <color name="bgs_wine_surface2">#FF2B1824</color>
     <color name="bgs_wine_nav">#FF33202C</color>
     <color name="bgs_wine_stroke">#FF4A2D3E</color>
+    <!-- [TEMAS-3b] fondos de los temas: Papel (para modo claro), Neón, Cassette y Quisqueya -->
+    <color name="bgs_paper_bg">#FFF5EFE0</color>
+    <color name="bgs_paper_surface">#FFFFFBF0</color>
+    <color name="bgs_paper_surface2">#FFEADFC8</color>
+    <color name="bgs_paper_nav">#FFE0D3B8</color>
+    <color name="bgs_paper_stroke">#FFD8CBB0</color>
+    <color name="bgs_neon_bg">#FF0D0620</color>
+    <color name="bgs_neon_surface">#FF150B2E</color>
+    <color name="bgs_neon_surface2">#FF1F1245</color>
+    <color name="bgs_neon_nav">#FF26165A</color>
+    <color name="bgs_neon_stroke">#FF4B2A8A</color>
+    <color name="bgs_cassette_bg">#FF1A120B</color>
+    <color name="bgs_cassette_surface">#FF241A11</color>
+    <color name="bgs_cassette_surface2">#FF30231A</color>
+    <color name="bgs_cassette_nav">#FF382A1F</color>
+    <color name="bgs_cassette_stroke">#FF4D3A2A</color>
+    <color name="bgs_quisqueya_bg">#FF0A1226</color>
+    <color name="bgs_quisqueya_surface">#FF101B38</color>
+    <color name="bgs_quisqueya_surface2">#FF182650</color>
+    <color name="bgs_quisqueya_nav">#FF1E2F60</color>
+    <color name="bgs_quisqueya_stroke">#FF2B3F7A</color>
 </resources>

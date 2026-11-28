@@ -319,7 +319,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun pickTheme() {
         val labels = arrayOf("Sistema", "Claro", "Oscuro")
         AlertDialog.Builder(this)
-            .setTitle("Tema")
+            .setTitle("Modo")
             .setSingleChoiceItems(labels, savedTheme()) { d, which ->
                 getSharedPreferences("castv", MODE_PRIVATE).edit().putInt("theme", which).apply()
                 d.dismiss()
@@ -1701,7 +1701,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         menu.add(0, 9, 8, "Ecualizador (teléfono)")
         if (showingMusic) menu.add(0, 28, 8, "🔊 Volumen extra: " + gainLabel())   // [VOLUMEN-1]
         menu.add(0, 10, 9, "Elegir TV")
-        menu.add(0, 12, 10, "Tema: " + themeLabel())
+        menu.add(0, 12, 10, "Modo: " + themeLabel())
         menu.add(0, 13, 11, "Color: " + accentNames[savedAccent()])
         if (Build.VERSION.SDK_INT >= 30) {
             menu.add(0, 14, 11, if (useTrash()) "Eliminado: a la papelera" else "Eliminado: permanente")
