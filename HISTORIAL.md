@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v593
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v594
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -248,3 +248,9 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TRAER-1 · 28 nov · al cambiar la salida de TV a Teléfono pregunta «¿Seguir escuchando/viendo aquí?» y sigue desde el mismo segundo · `MainActivity.kt`
 - TAG-3.40 · 28 nov · etiqueta `v3.40` publicada e instalada (la app muestra 3.40); incluye el lote visual 3
 - MEJORAS-VENT-1 · 28 nov · «Nuevo proyecto» con textos cortos; «Lo más escuchado» con título limpio, copias `_1` sumadas y conteo en la misma línea; diálogo Álbum ordenado por pistas con buscador y sin «??»; espacio al final de Pistas para el 🔀 · `MainActivity.kt`
+- CARPETA-2 · 28 nov · diálogo «Carpeta» con filas más juntas y buscador; la pulsación larga sigue ocultando la carpeta (`pickWithSearch` gana `compact` y `onLong`) · `MainActivity.kt`
+- BIENVENIDA-1 · 28 nov · guía de inicio de 3 pantallas: sale sola solo en una instalación nueva (`castv_welcome`) y se abre siempre desde Más › «👋 Guía de inicio» · `MainActivity.kt`
+- ÁLBUM-2 · 28 nov · en el diálogo «Álbum» los álbumes de 1 pista se agrupan en «🗂 Sueltas» (con buscador) cuando hay 5 o más · `MainActivity.kt`
+- VOLUMEN-1 · 28 nov · Más › «🔊 Volumen extra»: Apagado / +3 / +6 / +9 dB para la música del teléfono (`LoudnessEnhancer`, clave `music_gain`); sube todas las pistas por igual · `MainActivity.kt`
+- TAG-3.41 · 28 nov · etiqueta `v3.41` publicada (commit `248260c`): CARPETA-2 y BIENVENIDA-1
+- TAG-3.42 · 28 nov · etiqueta `v3.42` publicada (commit `133cab0`) e instalada: ÁLBUM-2 y VOLUMEN-1; la app muestra 3.42
