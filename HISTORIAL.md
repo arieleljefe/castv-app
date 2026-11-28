@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v557
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v560
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -220,3 +220,8 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - BUSCA-UNIR-1 · 27 nov · «🔎 Buscar por nombre» en la lista de Unir del Taller, en toda la biblioteca de la pestaña, conservando marcas y orden; botón «Siguiente (N)» · `MainActivity.kt`
 - UNIR-MINI-1 · 27 nov · la lista de Unir muestra miniatura o carátula, duración, carpeta, fecha y número de orden · `MainActivity.kt`
 - TALLER-FILTRO-1 · 27 nov · filtro en el Taller (Todos · Cortes · Partes · Unidos · MP3 · Descargas · Otros) con contador · `MainActivity.kt`, `activity_main.xml`
+- REDUCIR-1 · 27 nov · «📉 Reducir peso» de un video · `VideoReduce.kt`
+- QUITAR-AUDIO-1 · 27 nov · «🔇 Quitar audio» de un video · `VideoMute.kt`
+- DIVIDIR-1 y 2 · 27 nov · dividir un video por tamaño o por duración · `VideoSplit.kt`
+- CARPETA-1 y 1b · 27 nov · al terminar, botones para abrir el resultado y su ubicación
+- CORTAR-3 · 27 nov · «▶ Oír el tramo» pausa el video del reproductor antes de sonar · `CutAudio.kt`
