@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v576
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v577
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -233,3 +233,8 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - RENOMBRAR-1 · 27 nov · Taller › «✏️ Cambiar el nombre…»: renombra el archivo o todas las partes conservando sufijo y extensión; migra favoritos, listas, continuar, estadísticas, marcadores, letra y registros · `MainActivity.kt`, `Store.kt`, `Lrc.kt`, `Workshop.kt`
 - MEMORIA-1 · 28 nov · el build de `v3.35` fallaba con `OutOfMemoryError` al empaquetar el APK; `gradle.properties` limpio (sin líneas repetidas) con `org.gradle.jvmargs=-Xmx4g …` y `kotlin.daemon.jvmargs=-Xmx2g` · `gradle.properties`
 - TAG-3.38 · 28 nov · etiqueta `v3.38` publicada (commit `d9ab00c`) e instalada desde Ajustes › Actualizaciones; `v3.36` y `v3.37` quedaron saltadas; incluye todo lo posterior a `v3.35` (RENOMBRAR-1, TALLER-COMPARTIR-1, UNIR-NOMBRE-1, MEMORIA-1, etc.)
+- LOGO-CACHE-1 + LOGO-FICHA-1 + LOGO-PRIORIDAD-1 · 28 nov · logos de Canales: caché en el teléfono (30 días, ~40 MB), ficha oscura con la inicial mientras llega el logo, 5 descargas a la vez (la última pedida va primero), reintento a los 60 s y `prefetch` de Favoritos/Continuar/Más vistos · `Logos.kt`, `M3uActivity.kt`
+- ICONOS-MAS-1 + PIE-1 · 28 nov · Más: iconos propios (resumen, más visto, incógnito, no vistos, diagnóstico); el Taller vacío ya no muestra el pie de redes · `MainActivity.kt`, `ic_mas_chart.xml`, `ic_mas_trending.xml`, `ic_mas_incognito.xml`
+- CARPETA-RUTA-1 · 28 nov · las carpetas se muestran con nombre legible («WhatsApp Business Video», «… › Sent»; duplicadas con ruta legible); filtrar y ocultar siguen con la ruta cruda · `MainActivity.kt`
+- AVISO-MINI-1 · 28 nov · los avisos de `toast()` salen como pastilla con borde de acento justo encima del mini reproductor (fundido, se quita sola o al tocarla; Toast normal si la pantalla no está lista) · `MainActivity.kt`
+- AJUSTES-ICONOS-1 · 28 nov · portada de Ajustes con 15 tarjetas redondeadas, icono en círculo de acento, resumen y flecha · `SettingsActivity.kt`
