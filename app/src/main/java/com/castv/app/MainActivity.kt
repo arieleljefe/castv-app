@@ -1391,7 +1391,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     /** [VENT-1] Lista de opciones con buscador arriba, filas de hasta 2 líneas y alto máximo de ~60 % de la pantalla.
      *  `onPick` recibe la posición en la lista ORIGINAL (aunque se esté filtrando). */
-    private fun pickWithSearch(title: String, labels: List<String>, onPick: (Int) -> Unit) {
+    private fun pickWithSearch(
+        title: String,
+        labels: List<String>,
+        compact: Boolean = false,                          // [CARPETA-2] filas más juntas
+        onLong: ((Int, AlertDialog) -> Unit)? = null,      // [CARPETA-2] pulsación larga (índice original, diálogo)
+        onPick: (Int) -> Unit
+    ) {
         val dp = resources.displayMetrics.density
         val box = EditText(this).apply { hint = "🔎 Buscar…"; setSingleLine(true) }
         val lv = ListView(this)
@@ -1402,6 +1408,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 (v as? android.widget.TextView)?.apply {
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
+                    if (compact) {   // [CARPETA-2]
+                        minHeight = (40 * dp).toInt()
+                        setPadding(paddingLeft, (6 * dp).toInt(), paddingRight, (6 * dp).toInt())
+                    }
                 }
                 return v
             }
@@ -1436,6 +1446,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             dlg.dismiss()
             onPick(idx)
         }
+        lv.setOnItemLongClickListener { _, _, pos, _ ->   // [CARPETA-2]
+            val idx = shown.getOrNull(pos)
+            val ol = onLong
+            if (idx != null && ol != null) { ol(idx, dlg); true } else false
+        }
         dlg.show()
     }
 
@@ -1452,17 +1467,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val name = if ((repeated[shown[i]] ?: 0) > 1) folderPathPretty(f) else shown[i]   // dos con el mismo nombre: se ve la ruta
             labels.add("📁 $name (${counts[f]})")
         }
-        val picker = AlertDialog.Builder(this)
-            .setTitle("Carpeta")
-            .setItems(labels.toTypedArray()) { _, which ->
-                selectedFolder = if (which == 0) null else folders[which - 1]
-                applyFilters()
-            }
-            .show()
-        // [CARPETAS-1] mantener pulsada una carpeta la oculta de la biblioteca
-        picker.listView.setOnItemLongClickListener { _, _, pos, _ ->
-            if (pos > 0) confirmHideFolder(folders[pos - 1], picker)
-            true
+        // [CARPETA-2] filas más juntas y buscador; [CARPETAS-1] mantener pulsada una carpeta la oculta de la biblioteca
+        pickWithSearch("Carpeta", labels, compact = true, onLong = { idx, dlg ->
+            if (idx > 0) confirmHideFolder(folders[idx - 1], dlg)
+        }) { which ->
+            selectedFolder = if (which == 0) null else folders[which - 1]
+            applyFilters()
         }
     }
 
