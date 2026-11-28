@@ -250,7 +250,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         row1.setPadding(0, dp(2), 0, dp(2))
         hiddenBtn = chip("👁") { showHiddenDialog() }   // [OCULTAR-1]
         hiddenBtn.contentDescription = "Canales ocultos"
-        val addBtn = chip("＋ Lista") { addListDialog() }
+        val addBtn = chip("＋ Lista M3U") { addListDialog() }   // [LISTA-NOMBRE-1] «lista» sola era ambigua: aquí es una lista de canales
         val delBtn = chip("🗑 Quitar") { removeCurrent() }
         for (b in listOf(hiddenBtn, addBtn, delBtn)) {   // [CANALES-2] favBtn ya está en la cabecera
             b.textSize = 13f
@@ -265,7 +265,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         (hiddenBtn.layoutParams as LinearLayout.LayoutParams).leftMargin = 0   // [CANALES-2]
         iconLabel(favBtn, R.drawable.ic_star_border, "Favs")   // [ICONOS-2]
         favBtn.setOnLongClickListener { favStartMenu(); true }   // [FAV-INICIO-1]
-        iconLabel(addBtn, R.drawable.ic_add, "Lista")
+        iconLabel(addBtn, R.drawable.ic_add, "Lista M3U")
         iconLabel(delBtn, R.drawable.ic_delete, "Quitar")
         // [M3U-EXPORT-1] solo se ve con ★ Favs activo: exporta los favoritos como .m3u
         exportBtn = chip("📤") { exportFavsDialog() }

@@ -1585,7 +1585,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             else -> "Ocultar duplicados (${dupIds.size})"
         })
         menu.add(0, 3, 2, if (outPhone) "Salida: Teléfono" else "Salida: TV")
-        menu.add(0, 4, 3, "Mis listas")
+        menu.add(0, 4, 3, "Listas de reproducción")   // [LISTA-NOMBRE-1]
         if (showingMusic) {
             menu.add(0, 5, 4, "Filtrar por artista")
             menu.add(0, 6, 5, "Filtrar por álbum")
@@ -6461,7 +6461,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         for (n in names) labels.add(CastvIcons.item(icPl2, R.drawable.ic_mn_queue_music, "$n (${Store.listSize(n)})"))
         labels.add(CastvIcons.item(icPl2, R.drawable.ic_vp_add, "Nueva lista…"))
         bldPl2
-            .setTitle("Mis listas")
+            .setTitle("Mis listas de reproducción")   // [LISTA-NOMBRE-1]
             .setItems(labels.toTypedArray()) { _, which ->
                 if (which == names.size) {
                     promptNewList { n -> toast("Lista «$n» creada. Añade pistas con ⋮ › Añadir a lista") }
