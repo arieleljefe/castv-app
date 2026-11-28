@@ -445,6 +445,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             setStatus(if (outPhone) "📱 La música y los videos se verán en el teléfono"
                       else "📺 La música y los videos irán al TV")
             if (!outPhone) offerTvPicker()   // [TV-2]
+            if (outPhone && !localActive && playingItem != null && !linkOnTv && Zap.nowTitle == null) offerBringToPhone()   // [TRAER-1]
         }
 
         adapter = FileAdapter()
@@ -2875,6 +2876,21 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 )
             }
         }
+    }
+
+    /** [TRAER-1] Al cambiar la salida a Teléfono con una pista o video sonando en el TV: ofrece seguir aquí desde el mismo punto. */
+    private fun offerBringToPhone() {
+        val item = playingItem ?: return
+        val pos = if (lastDur > 0 && lastPos >= lastDur - 5) 0 else lastPos
+        AlertDialog.Builder(this)
+            .setTitle(if (item.isMusic) "¿Seguir escuchando aquí?" else "¿Seguir viendo aquí?")
+            .setMessage("«${prettyTitle(item)}» está en el TV (${fmt(pos)}). ¿Pasarlo al teléfono desde ese punto?")
+            .setPositiveButton("Sí, pasar") { _, _ ->
+                // el video detiene el TV en playVideoOnPhone; la música, en startLocal
+                if (item.isMusic) startPlayback(item, pos) else playVideoOnPhone(item, pos)
+            }
+            .setNegativeButton("No", null)
+            .show()
     }
 
     /** IP del teléfono en la interfaz que realmente llega al TV (no la de datos móviles). */
