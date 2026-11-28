@@ -4423,7 +4423,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (many) "📤 Compartir todas" else "📤 Compartir",
                 "📂 Ubicación",
                 "🔁 Usar con otra herramienta…",
-                "🗑 Quitar de la lista")) { _, which ->
+                "🗑 Quitar de la lista",
+                if (many) "❌ Eliminar los archivos…" else "❌ Eliminar el archivo…")) { _, which ->
                 when (which) {
                     0 -> {
                         playlist = ArrayList(p.parts)
@@ -4434,6 +4435,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     1 -> workShare(p)
                     2 -> workFolder(p)
                     3 -> workReuse(p)   // [TALLER-2]
+                    5 -> {   // [TALLER-2] usa la misma confirmación, papelera y PIN que Eliminar de siempre
+                        workLastScan = 0L
+                        confirmDelete(p.parts)
+                    }
                     else -> {
                         Workshop.hide(this, p.key)
                         workProjects = workProjects.filter { it.key != p.key }
