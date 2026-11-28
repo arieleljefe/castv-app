@@ -154,7 +154,8 @@ object Themes {
     class Pack(
         val name: String, val desc: String,
         val mode: Int, val accent: Int, val bg: Int, val shape: Int, val font: Int,
-        val pBg: Int, val pAccent: Int
+        val pBg: Int, val pAccent: Int,
+        val kind: Int = 0   // [TEMAS-6] 0 = de fábrica, 1 = mío, 2 = fila «Guardar el tema de ahora»
     )
 
     val packs = listOf(
@@ -181,7 +182,10 @@ object Themes {
             savedBg(a) == p.bg && savedShape(a) == p.shape && savedFont(a) == p.font
 
     /** Nombre del tema que coincide con lo guardado, o «Personalizado» si se retocó algo a mano. */
-    fun packLabel(a: Context): String = packs.firstOrNull { matches(a, it) }?.name ?: "Personalizado"
+    fun packLabel(a: Context): String =
+        packs.firstOrNull { matches(a, it) }?.name
+            ?: myThemes(a).firstOrNull { matchesMy(a, it) }?.name
+            ?: "Personalizado"
 
     private fun typefaceOf(font: Int): Typeface = when (font) {
         1 -> Typeface.SERIF
@@ -191,31 +195,188 @@ object Themes {
         else -> Typeface.DEFAULT
     }
 
-    /** Galería de temas con vista previa; al elegir guarda los cinco ajustes y llama a [onPicked]. */
-    fun pickPack(a: Activity, onPicked: () -> Unit) {
-        val cur = packs.indexOfFirst { matches(a, it) }
+    // ------------------------------------------------------------------ [TEMAS-6] Mis temas
+    class MyTheme(val name: String, val mode: Int, val accent: Int, val bg: Int, val shape: Int, val font: Int)
+
+    private fun myPrefs(a: Context) = a.getSharedPreferences("castv_themes", Context.MODE_PRIVATE)
+
+    fun myThemes(a: Context): MutableList<MyTheme> {
+        val out = ArrayList<MyTheme>()
+        try {
+            val arr = org.json.JSONArray(myPrefs(a).getString("list", "[]"))
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                out.add(MyTheme(
+                    o.optString("name", "Mi tema"), o.optInt("mode", 2).coerceIn(0, 2),
+                    o.optInt("accent", 0), o.optInt("bg", 0), o.optInt("shape", 0), o.optInt("font", 0)
+                ))
+            }
+        } catch (e: Exception) {
+            // lista dañada: se ignora y se empieza vacía
+        }
+        return out
+    }
+
+    private fun saveMyThemes(a: Context, l: List<MyTheme>) {
+        val arr = org.json.JSONArray()
+        for (t in l) {
+            arr.put(org.json.JSONObject()
+                .put("name", t.name).put("mode", t.mode).put("accent", t.accent)
+                .put("bg", t.bg).put("shape", t.shape).put("font", t.font))
+        }
+        myPrefs(a).edit().putString("list", arr.toString()).apply()
+    }
+
+    private fun currentAsMy(a: Context, name: String): MyTheme = MyTheme(
+        name, savedMode(a), a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("accent", 0),
+        savedBg(a), savedShape(a), savedFont(a)
+    )
+
+    private fun matchesMy(a: Context, t: MyTheme): Boolean =
+        savedMode(a) == t.mode && a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("accent", 0) == t.accent &&
+            savedBg(a) == t.bg && savedShape(a) == t.shape && savedFont(a) == t.font
+
+    private fun applyValues(a: Context, mode: Int, accent: Int, bg: Int, shape: Int, font: Int) {
+        a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit()
+            .putInt("theme", mode).putInt("accent", accent).putInt("bgstyle", bg)
+            .putInt("shape", shape).putInt("font", font).apply()
+    }
+
+    /** Añade o reemplaza (mismo nombre) un tema propio; máximo 20. */
+    private fun addMy(a: Activity, t: MyTheme, onSaved: () -> Unit): Boolean {
+        val l = myThemes(a)
+        if (l.size >= 20 && l.none { it.name == t.name }) {
+            android.widget.Toast.makeText(a, "Máximo 20 temas propios: borra alguno primero", android.widget.Toast.LENGTH_LONG).show()
+            return false
+        }
+        l.removeAll { it.name == t.name }
+        l.add(t)
+        saveMyThemes(a, l)
+        onSaved()
+        android.widget.Toast.makeText(a, "✓ Guardado: " + t.name, android.widget.Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    private fun askName(a: Activity, title: String, initial: String, onOk: (String) -> Unit) {
         val dp = a.resources.displayMetrics.density
-        val adapter = object : ArrayAdapter<Pack>(a, 0, packs) {
+        val et = android.widget.EditText(a).apply {
+            setText(initial)
+            setSelectAllOnFocus(true)
+            isSingleLine = true
+            filters = arrayOf<android.text.InputFilter>(android.text.InputFilter.LengthFilter(24))
+            setTextColor(ContextCompat.getColor(a, R.color.vlc_text))
+        }
+        val box = LinearLayout(a).apply {
+            setPadding((24 * dp).toInt(), (8 * dp).toInt(), (24 * dp).toInt(), 0)
+            addView(et, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        AlertDialog.Builder(a)
+            .setTitle(title)
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ -> onOk(et.text.toString().trim()) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** Mantener pulsado en la galería: copia de un tema de fábrica, o editar uno propio. */
+    private fun editMenu(a: Activity, p: Pack, onSaved: () -> Unit, reopen: () -> Unit) {
+        if (p.kind == 0) {
+            AlertDialog.Builder(a)
+                .setTitle(p.name)
+                .setItems(arrayOf("Guardar una copia en Mis temas", "Cancelar")) { _, w ->
+                    if (w == 0) {
+                        askName(a, "Nombre de la copia", p.name + " (mío)") { n ->
+                            val name = if (n.isEmpty()) p.name + " (mío)" else n
+                            addMy(a, MyTheme(name, p.mode, p.accent, p.bg, p.shape, p.font), onSaved)
+                            reopen()
+                        }
+                    } else reopen()
+                }
+                .show()
+            return
+        }
+        AlertDialog.Builder(a)
+            .setTitle(p.name)
+            .setItems(arrayOf("Actualizar con lo de ahora", "Renombrar", "Borrar", "Cancelar")) { _, w ->
+                val l = myThemes(a)
+                val i = l.indexOfFirst { it.name == p.name }
+                when {
+                    w == 0 && i >= 0 -> {
+                        l[i] = currentAsMy(a, p.name)
+                        saveMyThemes(a, l); onSaved()
+                        android.widget.Toast.makeText(a, "✓ Actualizado: " + p.name, android.widget.Toast.LENGTH_SHORT).show()
+                        reopen()
+                    }
+                    w == 1 && i >= 0 -> askName(a, "Nuevo nombre", p.name) { n ->
+                        val cur = myThemes(a)
+                        val j = cur.indexOfFirst { it.name == p.name }
+                        if (n.isEmpty() || j < 0) {
+                            reopen()
+                        } else if (n != p.name && cur.any { it.name == n }) {
+                            android.widget.Toast.makeText(a, "Ya hay un tema con ese nombre", android.widget.Toast.LENGTH_SHORT).show()
+                            reopen()
+                        } else {
+                            val t = cur[j]
+                            cur[j] = MyTheme(n, t.mode, t.accent, t.bg, t.shape, t.font)
+                            saveMyThemes(a, cur); onSaved(); reopen()
+                        }
+                    }
+                    w == 2 && i >= 0 -> AlertDialog.Builder(a)
+                        .setTitle("¿Borrar «" + p.name + "»?")
+                        .setPositiveButton("Borrar") { _, _ ->
+                            val cur = myThemes(a)
+                            cur.removeAll { it.name == p.name }
+                            saveMyThemes(a, cur); onSaved(); reopen()
+                        }
+                        .setNegativeButton("Cancelar") { _, _ -> reopen() }
+                        .show()
+                    else -> reopen()
+                }
+            }
+            .show()
+    }
+
+    /**
+     * Galería de temas con vista previa; al elegir guarda los cinco ajustes y llama a [onPicked].
+     * [TEMAS-6] Arriba: «＋ Guardar el tema de ahora» y «Mis temas»; mantener pulsado = copiar, renombrar, actualizar o borrar.
+     * [onSaved] se llama cuando cambia la lista o el nombre que muestra Ajustes.
+     */
+    fun pickPack(a: Activity, onSaved: () -> Unit = {}, onPicked: () -> Unit) {
+        val mine = myThemes(a)
+        val rows = ArrayList<Pack>()
+        rows.add(Pack("＋ Guardar el tema de ahora", "Con el nombre que quieras: modo, acento, fondo, forma y letra", 2, 0, 0, 0, 0, 0, 0, 2))
+        for (t in mine) {
+            rows.add(Pack(
+                t.name, "Mi tema · mantén pulsado para editarlo", t.mode, t.accent, t.bg, t.shape, t.font,
+                ContextCompat.getColor(a, bgSwatches[t.bg.coerceIn(0, bgSwatches.size - 1)]),
+                ContextCompat.getColor(a, swatches[t.accent.coerceIn(0, swatches.size - 1)]), 1
+            ))
+        }
+        rows.addAll(packs)
+        val cur = rows.indexOfFirst { it.kind != 2 && matches(a, it) }
+        val dp = a.resources.displayMetrics.density
+        val adapter = object : ArrayAdapter<Pack>(a, 0, rows) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val p = packs[position]
+                val p = rows[position]
                 val tf = typefaceOf(p.font)
+                val fg = if (p.kind == 2) ContextCompat.getColor(a, R.color.vlc_text) else p.pAccent
                 val prev = TextView(a).apply {
-                    text = "Aa"
+                    text = if (p.kind == 2) "＋" else "Aa"
                     textSize = 18f
-                    typeface = tf
+                    typeface = if (p.kind == 2) Typeface.DEFAULT else tf
                     gravity = Gravity.CENTER
-                    setTextColor(p.pAccent)
+                    setTextColor(fg)
                     background = GradientDrawable().apply {
-                        setColor(p.pBg)
+                        setColor(if (p.kind == 2) 0 else p.pBg)
                         cornerRadius = (when (p.shape) { 1 -> 3f; 2 -> 22f; else -> 12f }) * dp
-                        setStroke((2 * dp).toInt(), p.pAccent)
+                        setStroke((2 * dp).toInt(), fg)
                     }
                     layoutParams = LinearLayout.LayoutParams((64 * dp).toInt(), (44 * dp).toInt())
                 }
                 val name = TextView(a).apply {
                     text = if (position == cur) p.name + "  ✓" else p.name
                     textSize = 16f
-                    typeface = tf
+                    typeface = if (p.kind == 2) Typeface.DEFAULT_BOLD else tf
                     setTextColor(ContextCompat.getColor(a, R.color.vlc_text))
                 }
                 val desc = TextView(a).apply {
@@ -239,17 +400,32 @@ object Themes {
                 }
             }
         }
-        AlertDialog.Builder(a)
+        val reopen = { pickPack(a, onSaved, onPicked) }
+        val dlg = AlertDialog.Builder(a)
             .setTitle("Tema")
             .setAdapter(adapter) { d, which ->
-                val p = packs[which]
-                a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit()
-                    .putInt("theme", p.mode).putInt("accent", p.accent).putInt("bgstyle", p.bg)
-                    .putInt("shape", p.shape).putInt("font", p.font).apply()
+                val p = rows[which]
                 d.dismiss()
-                onPicked()
+                if (p.kind == 2) {
+                    val n0 = "Mi tema " + (mine.size + 1)
+                    askName(a, "Nombre de tu tema", n0) { n ->
+                        addMy(a, currentAsMy(a, if (n.isEmpty()) n0 else n), onSaved)
+                        reopen()
+                    }
+                } else {
+                    applyValues(a, p.mode, p.accent, p.bg, p.shape, p.font)
+                    onPicked()
+                }
             }
             .show()
+        dlg.listView.setOnItemLongClickListener { _, _, pos, _ ->
+            val p = rows[pos]
+            if (p.kind != 2) {
+                dlg.dismiss()
+                editMenu(a, p, onSaved, reopen)
+            }
+            true
+        }
     }
 
     /** [TEMAS-2] Diálogo con una bolita por fondo; al elegir guarda y llama a [onPicked]. */

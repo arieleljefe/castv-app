@@ -655,7 +655,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private fun pickPack() {   // [TEMAS-3b]
         val before = savedTheme()
-        Themes.pickPack(this) {
+        Themes.pickPack(this, { render() }) {
             applyThemeMode(savedTheme())   // si cambia el modo, Android recrea las pantallas
             if (savedTheme() == before) recreate()   // si no, esta pantalla se redibuja; MainActivity lo hace al volver
         }
