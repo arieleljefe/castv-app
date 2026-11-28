@@ -1378,8 +1378,26 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
         // [VENT-1] los de más pistas primero (empate: por nombre), «?» sueltos fuera, y un buscador arriba
         val names = counts.keys.sortedWith(compareByDescending<String> { counts[it] ?: 0 }.thenComparator { a, b -> naturalCompare(norm(a), norm(b)) })
+        // [ALBUM-2] los álbumes de 1 pista se agrupan en una fila «Sueltas» (solo si hay varios de más pistas y 5 o más sueltos)
+        val multi = names.filter { (counts[it] ?: 0) >= 2 }
+        val singles = names.filter { (counts[it] ?: 0) < 2 }
         val labels = ArrayList<String>()
         labels.add("💿 Todos los álbumes")
+        if (multi.isNotEmpty() && singles.size >= 5) {
+            multi.forEach { labels.add("💿 ${cleanQ(it)} (${counts[it]})") }
+            labels.add("🗂 Sueltas: ${singles.size} álbumes de 1 pista…")
+            pickWithSearch("Álbum", labels) { which ->
+                when {
+                    which == 0 -> { selectedAlbum = null; applyFilters() }
+                    which <= multi.size -> { selectedAlbum = multi[which - 1]; applyFilters() }
+                    else -> pickWithSearch("Álbumes de 1 pista", singles.map { "💿 ${cleanQ(it)}" }) { w ->
+                        selectedAlbum = singles[w]
+                        applyFilters()
+                    }
+                }
+            }
+            return
+        }
         names.forEach { labels.add("💿 ${cleanQ(it)} (${counts[it]})") }
         pickWithSearch("Álbum", labels) { which ->
             selectedAlbum = if (which == 0) null else names[which - 1]
