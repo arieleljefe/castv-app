@@ -4733,8 +4733,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (Mp3Converter.running.get() || LinkDownload.running.get()) {
                     toast("Ya hay una conversión o descarga en curso")
                 } else {
-                    dlg.dismiss()
-                    runJoin(ArrayList(chosen), !showingMusic)
+                    val vid = !showingMusic
+                    askJoinName(chosen[0], vid) { nm ->   // [UNIR-NOMBRE-1] si se cancela, la lista de marcar sigue abierta
+                        dlg.dismiss()
+                        runJoin(ArrayList(chosen), vid, nm)
+                    }
                 }
             }
         }
@@ -5222,15 +5225,53 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .setMessage("Se unirán en este orden (el de la lista; cámbialo con «Ordenar»):\n\n" + order +
                 "\n\nSin recodificar: no pierde calidad, pero solo funciona si todos son iguales (mismo códec, tamaño y giro)." +
                 (if (allMus) " Para audios, solo .m4a/AAC." else ""))
-            .setPositiveButton("Unir") { _, _ -> runJoin(sel, allVid) }
+            .setPositiveButton("Unir") { _, _ -> askJoinName(sel[0], allVid) { nm -> runJoin(sel, allVid, nm) } }   // [UNIR-NOMBRE-1]
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun runJoin(sel: List<MediaItem>, video: Boolean) {
+    /**
+     * [UNIR-NOMBRE-1] Pide el nombre del resultado antes de unir. Vacío = el de siempre (nombre del 1.º). La app añade « (unido)»
+     * (así el Taller lo reconoce) y la extensión; los caracteres que no valen en un archivo se cambian por «_». Cancelar no une nada.
+     * Entrega el nombre con extensión para que `Mp3Converter.cleanTitle` solo quite esa (un nombre como «Fiesta 12.30» no se corta).
+     */
+    private fun askJoinName(first: MediaItem, video: Boolean, go: (String?) -> Unit) {
+        val ext = if (video) ".mp4" else ".m4a"
+        val tail = Regex("\\s*\\(unido\\)\\s*$")
+        val def = Mp3Converter.cleanTitle(first.name).replace(tail, "")
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        val side = (20 * resources.displayMetrics.density).toInt()
+        val et = EditText(ctx).apply {
+            setText(def)
+            setSingleLine(true)
+            hint = "Nombre del archivo"
+            setSelection(text.length)
+        }
+        val box = android.widget.LinearLayout(ctx).apply {
+            setPadding(side, side / 2, side, 0)
+            addView(et, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        val dlg = builder
+            .setTitle("🔗 Nombre del resultado")
+            .setMessage("Se guardará en Descargas como «nombre (unido)$ext». Déjalo vacío para usar el del primer archivo.")
+            .setView(box)
+            .setPositiveButton("Unir") { _, _ ->
+                val typed = et.text.toString().trim().replace(tail, "").trim()
+                go(if (typed.isEmpty()) null else typed + ext)
+            }
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dlg.show()
+        et.requestFocus()
+    }
+
+    private fun runJoin(sel: List<MediaItem>, video: Boolean, typedName: String? = null) {
         val app = applicationContext
         val uris = sel.map { uriOf(it) }
-        val names = sel.map { it.name }
+        val names = if (typedName.isNullOrBlank()) sel.map { it.name } else listOf(typedName) + sel.drop(1).map { it.name }   // [UNIR-NOMBRE-1]
         val title = "🔗 Unir"
         batchCancel = false
         LinkJobNotifier.cancel = false
