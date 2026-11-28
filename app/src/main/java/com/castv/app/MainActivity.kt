@@ -365,6 +365,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
 
         listFiles = findViewById(R.id.listFiles)
+        // [VENT-1] espacio al final de la lista para que el botón 🔀 no tape el ⋮ de la última fila
+        listFiles.clipToPadding = false
+        listFiles.setPadding(listFiles.paddingLeft, listFiles.paddingTop, listFiles.paddingRight,
+            maxOf(listFiles.paddingBottom, (88 * resources.displayMetrics.density).toInt()))
         val inflater = LayoutInflater.from(this)
         val footer = inflater.inflate(R.layout.footer_credits, listFiles, false)
         listFiles.addFooterView(footer, null, false)
@@ -1371,17 +1375,68 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             toast("Tus archivos no traen el dato del álbum")
             return
         }
-        val names = counts.keys.sortedWith { a, b -> naturalCompare(norm(a), norm(b)) }
+        // [VENT-1] los de más pistas primero (empate: por nombre), «?» sueltos fuera, y un buscador arriba
+        val names = counts.keys.sortedWith(compareByDescending<String> { counts[it] ?: 0 }.thenComparator { a, b -> naturalCompare(norm(a), norm(b)) })
         val labels = ArrayList<String>()
         labels.add("💿 Todos los álbumes")
-        names.forEach { labels.add("💿 $it (${counts[it]})") }
-        AlertDialog.Builder(this)
-            .setTitle("Álbum")
-            .setItems(labels.toTypedArray()) { _, which ->
-                selectedAlbum = if (which == 0) null else names[which - 1]
-                applyFilters()
+        names.forEach { labels.add("💿 ${cleanQ(it)} (${counts[it]})") }
+        pickWithSearch("Álbum", labels) { which ->
+            selectedAlbum = if (which == 0) null else names[which - 1]
+            applyFilters()
+        }
+    }
+
+    /** [VENT-1] Quita los «?» seguidos (emojis que Android no pudo leer) y deja espacios normales. Solo para mostrar. */
+    private fun cleanQ(s: String): String = s.replace(Regex("\\?{2,}"), " ").replace(Regex("\\s{2,}"), " ").trim().ifEmpty { s }
+
+    /** [VENT-1] Lista de opciones con buscador arriba, filas de hasta 2 líneas y alto máximo de ~60 % de la pantalla.
+     *  `onPick` recibe la posición en la lista ORIGINAL (aunque se esté filtrando). */
+    private fun pickWithSearch(title: String, labels: List<String>, onPick: (Int) -> Unit) {
+        val dp = resources.displayMetrics.density
+        val box = EditText(this).apply { hint = "🔎 Buscar…"; setSingleLine(true) }
+        val lv = ListView(this)
+        var shown: List<Int> = labels.indices.toList()
+        val ad = object : android.widget.ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, ArrayList(labels)) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val v = super.getView(position, convertView, parent)
+                (v as? android.widget.TextView)?.apply {
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                return v
             }
-            .show()
+        }
+        lv.adapter = ad
+        val col = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (8 * dp).toInt(), (20 * dp).toInt(), 0)
+            addView(box)
+            addView(lv, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.6).toInt()))
+        }
+        val dlg = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(col)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        box.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(e: android.text.Editable?) {
+                val q = norm(e?.toString() ?: "")
+                shown = if (q.isEmpty()) labels.indices.toList() else labels.indices.filter { norm(labels[it]).contains(q) }
+                ad.clear()
+                ad.addAll(shown.map { labels[it] })
+                ad.notifyDataSetChanged()
+            }
+        })
+        lv.setOnItemClickListener { _, _, pos, _ ->
+            val idx = shown.getOrNull(pos) ?: return@setOnItemClickListener
+            dlg.dismiss()
+            onPick(idx)
+        }
+        dlg.show()
     }
 
     private fun pickFolder() {
@@ -1980,17 +2035,43 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
     }
 
+    /** [VENT-1] Título para «Lo más escuchado/visto»: sin «(Official Video)», «1080p», «_1» ni guiones bajos sueltos. Solo para mostrar. */
+    private fun topTitle(p: MediaItem): String {
+        var t = prettyTitle(p)
+        t = t.replace(Regex("\\s*[\\(\\[](official|video oficial)[^\\)\\]]*[\\)\\]]", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("\\b(2160p|1440p|1080p|720p|480p|4k)\\b", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("_\\d{1,2}$"), "")
+        t = t.replace('_', ' ')
+        t = t.replace(Regex("\\s{2,}"), " ").trim().trimEnd('-', ' ')
+        return t.ifEmpty { prettyTitle(p) }
+    }
+
     private fun showTopDialog(music: Boolean, m: List<MediaItem>, v: List<MediaItem>) {
-        val list = if (music) m else v
-        val labels = list.mapIndexed { i, p ->
-            val n = Store.playCount(p)
-            val w = Store.watchSec(p)
-            "${i + 1}. ${prettyTitle(p)}\n     " + (if (n == 1) "1 reproducción" else "$n reproducciones") +
-                (if (w > 0) " · ${fmt(w)} vistos" else "")
-        }.toTypedArray()
+        // [VENT-1] título limpio solo para mostrar; la misma canción con «_1», «_2»… se suma en una fila;
+        // el conteo va en la misma línea («19 ×»); filas de hasta 2 líneas con «…»
+        val raw = if (music) m else v
+        val groups = LinkedHashMap<String, ArrayList<MediaItem>>()
+        raw.forEach { p -> groups.getOrPut(topTitle(p).lowercase()) { ArrayList() }.add(p) }
+        val merged = groups.values.sortedByDescending { g -> g.sumOf { Store.playCount(it) } }
+        val list = merged.map { it[0] }
+        val labels = merged.mapIndexed { i, g ->
+            val n = g.sumOf { Store.playCount(it) }
+            val w = g.sumOf { Store.watchSec(it) }
+            "${i + 1}. ${topTitle(g[0])}  ·  $n ×" + (if (w > 0) " · ${fmt(w)}" else "")
+        }
+        val ad = object : android.widget.ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, labels) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val tv = super.getView(position, convertView, parent)
+                (tv as? android.widget.TextView)?.apply {
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                return tv
+            }
+        }
         val b = AlertDialog.Builder(this)
             .setTitle(if (music) "🎵 Lo más escuchado" else "🎬 Lo más visto")
-            .setItems(labels) { _, idx ->
+            .setAdapter(ad) { _, idx ->
                 playlist = ArrayList(list)
                 playIndex = idx
                 playingFromQueue = false
@@ -4725,12 +4806,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .setTitle("＋ Nuevo proyecto")
             .setItems(arrayOf<CharSequence>(
                 "✂️ Cortar (audio o video)",
-                "📦 Dividir un video (por tamaño o duración)",
+                "📦 Dividir un video",   // [VENT-1]
                 "🔗 Unir (2 o más videos o audios)",
                 "📉 Reducir el peso de un video",
                 "🔇 Quitar el audio de un video",
                 "🎵 Convertir un video a MP3",
-                "🔔 Tono de llamada, notificación o alarma",
+                "🔔 Tono / notificación / alarma",   // [VENT-1]
                 "🌐 Enlace → MP3 / descargar")) { _, which ->
                 if (which == 7) askLinkToMp3() else workStart(which + 1)
             }
