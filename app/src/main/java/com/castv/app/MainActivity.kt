@@ -1268,6 +1268,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (g.kind == 4) { workNew(); return }   // [TALLER-1]
         if (g.kind == 5) { workProjectMenu(g.key); return }
         if (g.kind == 7) { workCleanPick(); return }   // [TALLER-LIMPIA-1]
+        if (g.kind == 8) { workSharePick(); return }   // [TALLER-COMPARTIR-1]
         if (g.kind == 6) { Workshop.clearHidden(this); workLastScan = 0L; applyFilters(); return }
         when (g.kind) {
             0 -> selectedAlbum = g.key
@@ -4372,6 +4373,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val nOld = workOld().size   // [TALLER-LIMPIA-1]
         if (nOld > 0 && q.isEmpty()) rows.add(GroupRow(7, "🧹 Limpiar antiguos",
             countLabel(nOld, "proyecto", "proyectos") + " de más de 30 días · tú eliges qué borrar", null, ""))
+        if (workProjects.isNotEmpty() && q.isEmpty()) rows.add(GroupRow(8, "📤 Compartir varios",
+            "Marca varios proyectos y envíalos juntos", null, ""))   // [TALLER-COMPARTIR-1]
         for (p in workSorted()) {   // [TALLER-ORDENAR-1]
             if (workFilter != 0 && workCategory(p) != workFilter) continue   // [TALLER-FILTRO-1]
             val bits = ArrayList<String>()
@@ -4994,6 +4997,78 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val uris = ArrayList<Uri>()
         for (m in p.parts) uris.add(uriOf(m))
         val type = if (p.parts.all { it.isMusic }) "audio/*" else "video/*"
+        val i = if (uris.size == 1) Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uris[0])
+                else Intent(Intent.ACTION_SEND_MULTIPLE).setType(type).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            startActivity(Intent.createChooser(i, "Compartir"))
+        } catch (e: Exception) {
+            toast("No se pudo compartir")
+        }
+    }
+
+    // ------------------------------------------- [TALLER-COMPARTIR-1] compartir varios proyectos
+
+    /** Lista sin nada marcado para elegir varios proyectos y enviarlos juntos (máximo 50 archivos en total). No borra ni cambia nada. */
+    private fun workSharePick() {
+        val all = workSorted()
+        if (all.isEmpty()) { toast("Aún no hay proyectos"); return }
+        val chosen = LinkedHashSet<String>()
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        val side = (16 * resources.displayMetrics.density).toInt()
+        val summary = TextView(ctx).apply { text = "Nada marcado"; textSize = 13f }
+        val rows = WorkCleanAdapter(all, chosen)
+        val list = ListView(ctx).apply { adapter = rows }
+        val box = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(side, 0, side, 0)
+            addView(summary)
+            addView(list, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.5f).toInt(), 1f))
+        }
+        val dlg = builder
+            .setTitle("📤 Compartir varios")
+            .setView(box)
+            .setPositiveButton("Compartir", null)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        val ok = dlg.getButton(AlertDialog.BUTTON_POSITIVE)
+        ok.isEnabled = false
+        fun picked() = all.filter { it.key in chosen }
+        list.setOnItemClickListener { _, _, pos, _ ->
+            val key = all[pos].key
+            if (!chosen.remove(key)) chosen.add(key)
+            rows.notifyDataSetChanged()
+            val sel = picked()
+            val n = sel.sumOf { it.parts.size }
+            ok.isEnabled = sel.isNotEmpty() && n <= 50
+            summary.text = if (sel.isEmpty()) "Nada marcado" else
+                "Marcado: " + countLabel(sel.size, "proyecto", "proyectos") + " · " +
+                countLabel(n, "archivo", "archivos") + " · " +
+                android.text.format.Formatter.formatShortFileSize(this, sel.sumOf { it.bytes }) +
+                (if (n > 50) "\nMáximo 50 archivos a la vez: desmarca alguno" else "")
+        }
+        ok.setOnClickListener {
+            val files = picked().flatMap { it.parts }
+            if (files.isNotEmpty() && files.size <= 50) {
+                dlg.dismiss()
+                workShareFiles(files)
+            }
+        }
+    }
+
+    /** Envía varios archivos juntos con el menú de compartir de Android (audio y video mezclados: tipo genérico). */
+    private fun workShareFiles(files: List<MediaItem>) {
+        val uris = ArrayList<Uri>()
+        for (m in files) uris.add(uriOf(m))
+        val type = when {
+            files.all { it.isMusic } -> "audio/*"
+            files.none { it.isMusic } -> "video/*"
+            else -> "*/*"
+        }
         val i = if (uris.size == 1) Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uris[0])
                 else Intent(Intent.ACTION_SEND_MULTIPLE).setType(type).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
