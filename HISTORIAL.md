@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v555
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v557
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -217,3 +217,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TALLER-1 · 27 nov · pestaña «TALLER» (Video y Audio): «＋ Nuevo proyecto» (Cortar, Dividir, Unir, Reducir peso, Quitar audio, MP3, Tono, Enlace → MP3) que lleva a la biblioteca para tocar el archivo, y tarjetas de lo que CASTV generó (reconocido por el nombre: « (corte)», « (unido)», « (reducido)», « (sin audio)», « (parte N de M)») con Reproducir, Compartir, Ubicación y Quitar de la lista; los «quitados» van en `castv_work` · `Workshop.kt`, `MainActivity.kt`, `activity_main.xml`
 - TALLER-1b · 27 nov · MP3 convertidos y descargas de enlace también salen en el Taller (registro en `castv_work`, clave `records`, últimos 100, sin enlace de origen; Android 10+) · `Workshop.kt`, `SavedFile.kt`, `LinkJobNotifier.kt`, `MainActivity.kt`
 - TALLER-2 · 27 nov · peso en cada tarjeta y total en «Nuevo proyecto» (2a), «🔁 Usar con otra herramienta» (2b), «❌ Eliminar el archivo» con la confirmación, papelera y PIN de siempre (2c) y Unir con lista para marcar en orden (2d) · `Workshop.kt`, `MainActivity.kt`
+- BUSCA-UNIR-1 · 27 nov · «🔎 Buscar por nombre» en la lista de Unir del Taller, en toda la biblioteca de la pestaña, conservando marcas y orden; botón «Siguiente (N)» · `MainActivity.kt`
+- UNIR-MINI-1 · 27 nov · la lista de Unir muestra miniatura o carátula, duración, carpeta, fecha y número de orden · `MainActivity.kt`
+- TALLER-FILTRO-1 · 27 nov · filtro en el Taller (Todos · Cortes · Partes · Unidos · MP3 · Descargas · Otros) con contador · `MainActivity.kt`, `activity_main.xml`
