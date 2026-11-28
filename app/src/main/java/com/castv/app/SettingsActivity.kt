@@ -463,19 +463,60 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
     }
 
+    /** [AJUSTES-ICONOS-1] Icono de cada sección de la portada (dibujos que la app ya trae). */
+    private fun sectionIcon(name: String): Int = when (name) {
+        "Interfaz" -> R.drawable.ic_vp_palette
+        "Subtítulos" -> R.drawable.ic_vp_subs
+        "Red" -> R.drawable.ic_vp_phone
+        "Video" -> R.drawable.ic_nav_video
+        "Biblioteca" -> R.drawable.ic_mas_folder
+        "Reproducción" -> R.drawable.ic_vp_play
+        "Audio" -> R.drawable.ic_mas_eq
+        "Control parental" -> R.drawable.ic_vp_lock
+        "Emisión al TV" -> R.drawable.ic_tv
+        "Historial" -> R.drawable.ic_mn_history
+        "Almacenamiento" -> R.drawable.ic_mn_archive
+        "Avanzado" -> R.drawable.ic_vp_build
+        "Actualizaciones" -> R.drawable.ic_mn_download
+        "Respaldo" -> R.drawable.ic_mn_upload
+        "Acerca de" -> R.drawable.ic_vp_info
+        else -> R.drawable.ic_mas_list
+    }
+
+    /** [AJUSTES-ICONOS-1] Fila de la portada: tarjeta redondeada con icono en círculo (color de acento), título, resumen y flecha. */
     private fun homeRow(name: String, summary: String?) {
-        val box = LinearLayout(this)
-        box.gravity = Gravity.CENTER_VERTICAL
-        box.setPadding(dp(20), dp(14), dp(16), dp(14))
-        val sel = TypedValue()
-        theme.resolveAttribute(android.R.attr.selectableItemBackground, sel, true)
-        box.setBackgroundResource(sel.resourceId)
-        box.setOnClickListener { showSection(name) }
+        val acc = accent()
+        val card = LinearLayout(this)
+        card.gravity = Gravity.CENTER_VERTICAL
+        card.setPadding(dp(14), dp(12), dp(12), dp(12))
+        val cardBg = GradientDrawable()
+        cardBg.setColor(Themes.color(this, R.attr.castvSurface))
+        cardBg.cornerRadius = dp(16).toFloat()
+        cardBg.setStroke(dp(1), lineColor)
+        card.background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf((acc and 0x00FFFFFF) or 0x33000000), cardBg, null)
+        card.isClickable = true
+        card.isFocusable = true
+        card.setOnClickListener { showSection(name) }
+
+        val circle = GradientDrawable()
+        circle.shape = GradientDrawable.OVAL
+        circle.setColor((acc and 0x00FFFFFF) or 0x2B000000)
+        val icon = android.widget.ImageView(this)
+        icon.setImageResource(sectionIcon(name))
+        icon.setColorFilter(acc)
+        icon.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10))
+        icon.background = circle
+        icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        card.addView(icon, LinearLayout.LayoutParams(dp(44), dp(44)))
+
         val col = LinearLayout(this)
         col.orientation = LinearLayout.VERTICAL
         val t = TextView(this)
         t.text = name
         t.textSize = 16f
+        t.setTypeface(null, android.graphics.Typeface.BOLD)
         t.setTextColor(txtColor)
         col.addView(t)
         if (summary != null) {
@@ -486,13 +527,20 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
             s.setPadding(0, dp(2), 0, 0)
             col.addView(s)
         }
-        box.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val colLp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        colLp.marginStart = dp(14)
+        colLp.marginEnd = dp(8)
+        card.addView(col, colLp)
+
         val arrow = TextView(this)
         arrow.text = "›"
         arrow.textSize = 24f
-        arrow.setTextColor(accent())
-        box.addView(arrow)
-        content.addView(box)
+        arrow.setTextColor(acc)
+        card.addView(arrow)
+
+        val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.setMargins(dp(12), dp(4), dp(12), dp(4))
+        content.addView(card, lp)
     }
 
     private fun section(name: String, first: Boolean = false) {
