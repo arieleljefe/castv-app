@@ -4422,6 +4422,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 if (many) "▶ Reproducir las partes en orden" else "▶ Reproducir",
                 if (many) "📤 Compartir todas" else "📤 Compartir",
                 "📂 Ubicación",
+                "🔁 Usar con otra herramienta…",
                 "🗑 Quitar de la lista")) { _, which ->
                 when (which) {
                     0 -> {
@@ -4432,6 +4433,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     }
                     1 -> workShare(p)
                     2 -> workFolder(p)
+                    3 -> workReuse(p)   // [TALLER-2]
                     else -> {
                         Workshop.hide(this, p.key)
                         workProjects = workProjects.filter { it.key != p.key }
@@ -4441,6 +4443,20 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 }
             }
             .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    /** [TALLER-2] «Usar con otra herramienta»: el mismo archivo (la 1.ª parte, si hay varias) sin volver a buscarlo. */
+    private fun workReuse(p: Workshop.Project) {
+        val item = p.parts[0]
+        val tools = if (item.isMusic) intArrayOf(1, 7) else intArrayOf(1, 2, 4, 5, 6)
+        AlertDialog.Builder(this)
+            .setTitle(p.base)
+            .setItems(Array<CharSequence>(tools.size) { workToolLabel(tools[it]) }) { _, which ->
+                workTool = tools[which]
+                workPicked(item)
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 
