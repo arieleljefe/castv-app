@@ -77,6 +77,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private lateinit var tabAll: TextView
     private lateinit var tabFavs: TextView
     private lateinit var tabResume: TextView
+    private lateinit var tabWork: TextView   // [TALLER-1]
     private lateinit var tvIncog: TextView   // [INCOG-2]
     private lateinit var navVideo: TextView
     private lateinit var navAudio: TextView
@@ -117,7 +118,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private enum class ViewMode(val label: String) {
         ALL("Ver: Todos"), FAVS("Ver: ⭐ Favoritos"), RESUME("Ver: ⏩ Continuar"),
-        GROUPS("Ver: Álbumes / carpetas"), LISTS("Ver: Listas")   // [TABS-1]
+        GROUPS("Ver: Álbumes / carpetas"), LISTS("Ver: Listas"),   // [TABS-1]
+        WORKSHOP("Ver: Taller")   // [TALLER-1]
     }
 
     // Salida de la música: false = TV, true = el propio teléfono (los videos siempre van al TV)
@@ -391,6 +393,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         tabAll = findViewById(R.id.tabAll)
         tabFavs = findViewById(R.id.tabFavs)
         tabResume = findViewById(R.id.tabResume)
+        tabWork = findViewById(R.id.tabWork)   // [TALLER-1]
         tvIncog = findViewById(R.id.tvIncog)   // [INCOG-2]
         // [VERSION-2] La versión de la cabecera sale de la app instalada (ya no es un texto fijo)
         // [VERSION-5] en la cabecera solo el número (sin « (build N)»); Acerca de y Ajustes lo muestran completo
@@ -453,8 +456,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         navQueue.setOnClickListener { showQueue() }
         navMore.setOnClickListener { showMoreSheet() }   // [UI-1]
         tabAll.setOnClickListener { groupReturn = null; viewMode = ViewMode.ALL; applyFilters() }
-        tabFavs.setOnClickListener { groupReturn = null; resetFilters(); viewMode = ViewMode.GROUPS; applyFilters() }   // [TABS-1] Álbumes / Carpetas
-        tabResume.setOnClickListener { groupReturn = null; resetFilters(); viewMode = ViewMode.LISTS; applyFilters() }   // [TABS-1] Listas
+        tabFavs.setOnClickListener { groupReturn = null; resetFilters(); workTool = null; viewMode = ViewMode.GROUPS; applyFilters() }   // [TABS-1] Álbumes / Carpetas
+        tabResume.setOnClickListener { groupReturn = null; resetFilters(); workTool = null; viewMode = ViewMode.LISTS; applyFilters() }   // [TABS-1] Listas
+        tabWork.setOnClickListener { groupReturn = null; resetFilters(); workTool = null; workLastScan = 0L; viewMode = ViewMode.WORKSHOP; applyFilters() }   // [TALLER-1]
         fab.setOnClickListener { shuffleAndPlay() }
         tvFilter.setOnClickListener { clearFilters() }
         listFiles.setOnScrollListener(object : AbsListView.OnScrollListener {
@@ -636,13 +640,14 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 return@setOnItemClickListener
             }
             if (idx in currentList.indices) {
+                if (workTool != null && !selecting) { workPicked(currentList[idx]); return@setOnItemClickListener }   // [TALLER-1]
                 if (selecting) toggleSelect(currentList[idx]) else playFromList(idx)
             }
         }
         listFiles.setOnItemLongClickListener { _, _, position, _ ->
             val idx = position - listFiles.headerViewsCount
             if (groupsShown) {   // [TABS-1] mantener pulsada una lista: Abrir / Quitar lista
-                groupAdapter.rows.getOrNull(idx)?.let { if (it.kind == 2) openPlaylistMenu(it.key) }
+                groupAdapter.rows.getOrNull(idx)?.let { if (it.kind == 2) openPlaylistMenu(it.key) else if (it.kind == 5) workProjectMenu(it.key) }   // [TALLER-1]
                 return@setOnItemLongClickListener true
             }
             if (idx in currentList.indices) {
@@ -1049,6 +1054,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private fun naturalCompare(a: String, b: String): Int = CastvText.naturalCompare(a, b)
 
     private fun applyFilters() {
+        if (viewMode == ViewMode.WORKSHOP) { showWorkshop(); return }   // [TALLER-1]
         // [TABS-1] con un filtro elegido (artista, carpeta, lista…) se sale de las pestañas de grupos
         if (inGroups() && groupReturn == null &&
             (selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null || onlyUnseen)) {
@@ -1164,7 +1170,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private fun hasActiveFilter(): Boolean =
         selectedFolder != null || selectedArtist != null || selectedAlbum != null || selectedPlaylist != null ||
-            viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME   // [TABS-1]
+            viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME || viewMode == ViewMode.WORKSHOP || workTool != null   // [TABS-1] [TALLER-1]
 
     private fun resetFilters() {
         selectedFolder = null
@@ -1176,7 +1182,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private fun clearFilters() {
         resetFilters()
-        if (viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME) viewMode = ViewMode.ALL   // [TABS-1]
+        workTool = null   // [TALLER-1]
+        if (viewMode == ViewMode.FAVS || viewMode == ViewMode.RESUME || viewMode == ViewMode.WORKSHOP) viewMode = ViewMode.ALL   // [TABS-1] [TALLER-1]
         groupReturn?.let { viewMode = it }   // [TABS-1] volver a Álbumes / Carpetas / Listas
         groupReturn = null
         applyFilters()
@@ -1258,6 +1265,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     /** Toca una fila de grupo: abre sus archivos (Atrás o ✕ vuelve a la pestaña). */
     private fun openGroup(g: GroupRow) {
+        if (g.kind == 4) { workNew(); return }   // [TALLER-1]
+        if (g.kind == 5) { workProjectMenu(g.key); return }
+        if (g.kind == 6) { Workshop.clearHidden(this); workLastScan = 0L; applyFilters(); return }
         when (g.kind) {
             0 -> selectedAlbum = g.key
             1 -> selectedFolder = g.key
@@ -1285,6 +1295,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         selectedAlbum?.let { parts.add("💿 $it") }
         selectedPlaylist?.let { parts.add("📃 $it") }
         if (onlyUnseen && !showingMusic) parts.add("👁 No vistos")   // [NOVISTOS-1]
+        workTool?.let { parts.add(workToolLabel(it) + ": toca un archivo") }   // [TALLER-1]
         if (parts.isEmpty()) {
             tvFilter.visibility = View.GONE
         } else {
@@ -1409,6 +1420,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         tabResume.text = "LISTAS"                                     // [TABS-1] antes CONTINUAR
         tab(tabFavs, viewMode == ViewMode.GROUPS)
         tab(tabResume, viewMode == ViewMode.LISTS)
+        tabWork.text = "TALLER"   // [TALLER-1]
+        tab(tabWork, viewMode == ViewMode.WORKSHOP)
     }
 
     private var recentPop: android.widget.ListPopupWindow? = null
@@ -4229,6 +4242,232 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
     }
 
+    // ------------------------------------------- [TALLER-1] Taller: todo lo que crea o altera archivos, en un solo lugar
+
+    private var workTool: Int? = null            // herramienta elegida: el próximo archivo que se toque la usa (1 cortar, 2 dividir, 4 reducir, 5 quitar audio, 6 MP3, 7 tono)
+    private var workProjects: List<Workshop.Project> = emptyList()
+    private var workScanning = false
+    private var workLastScan = 0L
+    private var workGen = 0
+
+    private fun workToolLabel(t: Int): String = when (t) {
+        1 -> "✂️ Cortar"
+        2 -> "📦 Dividir"
+        3 -> "🔗 Unir"
+        4 -> "📉 Reducir peso"
+        5 -> "🔇 Quitar audio"
+        6 -> "🎵 Convertir a MP3"
+        7 -> "🔔 Tono"
+        else -> "Taller"
+    }
+
+    private fun workWhen(added: Long): String {
+        val ms = if (added < 100_000_000_000L) added * 1000L else added
+        return android.text.format.DateUtils.getRelativeTimeSpanString(
+            ms, System.currentTimeMillis(), android.text.format.DateUtils.DAY_IN_MILLIS).toString()
+    }
+
+    /** Pestaña Taller: «＋ Nuevo proyecto» y, debajo, lo que CASTV generó (se reconoce por el nombre; se busca en Videos y Audio). */
+    private fun showWorkshop() {
+        if (!groupsShown) {
+            groupsShown = true
+            listFiles.adapter = groupAdapter
+        }
+        groupAdapter.grid = false
+        val q = norm(query).trim()
+        val rows = ArrayList<GroupRow>()
+        rows.add(GroupRow(4, "＋ Nuevo proyecto", "Cortar, dividir, unir, reducir peso, quitar audio, MP3 y tonos", null, ""))
+        for (p in workProjects) {
+            val bits = ArrayList<String>()
+            bits.add(p.tool)
+            if (p.parts.size > 1) {
+                bits.add(if (p.parts.size == p.total) p.parts.size.toString() + " partes" else p.parts.size.toString() + " de " + p.total + " partes")
+            } else if (p.parts[0].durationSec > 0) {
+                bits.add(fmt(p.parts[0].durationSec))
+            }
+            bits.add(workWhen(p.newest))
+            val sub = bits.joinToString("  ·  ")
+            if (q.isNotEmpty() && !norm(p.base + " " + sub).contains(q)) continue
+            rows.add(GroupRow(5, p.base, sub, p.parts.firstOrNull(), p.key))
+        }
+        val nHidden = Workshop.hidden(this).size
+        if (nHidden > 0 && q.isEmpty()) rows.add(GroupRow(6, "Mostrar los quitados ($nHidden)", "Vuelven a la lista; los archivos nunca se borraron", null, ""))
+        groupAdapter.rows = rows
+        groupAdapter.notifyDataSetChanged()
+        tvEmptyAction.visibility = View.GONE
+        if (workProjects.isEmpty()) {
+            tvEmpty.text = if (workScanning || workLastScan == 0L) "Buscando tus proyectos…"
+                else "Aún no hay proyectos.\nLo que cortes, unas, reduzcas o dividas con CASTV aparecerá aquí."
+            tvEmpty.visibility = View.VISIBLE
+        } else {
+            tvEmpty.visibility = View.GONE
+        }
+        if (!footerAttached) {
+            listFiles.addFooterView(footerView, null, false)
+            footerAttached = true
+        }
+        setFabShown(false)
+        updateTabs()
+        updateFilterChip()
+        // se vuelve a buscar al entrar (no a cada letra del buscador)
+        val now = System.currentTimeMillis()
+        if (workScanning || now - workLastScan < 5000L) return
+        workScanning = true
+        workLastScan = now
+        val gen = ++workGen
+        thread {
+            val found = try {
+                val all = ArrayList<MediaItem>()
+                all.addAll(MediaScanner.scanVideos(this))
+                all.addAll(MediaScanner.scanMusic(this))
+                Workshop.detect(all, Workshop.hidden(this))
+            } catch (e: Exception) {
+                emptyList()
+            }
+            runOnUiThread {
+                workScanning = false
+                if (gen != workGen || isFinishing) return@runOnUiThread
+                workProjects = found
+                if (viewMode == ViewMode.WORKSHOP) showWorkshop()
+            }
+        }
+    }
+
+    /** «＋ Nuevo proyecto»: elegir la herramienta. */
+    private fun workNew() {
+        AlertDialog.Builder(this)
+            .setTitle("＋ Nuevo proyecto")
+            .setItems(arrayOf<CharSequence>(
+                "✂️ Cortar (audio o video)",
+                "📦 Dividir un video (por tamaño o duración)",
+                "🔗 Unir (2 o más videos o audios)",
+                "📉 Reducir el peso de un video",
+                "🔇 Quitar el audio de un video",
+                "🎵 Convertir un video a MP3",
+                "🔔 Tono de llamada, notificación o alarma",
+                "🌐 Enlace → MP3 / descargar")) { _, which ->
+                if (which == 7) askLinkToMp3() else workStart(which + 1)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** Lleva a la biblioteca para elegir el archivo (un toque lo usa); «Unir» pide marcar varios con pulsación larga. */
+    private fun workStart(tool: Int) {
+        workTool = if (tool == 3) null else tool
+        groupReturn = null
+        resetFilters()
+        viewMode = ViewMode.ALL
+        val needVideo = tool == 2 || tool == 4 || tool == 5 || tool == 6
+        when {
+            needVideo && showingMusic -> showMovies()
+            tool == 7 && !showingMusic -> showMusic()
+            else -> applyFilters()
+        }
+        toast(if (tool == 3) "Mantén pulsado un archivo, marca 2 o más y toca ⋮ › 🔗 Unir"
+              else workToolLabel(tool) + ": toca el archivo (✕ arriba para cancelar)")
+    }
+
+    /** Se tocó un archivo con una herramienta elegida en el Taller. */
+    private fun workPicked(item: MediaItem) {
+        val tool = workTool ?: return
+        if (item.isMusic && (tool == 2 || tool == 4 || tool == 5 || tool == 6)) {
+            toast("Esta herramienta es para videos")
+            return
+        }
+        workTool = null
+        updateFilterChip()
+        val uri = uriOf(item)
+        val durMs = item.durationSec * 1000L
+        val pos: () -> Long = { 0L }
+        when (tool) {
+            1 -> {
+                if (item.isMusic) {
+                    CutAudio.pauseHook = { pauseAll() }
+                    CutAudio.show(this, uri, item.name, durMs, false, pos)
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("✂️ Cortar")
+                        .setItems(arrayOf<CharSequence>("🎵 Solo el audio → MP3", "🎬 El video → MP4 (sin recodificar)")) { _, which ->
+                            CutAudio.pauseHook = { pauseAll() }
+                            CutAudio.show(this, uri, item.name, durMs, which == 1, pos)
+                        }
+                        .setNegativeButton("Cancelar", null)
+                        .show()
+                }
+            }
+            2 -> VideoSplit.show(this, uri, item.name)
+            4 -> VideoReduce.show(this, uri, item.name)
+            5 -> VideoMute.show(this, uri, item.name)
+            6 -> bulkMp3(listOf(item))
+            7 -> {
+                toast("En «Guardar en:» elige Tonos de llamada, Notificaciones o Alarmas")
+                CutAudio.pauseHook = { pauseAll() }
+                CutAudio.show(this, uri, item.name, durMs, false, pos)
+            }
+        }
+    }
+
+    /** Tarjeta de un proyecto: Reproducir · Compartir · Ubicación · Quitar de la lista (no borra el archivo). */
+    private fun workProjectMenu(key: String) {
+        val p = workProjects.firstOrNull { it.key == key } ?: return
+        val many = p.parts.size > 1
+        AlertDialog.Builder(this)
+            .setTitle(p.base)
+            .setItems(arrayOf<CharSequence>(
+                if (many) "▶ Reproducir las partes en orden" else "▶ Reproducir",
+                if (many) "📤 Compartir todas" else "📤 Compartir",
+                "📂 Ubicación",
+                "🗑 Quitar de la lista")) { _, which ->
+                when (which) {
+                    0 -> {
+                        playlist = ArrayList(p.parts)
+                        playIndex = 0
+                        playingFromQueue = false
+                        startPlayback(p.parts[0])
+                    }
+                    1 -> workShare(p)
+                    2 -> workFolder(p)
+                    else -> {
+                        Workshop.hide(this, p.key)
+                        workProjects = workProjects.filter { it.key != p.key }
+                        showWorkshop()
+                        toast("Quitado de la lista (el archivo sigue en el teléfono)")
+                    }
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun workShare(p: Workshop.Project) {
+        if (p.parts.size > 50) { toast("Se pueden compartir hasta 50 a la vez"); return }
+        val uris = ArrayList<Uri>()
+        for (m in p.parts) uris.add(uriOf(m))
+        val type = if (p.parts.all { it.isMusic }) "audio/*" else "video/*"
+        val i = if (uris.size == 1) Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uris[0])
+                else Intent(Intent.ACTION_SEND_MULTIPLE).setType(type).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            startActivity(Intent.createChooser(i, "Compartir"))
+        } catch (e: Exception) {
+            toast("No se pudo compartir")
+        }
+    }
+
+    private fun workFolder(p: Workshop.Project) {
+        val folder = p.parts[0].folder
+        if (!folder.contains("download", ignoreCase = true)) {
+            toast("Está en la carpeta «" + folder.trimEnd('/').substringAfterLast('/') + "»")
+            return
+        }
+        try {
+            startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            toast("No hay una app de archivos para abrir la carpeta")
+        }
+    }
+
     // ------------------------------------------- [CORTAR-1a] Cortar audio de lo que suena
 
     /** ✂️ en «Reproduciendo»: elige inicio y fin de la pista (o video) actual y guarda ese tramo como MP3 en Descargas. */
@@ -4270,8 +4509,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     @Volatile private var batchCancel = false
 
     /** Convierte a MP3 los videos seleccionados, uno tras otro (Descargas). Si uno falla sigue con el siguiente; Cancelar corta el lote. */
-    private fun bulkMp3() {
-        val vids = selectedItems().filter { !it.isMusic }
+    private fun bulkMp3(src: List<MediaItem> = selectedItems()) {   // [TALLER-1] el Taller lo llama con un solo video
+        val vids = src.filter { !it.isMusic }
         if (vids.isEmpty()) { toast("Selecciona videos"); return }
         if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return }
         val app = applicationContext
@@ -5695,10 +5934,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             icon.setImageResource(when (g.kind) {
                 0 -> R.drawable.ic_mas_album
                 1 -> R.drawable.ic_mas_folder
-                3 -> R.drawable.ic_vp_add
+                3, 4 -> R.drawable.ic_vp_add   // [TALLER-1]
+                5 -> if (g.rep?.isMusic == true) R.drawable.ic_nav_audio else R.drawable.ic_nav_video
                 else -> R.drawable.ic_mas_list
             })
-            icon.setColorFilter(if (g.kind == 3) accentColor() else col(R.color.vlc_muted))
+            icon.setColorFilter(if (g.kind == 3 || g.kind == 4) accentColor() else col(R.color.vlc_muted))
             val thumb = v.findViewById<ImageView>(R.id.groupThumb)
             val rep = g.rep
             if (rep != null) {

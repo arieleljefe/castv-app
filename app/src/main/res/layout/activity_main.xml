@@ -155,11 +155,13 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab_off"
+            android:ellipsize="end"
             android:gravity="center"
-            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:letterSpacing="0.04"
             android:text="PISTAS"
             android:textColor="@color/vlc_muted"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -168,11 +170,13 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab_off"
+            android:ellipsize="end"
             android:gravity="center"
-            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:letterSpacing="0.04"
             android:text="FAVORITOS"
             android:textColor="@color/vlc_muted"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -181,11 +185,28 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab_off"
+            android:ellipsize="end"
             android:gravity="center"
-            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:letterSpacing="0.04"
             android:text="CONTINUAR"
             android:textColor="@color/vlc_muted"
-            android:textSize="13sp"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+        <!-- [TALLER-1] edición: cortar, dividir, unir, reducir, quitar audio, MP3, tonos -->
+        <TextView
+            android:id="@+id/tabWork"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/tab_off"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:letterSpacing="0.04"
+            android:maxLines="1"
+            android:text="TALLER"
+            android:textColor="@color/vlc_muted"
+            android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
 
