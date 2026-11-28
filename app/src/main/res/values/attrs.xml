@@ -9,4 +9,9 @@
     <attr name="castvSurface2" format="color"/>
     <attr name="castvNav" format="color"/>
     <attr name="castvStroke" format="color"/>
+    <!-- [TEMAS-3a] radios de las esquinas (la «forma» del tema) -->
+    <attr name="castvRadiusThumb" format="dimension"/>
+    <attr name="castvRadiusChip" format="dimension"/>
+    <attr name="castvRadiusSearch" format="dimension"/>
+    <attr name="castvRadiusDialog" format="dimension"/>
 </resources>

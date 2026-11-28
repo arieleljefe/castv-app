@@ -237,6 +237,8 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
             Themes.bgNames[Themes.savedBg(this)] + (if (Themes.isNight(this)) "" else " · solo en modo oscuro"),
             { pickBg() }))
 
+        l.add(Entry("Interfaz", "Forma", Themes.shapeNames[Themes.savedShape(this)], { pickShape() }))   // [TEMAS-3a]
+        l.add(Entry("Interfaz", "Letra", Themes.fontNames[Themes.savedFont(this)], { pickFont() }))   // [TEMAS-3a]
         l.add(Entry("Interfaz", "Tamaño del texto", CastvTextSize.names[CastvTextSize.saved(this)],   // [TEXTO-TAM-1]
             { pickTextSize() }))
 
@@ -407,7 +409,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
     }
 
     private fun sectionSummary(name: String): String? = when (name) {
-        "Interfaz" -> "Tema, color de acento, fondo oscuro, tamaño del texto, filas compactas, botones grandes y vibración"
+        "Interfaz" -> "Tema, color de acento, fondo oscuro, forma, letra, tamaño del texto, filas compactas, botones grandes y vibración"
         "Subtítulos" -> "Tamaño, color, fondo e IA"
         "Red" -> "Datos móviles y puerto del servidor"
         "Video" -> "Gestos, velocidad, controles y brillo"
@@ -660,6 +662,14 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         Themes.pickBg(this) {
             recreate()   // esta pantalla se redibuja con el fondo; MainActivity lo hace al volver
         }
+    }
+
+    private fun pickShape() {   // [TEMAS-3a]
+        Themes.pickShape(this) { recreate() }
+    }
+
+    private fun pickFont() {   // [TEMAS-3a]
+        Themes.pickFont(this) { recreate() }
     }
 
     private fun toggleTrash() {

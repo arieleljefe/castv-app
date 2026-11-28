@@ -335,6 +335,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         accentAtStart = savedAccent()   // [UI-1b]
         bgAtStart = Themes.savedBg(this)   // [TEMAS-2]
         textAtStart = CastvTextSize.saved(this)   // [TEXTO-TAM-1]
+        styleAtStart = Themes.styleKey(this)   // [TEMAS-3a]
         setContentView(R.layout.activity_main)
         val night = (resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -2883,6 +2884,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         super.onResume()
         if (savedAccent() != accentAtStart) { recreate(); return }   // [UI-1b] color cambiado en Ajustes
         if (Themes.savedBg(this) != bgAtStart) { recreate(); return }   // [TEMAS-2] fondo cambiado en Ajustes
+        if (Themes.styleKey(this) != styleAtStart) { recreate(); return }   // [TEMAS-3a] forma o letra cambiadas en Ajustes
         if (CastvTextSize.saved(this) != textAtStart) { recreate(); return }   // [TEXTO-TAM-1] tamaño de texto cambiado en Ajustes
         updateIncogBadge()   // [INCOG-2]
         applySofa()   // [SOFA-1] «Botones grandes» cambiado en Ajustes
@@ -4320,6 +4322,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private var lrcShowNext = false             // [LRC-1] al guardar una letra, mostrarla enseguida
     private var accentAtStart = 0     // [UI-1b] color con el que se dibujó esta pantalla
     private var bgAtStart = 0         // [TEMAS-2] fondo con el que se dibujó esta pantalla
+    private var styleAtStart = 0     // [TEMAS-3a] forma y letra con las que se dibujó esta pantalla
     private var textAtStart = 1       // [TEXTO-TAM-1] tamaño de texto con el que se dibujó esta pantalla
     private var selecting = false
     private val selectedIds = HashSet<Long>()

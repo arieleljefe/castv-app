@@ -58,6 +58,27 @@ object Themes {
         R.color.bgs_forest_surface, R.color.bgs_wine_surface
     )
 
+    // [TEMAS-3a] Forma y letra. 0 = la de siempre (sin estilo). Claves `shape` y `font` en `castv`.
+    val shapeNames = arrayOf("Redondeada (la de siempre)", "Cuadrada", "Píldora")
+    private val shapeOverlays = intArrayOf(0, R.style.ShapeOverlaySquare, R.style.ShapeOverlayPill)
+    val fontNames = arrayOf("Normal", "Serif", "Monoespaciada", "Condensada")
+    private val fontOverlays = intArrayOf(
+        0, R.style.FontOverlaySerif, R.style.FontOverlayMono, R.style.FontOverlayCondensed
+    )
+
+    fun savedShape(a: Context): Int {
+        val v = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("shape", 0)
+        return if (v in shapeNames.indices) v else 0
+    }
+
+    fun savedFont(a: Context): Int {
+        val v = a.getSharedPreferences("castv", Context.MODE_PRIVATE).getInt("font", 0)
+        return if (v in fontNames.indices) v else 0
+    }
+
+    /** Un solo número con forma y letra, para que MainActivity sepa si cambiaron en Ajustes. */
+    fun styleKey(a: Context): Int = savedShape(a) * 10 + savedFont(a)
+
     fun isNight(c: Context): Boolean =
         (c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
@@ -86,6 +107,10 @@ object Themes {
      */
     fun apply(a: Activity, paintWindow: Boolean = true) {
         a.theme.applyStyle(overlays[saved(a)], true)
+        val sh = savedShape(a)   // [TEMAS-3a]
+        if (sh != 0) a.theme.applyStyle(shapeOverlays[sh], true)
+        val fo = savedFont(a)
+        if (fo != 0) a.theme.applyStyle(fontOverlays[fo], true)
         val b = savedBg(a)
         if (b != 0 && isNight(a)) {   // [TEMAS-2] Medianoche = sin cambios; en modo claro no se usa
             a.theme.applyStyle(bgOverlays[b], true)
@@ -129,6 +154,23 @@ object Themes {
             }
             .show()
     }
+
+    private fun pickList(a: Activity, title: String, items: Array<String>, cur: Int, key: String, onPicked: () -> Unit) {
+        AlertDialog.Builder(a)
+            .setTitle(title)
+            .setSingleChoiceItems(items, cur) { d, which ->
+                a.getSharedPreferences("castv", Context.MODE_PRIVATE).edit().putInt(key, which).apply()
+                d.dismiss()
+                onPicked()
+            }
+            .show()
+    }
+
+    /** [TEMAS-3a] Diálogo de forma (esquinas); al elegir guarda y llama a [onPicked]. */
+    fun pickShape(a: Activity, onPicked: () -> Unit) = pickList(a, "Forma", shapeNames, savedShape(a), "shape", onPicked)
+
+    /** [TEMAS-3a] Diálogo de letra; al elegir guarda y llama a [onPicked]. */
+    fun pickFont(a: Activity, onPicked: () -> Unit) = pickList(a, "Letra", fontNames, savedFont(a), "font", onPicked)
 
     /** Diálogo con una bolita de color por opción; al elegir guarda y llama a [onPicked]. */
     fun pick(a: Activity, onPicked: () -> Unit) {
