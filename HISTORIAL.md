@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v567
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v568
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -230,3 +230,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - TALLER-ORDENAR-1 · 27 nov · ordenar proyectos (Recientes, Antiguos, Más pesados, Nombre), se recuerda; fechas unificadas · `MainActivity.kt`
 - TALLER-COMPARTIR-1 · 27 nov · Taller › «📤 Compartir varios»: marcar varios proyectos y enviarlos juntos (máx. 50 archivos) · `MainActivity.kt`
 - UNIR-NOMBRE-1 · 27 nov · antes de unir se pide el nombre del resultado (la app añade « (unido)» y la extensión); vacío = el del primero · `MainActivity.kt`
+- RENOMBRAR-1 · 27 nov · Taller › «✏️ Cambiar el nombre…»: renombra el archivo o todas las partes conservando sufijo y extensión; migra favoritos, listas, continuar, estadísticas, marcadores, letra y registros · `MainActivity.kt`, `Store.kt`, `Lrc.kt`, `Workshop.kt`
