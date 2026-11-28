@@ -1,4 +1,4 @@
-# CASTV: CHANGELOG (cerebro) · v562
+# CASTV: CHANGELOG (cerebro) · v563
 
 **Para retomar: Ariel pasa SOLO este archivo.** La IA lo lee completo y sigue sin preguntar datos fijos.
 Archivos hermanos (solo si hacen falta): `HISTORIAL.md` (lo ya ✅), `MAPA.md` (arquitectura del código, se crea cuando Ariel pase el código).
@@ -93,7 +93,8 @@ rm -f ~/storage/downloads/*_actual.*
 ## 4. ESTADO VIVO
 
 ### ▶ RETOMAR AQUÍ (27 nov 2026)
-- **PAUSA (27 nov, 10:13 p. m.; Ariel: «Me gusta la idea anota todo para seguir mas ahorita»).** No dijo cuál letra: al retomar, preguntar solo eso (todavía no hay «Dale», R2). **Ideas ⬜:**
+- **A, B y C APROBADAS (27 nov; Ariel: «Quiero la A y la B y la C» = «Dale», R2).** Tres parches separados, un commit cada uno, de menor a mayor riesgo: **B** compartir varios › **C** nombre antes de unir › **A** renombrar proyectos. **Hallazgo (revisado `Store.kt`):** `Store.key(item)` = `a|` o `v|` + nombre en minúsculas + duración, así que renombrar un archivo CAMBIA su clave y se perderían favoritos, «continuar», vistas y reproducciones, marcadores, listas y conteos del mes. A debe migrar esas claves (función nueva en `Store`, p. ej. `renameItem(viejo, nuevo)`), conservar el sufijo que el Taller reconoce (« (corte)», « (unido)», « (reducido)», « (sin audio)», « (parte N de M)») y actualizar el nombre en los registros de MP3/descargas (`castv_work`, clave `records`). C: `VideoJoin.join` ya usa `names[0]` + « (unido)»; basta pasar el nombre escrito, limpio con `Mp3Converter.cleanTitle`. **Recibidos:** `Store.kt` y `VideoJoin.kt`. **Faltan (R5, una sola línea):** `MainActivity.kt` (copia fresca), `Workshop.kt`, `SavedFile.kt`, `Mp3Converter.kt`, `Thumbs.kt`, `PlayerCore.kt`. **Siguiente paso:** con esos archivos, entregar el parche B, luego C y A (cada uno con `git apply --check`, sin compilador, R4). ✅ solo con su «ya funciona» (R3).
+- **PAUSA (27 nov, 10:13 p. m.; Ariel: «Me gusta la idea anota todo para seguir mas ahorita»).** Resuelto: Ariel eligió A, B y C (ver la entrada siguiente). **Ideas ⬜:**
   - **A. Renombrar proyectos** (recomendada por la IA si cuesta reconocerlos; riesgo medio): desde la tarjeta; cambia el nombre del archivo y debe conservar su tipo en el Taller (los cortes, unidos, etc. se reconocen por el nombre; los MP3 y descargas usan registro). Partes divididas: renombrar el grupo sin romper «(parte N de M)».
   - **B. Compartir varios** (riesgo bajo; la sencilla): marcar varios proyectos y enviarlos juntos.
   - **C. Nombre antes de unir** (riesgo medio): escribir el nombre del resultado; toca el proceso de unir (`VideoJoin`), conservar « (unido)».
