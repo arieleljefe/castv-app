@@ -4254,6 +4254,31 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private var workFilter = 0
     private val workFilterNames = arrayOf("Todos", "Cortes", "Partes", "Unidos", "MP3", "Descargas", "Otros")
 
+    // [TALLER-ORDENAR-1] orden de las tarjetas; se recuerda en `castv_work`
+    private val workSortNames = arrayOf("Recientes", "Antiguos", "Más pesados", "Nombre")
+
+    private fun workSortMode(): Int =
+        getSharedPreferences("castv_work", MODE_PRIVATE).getInt("sort", 0).coerceIn(0, workSortNames.size - 1)
+
+    private fun workSorted(): List<Workshop.Project> = when (workSortMode()) {
+        1 -> workProjects.sortedBy { workMs(it.newest) }
+        2 -> workProjects.sortedByDescending { it.bytes }
+        3 -> workProjects.sortedWith { a, b -> naturalCompare(norm(a.base), norm(b.base)) }
+        else -> workProjects.sortedByDescending { workMs(it.newest) }
+    }
+
+    private fun workSortPick() {
+        AlertDialog.Builder(this)
+            .setTitle("↕ Ordenar proyectos")
+            .setSingleChoiceItems(arrayOf<CharSequence>(*workSortNames), workSortMode()) { dialog, which ->
+                getSharedPreferences("castv_work", MODE_PRIVATE).edit().putInt("sort", which).apply()
+                dialog.dismiss()
+                if (viewMode == ViewMode.WORKSHOP) { showWorkshop(); listFiles.setSelection(0) }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     private fun workCategory(p: Workshop.Project): Int = when (p.tool) {
         "✂️ Cortado" -> 1
         "📦 Dividido" -> 2
@@ -4271,13 +4296,16 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val box = findViewById<android.widget.LinearLayout>(R.id.workChips)
         val d = resources.displayMetrics.density
         if (box.childCount == 0) {
-            for (i in workFilterNames.indices) {
+            // la posición 0 es «Ordenar»; los filtros van de la 1 en adelante
+            for (i in -1 until workFilterNames.size) {
                 val chip = TextView(this).apply {
                     textSize = 12f
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     gravity = android.view.Gravity.CENTER
                     minHeight = (36 * d).toInt()
-                    setOnClickListener { workFilter = i; showWorkshop(); listFiles.setSelection(0) }
+                    setOnClickListener {
+                        if (i < 0) workSortPick() else { workFilter = i; showWorkshop(); listFiles.setSelection(0) }
+                    }
                 }
                 val lp = android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -4286,8 +4314,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 box.addView(chip, lp)
             }
         }
+        val sortChip = box.getChildAt(0) as TextView
+        sortChip.text = "↕ " + workSortNames[workSortMode()]
+        sortChip.setBackgroundResource(R.drawable.bg_chip)
+        sortChip.setTextColor(accentColor())
+        sortChip.setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)
         for (i in workFilterNames.indices) {
-            val chip = box.getChildAt(i) as TextView
+            val chip = box.getChildAt(i + 1) as TextView
             val n = if (i == 0) workProjects.size else workProjects.count { workCategory(it) == i }
             val on = i == workFilter
             chip.text = workFilterNames[i] + " (" + n + ")"
@@ -4339,7 +4372,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val nOld = workOld().size   // [TALLER-LIMPIA-1]
         if (nOld > 0 && q.isEmpty()) rows.add(GroupRow(7, "🧹 Limpiar antiguos",
             countLabel(nOld, "proyecto", "proyectos") + " de más de 30 días · tú eliges qué borrar", null, ""))
-        for (p in workProjects) {
+        for (p in workSorted()) {   // [TALLER-ORDENAR-1]
             if (workFilter != 0 && workCategory(p) != workFilter) continue   // [TALLER-FILTRO-1]
             val bits = ArrayList<String>()
             bits.add(p.tool)
