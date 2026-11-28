@@ -5947,6 +5947,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             val seen = Store.isSeen(item)
             labels.add(CastvIcons.item(icIt, R.drawable.ic_mn_visibility, if (seen) "Marcar como no visto" else "Marcar como visto"))
             actions.add { Store.markSeen(item, !seen); refreshSeen() }   // [NOVISTOS-1]
+            val later = Store.isWatchLater(item)   // [VER-DESPUES-1]
+            labels.add(CastvIcons.item(icIt, R.drawable.ic_mas_timer, if (later) "Quitar de «Ver más tarde»" else "Ver más tarde"))
+            actions.add {
+                val now = Store.toggleWatchLater(item)
+                toast(if (now) "🕓 Guardado en «Ver más tarde» (Listas)" else "Quitado de «Ver más tarde»")
+                applyFilters()
+            }
         }
         bldIt
             .setTitle(prettyTitle(item))

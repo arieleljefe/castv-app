@@ -1317,4 +1317,29 @@ object Store {
     fun removeFromList(name: String, item: MediaItem) {
         if (lists[name]?.remove(key(item)) == true) saveLists()
     }
+
+    // ------------------------------------------------- [VER-DESPUES-1] «Ver más tarde»
+    // Es una lista de reproducción más (clave "lists" de castv_lib, así que viaja en el respaldo y se ve en Listas); la app la crea
+    // sola al guardar el primer video y el reproductor lo quita cuando se termina de ver.
+
+    const val WATCH_LATER = "🕓 Ver más tarde"
+
+    @Synchronized
+    fun isWatchLater(item: MediaItem): Boolean = lists[WATCH_LATER]?.contains(key(item)) == true
+
+    /** Guarda [item] en «Ver más tarde» (o lo quita si ya estaba). Devuelve true si quedó guardado. */
+    @Synchronized
+    fun toggleWatchLater(item: MediaItem): Boolean {
+        val l = lists.getOrPut(WATCH_LATER) { ArrayList() }
+        val k = key(item)
+        val now = if (l.remove(k)) false else { l.add(k); true }
+        saveLists()
+        return now
+    }
+
+    /** Lo quita de «Ver más tarde» si estaba (se llama al terminar de verlo). */
+    @Synchronized
+    fun doneWatchLater(item: MediaItem) {
+        if (lists[WATCH_LATER]?.remove(key(item)) == true) saveLists()
+    }
 }
