@@ -1422,6 +1422,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         tab(tabResume, viewMode == ViewMode.LISTS)
         tabWork.text = "TALLER"   // [TALLER-1]
         tab(tabWork, viewMode == ViewMode.WORKSHOP)
+        updateWorkChips()   // [TALLER-FILTRO-1] se oculta fuera del Taller
     }
 
     private var recentPop: android.widget.ListPopupWindow? = null
@@ -4247,6 +4248,62 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
     private var workTool: Int? = null            // herramienta elegida: el próximo archivo que se toque la usa (1 cortar, 2 dividir, 4 reducir, 5 quitar audio, 6 MP3, 7 tono)
     private var workProjects: List<Workshop.Project> = emptyList()
     private var workScanning = false
+
+    // [TALLER-FILTRO-1] 0 = Todos; solo cambia lo que se ve
+    private var workFilter = 0
+    private val workFilterNames = arrayOf("Todos", "Cortes", "Partes", "Unidos", "MP3", "Descargas", "Otros")
+
+    private fun workCategory(p: Workshop.Project): Int = when (p.tool) {
+        "✂️ Cortado" -> 1
+        "📦 Dividido" -> 2
+        "🔗 Unido" -> 3
+        "🎵 MP3" -> 4
+        "⬇ Descargado" -> 5
+        else -> 6   // reducidos, sin audio y cualquier otro
+    }
+
+    private fun updateWorkChips() {
+        val scroll = findViewById<View>(R.id.workChipsScroll)
+        val show = viewMode == ViewMode.WORKSHOP && workProjects.isNotEmpty()
+        scroll.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) return
+        val box = findViewById<android.widget.LinearLayout>(R.id.workChips)
+        val d = resources.displayMetrics.density
+        if (box.childCount == 0) {
+            for (i in workFilterNames.indices) {
+                val chip = TextView(this).apply {
+                    textSize = 12f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    gravity = android.view.Gravity.CENTER
+                    minHeight = (36 * d).toInt()
+                    setOnClickListener { workFilter = i; showWorkshop(); listFiles.setSelection(0) }
+                }
+                val lp = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.marginEnd = (8 * d).toInt()
+                box.addView(chip, lp)
+            }
+        }
+        for (i in workFilterNames.indices) {
+            val chip = box.getChildAt(i) as TextView
+            val n = if (i == 0) workProjects.size else workProjects.count { workCategory(it) == i }
+            val on = i == workFilter
+            chip.text = workFilterNames[i] + " (" + n + ")"
+            chip.isSelected = on
+            if (on) {
+                chip.background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 18 * d
+                    setColor(accentColor())
+                }
+                chip.setTextColor(android.graphics.Color.BLACK)
+            } else {
+                chip.setBackgroundResource(R.drawable.bg_chip)
+                chip.setTextColor(col(R.color.vlc_muted))
+            }
+            chip.setPadding((14 * d).toInt(), 0, (14 * d).toInt(), 0)   // después del fondo, que puede cambiar el relleno
+        }
+    }
     private var workLastScan = 0L
     private var workGen = 0
 
@@ -4279,6 +4336,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         rows.add(GroupRow(4, "＋ Nuevo proyecto", if (workProjects.isEmpty()) "Cortar, dividir, unir, reducir peso, quitar audio, MP3 y tonos"
             else countLabel(workProjects.size, "proyecto", "proyectos") + " · ocupan " + android.text.format.Formatter.formatShortFileSize(this, workProjects.sumOf { it.bytes }), null, ""))   // [TALLER-2]
         for (p in workProjects) {
+            if (workFilter != 0 && workCategory(p) != workFilter) continue   // [TALLER-FILTRO-1]
             val bits = ArrayList<String>()
             bits.add(p.tool)
             if (p.parts.size > 1) {
@@ -4300,6 +4358,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         if (workProjects.isEmpty()) {
             tvEmpty.text = if (workScanning || workLastScan == 0L) "Buscando tus proyectos…"
                 else "Aún no hay proyectos.\nLo que cortes, unas, reduzcas o dividas con CASTV aparecerá aquí."
+            tvEmpty.visibility = View.VISIBLE
+        } else if (workFilter != 0 && workProjects.none { workCategory(it) == workFilter }) {   // [TALLER-FILTRO-1]
+            tvEmpty.text = "No hay proyectos en «" + workFilterNames[workFilter] + "»."
             tvEmpty.visibility = View.VISIBLE
         } else {
             tvEmpty.visibility = View.GONE
