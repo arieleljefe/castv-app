@@ -43,6 +43,7 @@ object SavedFile {
     }
 
     fun offer(act: Activity, icon: String, name: String, uri: Uri?) {
+        Workshop.record(act.applicationContext, icon, name, uri)   // [TALLER-1b]
         if (uri == null || act.isFinishing || act.isDestroyed) {
             Toast.makeText(act.applicationContext, "$icon Guardado en Descargas: $name", Toast.LENGTH_LONG).show()
             return

@@ -4320,7 +4320,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 val all = ArrayList<MediaItem>()
                 all.addAll(MediaScanner.scanVideos(this))
                 all.addAll(MediaScanner.scanMusic(this))
-                Workshop.detect(all, Workshop.hidden(this))
+                Workshop.detect(all, Workshop.hidden(this), Workshop.records(this))
             } catch (e: Exception) {
                 emptyList()
             }

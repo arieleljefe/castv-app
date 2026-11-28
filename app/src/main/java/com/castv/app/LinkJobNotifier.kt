@@ -60,6 +60,7 @@ object LinkJobNotifier {
     /** Aviso final (sin barra). Con [uri], tocarlo abre el archivo y salen los botones «Abrir» y «Abrir ubicación»;
      *  sin él, abre la app. [CARPETA-1] [folder] = true sin [uri] (varios archivos): solo «Abrir ubicación». */
     fun done(ctx: Context, title: String, text: String, uri: Uri?, folder: Boolean = false) {
+        if (title.contains("Guardado")) Workshop.record(ctx, title.substringBefore(' '), text, uri)   // [TALLER-1b]
         try {
             ensureChannel(ctx)
             val tap: Intent? = if (uri != null) {

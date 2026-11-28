@@ -1,6 +1,10 @@
 package com.castv.app
 
+import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * [TALLER-1] Reconoce por el nombre lo que la propia app generó (cortes, partes, uniones, reducidos, sin audio)
@@ -42,11 +46,40 @@ object Workshop {
         prefs(ctx).edit().remove("hidden").apply()
     }
 
+    /** [TALLER-1b] Registro de lo guardado sin sufijo en el nombre (MP3 convertidos, descargas): enlace del archivo, herramienta, nombre y fecha. */
+    class Rec(val uri: String, val tool: String, val name: String, val ms: Long)
+
+    fun records(ctx: Context): List<Rec> {
+        val raw = prefs(ctx).getString("records", null) ?: return emptyList()
+        return try {
+            val a = JSONArray(raw)
+            (0 until a.length()).map { val o = a.getJSONObject(it); Rec(o.getString("u"), o.getString("t"), o.getString("n"), o.getLong("d")) }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    /** Anota un archivo guardado por la app (últimos 100). Lo llaman `SavedFile.offer` y `LinkJobNotifier.done`. No guarda enlaces de origen (R9). */
+    @Synchronized
+    fun record(ctx: Context, icon: String, name: String, uri: Uri?) {
+        if (uri == null) return
+        try {
+            val tool = when (icon) {
+                "🎵" -> "🎵 MP3"
+                "⬇" -> "⬇ Descargado"
+                else -> return   // lo demás ya se reconoce por el nombre
+            }
+            val list = ArrayList(records(ctx).filter { it.uri != uri.toString() })
+            list.add(0, Rec(uri.toString(), tool, name, System.currentTimeMillis()))
+            val a = JSONArray()
+            for (r in list.take(100)) a.put(JSONObject().put("u", r.uri).put("t", r.tool).put("n", r.name).put("d", r.ms))
+            prefs(ctx).edit().putString("records", a.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
     private fun partNo(m: MediaItem): Int =
         partRe.find(m.name)?.groupValues?.get(1)?.toIntOrNull() ?: 0
 
     /** Busca en la biblioteca lo que CASTV generó; lo más nuevo primero. */
-    fun detect(items: List<MediaItem>, hidden: Set<String>): List<Project> {
+    fun detect(items: List<MediaItem>, hidden: Set<String>, recs: List<Rec> = emptyList()): List<Project> {
         val out = ArrayList<Project>()
         val groups = LinkedHashMap<String, MutableList<MediaItem>>()
         val bases = HashMap<String, String>()
@@ -68,6 +101,18 @@ object Workshop {
                     break
                 }
             }
+        }
+        // [TALLER-1b] MP3 y descargas registrados: se busca su archivo por el número de MediaStore (sin repetir lo ya reconocido)
+        val seen = HashSet<Long>()
+        for (p in out) for (m in p.parts) seen.add(m.id)
+        for (g in groups.values) for (m in g) seen.add(m.id)
+        for (r in recs) {
+            val id = try { ContentUris.parseId(Uri.parse(r.uri)) } catch (e: Exception) { continue }
+            val music = r.uri.contains("/audio/")
+            val m = items.firstOrNull { it.id == id && it.isMusic == music } ?: continue
+            val key = "r|" + r.uri
+            if (key in hidden || !seen.add(m.id)) continue
+            out.add(Project(key, r.tool, r.name.substringBeforeLast('.'), listOf(m), r.ms, 1))
         }
         for ((key, list) in groups) {
             if (key in hidden) continue
