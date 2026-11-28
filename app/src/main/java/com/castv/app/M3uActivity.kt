@@ -1743,6 +1743,8 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         // [ANIM-1b] el fundido solo si cambió lo que se ve (no en cada repintado igual, para que no parpadee)
         val key = (recent.map { it.url } + "|" + favList.map { it.url } + "|" + topList.map { it.first.url }).joinToString(",")
         sectionsFade = key != lastSectionsKey
+        // [LOGO-PRIORIDAD-1] los logos de lo que se ve arriba se bajan ya (y se guardan en el teléfono)
+        Logos.prefetch(this, (favList + recent + topList.map { it.first }).map { it.logo })
         lastSectionsKey = key
         addSection("🕘 Continuar", recent)
         addSection("★ Favoritos", favList, big = true)   // [VISTA-4] misma estrella (color de acento) que la lista; [CARTELERA-1] tarjetas grandes
@@ -1803,7 +1805,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         }
         val logo = ImageView(this)
         logo.scaleType = ImageView.ScaleType.FIT_CENTER
-        Logos.load(logo, c.logo)
+        Logos.load(logo, c.logo, c.name)   // [LOGO-FICHA-1]
         if (c.logo.isEmpty()) {
             logo.setImageResource(R.drawable.ic_tv)
             logo.setColorFilter(mutedColor)
@@ -1843,7 +1845,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
         box.setPadding(dp(4), dp(4), dp(4), dp(4))   // [VISTA-2]
         val logo = ImageView(this)
         logo.scaleType = ImageView.ScaleType.FIT_CENTER
-        Logos.load(logo, c.logo)
+        Logos.load(logo, c.logo, c.name)   // [LOGO-FICHA-1]
         if (c.logo.isEmpty()) {
             logo.setImageResource(R.drawable.ic_tv)
             logo.setColorFilter(mutedColor)
@@ -3167,7 +3169,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
             }
             v.setBackgroundColor(if (sel) ((accent() and 0x00FFFFFF) or 0x33000000) else dragBg(position))   // [FAV-ARRASTRAR-1]
             logo.visibility = View.VISIBLE
-            Logos.load(logo, c.logo)
+            Logos.load(logo, c.logo, c.name)   // [LOGO-FICHA-1]
             if (c.logo.isEmpty()) {   // [PULIDO-3d] sin logo: icono genérico de TV en gris
                 logo.setImageResource(R.drawable.ic_tv)
                 logo.setColorFilter(mutedColor)
