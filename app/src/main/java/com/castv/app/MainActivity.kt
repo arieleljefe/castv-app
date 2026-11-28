@@ -562,6 +562,14 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         findViewById<View>(R.id.btnNext).setOnClickListener { step(+1) }
         findViewById<View>(R.id.btnShuffle).setOnClickListener { shuffleAndPlay() }
         btnAuto.setOnClickListener { cycleRepeat() }
+        // [PLAYER-TIPS-1] mantener pulsado un botón del reproductor dice qué hace (btnExpand ya tiene su pulsación larga)
+        for ((id, tip) in listOf(
+            R.id.btnShuffle to "Mezclar y reproducir", R.id.btnPrev to "Anterior", R.id.btnPlay to "Reproducir o pausar",
+            R.id.btnStop to "Detener", R.id.btnNext to "Siguiente", R.id.btnBack10 to "Atrás 10 segundos",
+            R.id.btnFwd10 to "Adelantar 10 segundos", R.id.btnMute to "Silencio", R.id.btnQuick to "Reproducir o pausar",
+            R.id.btnNowFav to "Favorito")) {
+            findViewById<View>(id)?.let { androidx.appcompat.widget.TooltipCompat.setTooltipText(it, tip) }
+        }
 
         findViewById<Button>(R.id.btnBack10).setOnClickListener {
             val t = maxOf(0, lastPos - 10)
@@ -2262,6 +2270,13 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         btnAuto.setImageResource(if (repeatMode == Repeat.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat)
         btnAuto.setBackgroundResource(if (repeatMode == Repeat.OFF) R.drawable.ctrl_off else R.drawable.ctrl_on)
         btnAuto.alpha = if (repeatMode == Repeat.OFF) 0.5f else 1f
+        val rep = when (repeatMode) {   // [PLAYER-TIPS-1] el texto del botón sigue el modo
+            Repeat.OFF -> "Repetir: apagado"
+            Repeat.ALL -> "Repetir: toda la lista"
+            Repeat.ONE -> "Repetir: una pista"
+        }
+        btnAuto.contentDescription = rep
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(btnAuto, rep)
     }
 
     /** Qué hacer cuando termina una pista (siempre en el hilo principal). */

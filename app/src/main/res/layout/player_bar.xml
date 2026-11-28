@@ -109,14 +109,18 @@
         android:visibility="gone">
 
     <!-- [UI-3a] carátula grande (solo se ve al expandir y si hay imagen) -->
+    <!-- [PLAYER-ART-1] el ancho se ajusta a la imagen y va centrada (antes ocupaba todo el ancho y dejaba barras a los lados) -->
     <ImageView
         android:id="@+id/nowBigArt"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="190dp"
-        android:layout_marginBottom="8dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="10dp"
+        android:adjustViewBounds="true"
         android:background="@drawable/bg_thumb"
         android:clipToOutline="true"
         android:contentDescription="@null"
+        android:elevation="4dp"
         android:scaleType="fitCenter"
         android:visibility="gone" />
 
