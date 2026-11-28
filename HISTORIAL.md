@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v597
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v601
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -254,3 +254,6 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - VOLUMEN-1 · 28 nov · Más › «🔊 Volumen extra»: Apagado / +3 / +6 / +9 dB para la música del teléfono (`LoudnessEnhancer`, clave `music_gain`); sube todas las pistas por igual · `MainActivity.kt`
 - TAG-3.41 · 28 nov · etiqueta `v3.41` publicada (commit `248260c`): CARPETA-2 y BIENVENIDA-1
 - TAG-3.42 · 28 nov · etiqueta `v3.42` publicada (commit `133cab0`) e instalada: ÁLBUM-2 y VOLUMEN-1; la app muestra 3.42
+- TEMAS-3a · 28 nov · Ajustes › Interfaz › «Forma» (Redondeada · Cuadrada · Píldora) y «Letra» (Normal · Serif · Monoespaciada · Condensada): radios de `bg_chip/search/dialog/thumb` pasan a atributos `castvRadius*` y la letra a `android:fontFamily`; claves `shape` y `font`; `MainActivity` se recrea al volver (`styleAtStart`) · `Themes.kt`, `SettingsActivity.kt`, `MainActivity.kt`, `attrs.xml`, `styles.xml`, 4 drawables `bg_*`
+- TEMAS-3b · 28 nov · «Tema» pasa a galería de 6 temas con vista previa (CASTV, Cine, Neón, Cassette, Papel, Quisqueya; cada uno guarda modo + acento + fondo + forma + letra; «Personalizado» si se retoca); el Sistema/Claro/Oscuro pasa a la fila «Modo»; «Fondo oscuro» pasa a «Fondo» con 4 fondos nuevos (Papel para modo claro, Neón, Cassette, Quisqueya) · `Themes.kt`, `SettingsActivity.kt`, `MainActivity.kt`, `colors.xml`, `styles.xml`
+- TAG-3.43 · 28 nov · etiqueta `v3.43` publicada e instalada: TEMAS-3a y TEMAS-3b (número por confirmar en Acerca de)
