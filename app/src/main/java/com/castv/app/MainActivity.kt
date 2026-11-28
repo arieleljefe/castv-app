@@ -419,6 +419,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         tvSearchChannels.setOnClickListener { openChannelsSearch() }
         btnPlay = findViewById(R.id.btnPlay)
         fab = findViewById(R.id.fabShuffle)
+        window.decorView.postDelayed({ maybeWelcome() }, 900)   // [BIENVENIDA-1]
 
         sortMode = Sort.values().getOrElse(
             getSharedPreferences("castv", MODE_PRIVATE).getInt("sort", 0)) { Sort.NAME_ASC }
@@ -1695,7 +1696,38 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         menu.add(0, 22, 11, "Favoritos: " + allItems.count { Store.isFav(it) })   // [TABS-1]
         menu.add(0, 23, 11, "Continuar: " + allItems.count { Store.resumeAt(it) >= 10 })   // [TABS-1]
         menu.add(0, 24, 11, "Informe de diagnóstico")   // [DIAG-1]
+        menu.add(0, 27, 12, "👋 Guía de inicio")   // [BIENVENIDA-1]
         menu.add(0, 11, 12, "Mis redes y contacto")
+    }
+
+    /** [BIENVENIDA-1] Primer arranque guiado: solo en una instalación NUEVA (no al actualizar) y una sola vez.
+     *  La marca vive en sus propias preferencias (`castv_welcome`), fuera de los respaldos. */
+    private fun maybeWelcome() {
+        if (isFinishing || isDestroyed) return
+        val sp = getSharedPreferences("castv_welcome", MODE_PRIVATE)
+        if (sp.getBoolean("seen", false)) return
+        sp.edit().putBoolean("seen", true).apply()
+        val fresh = try {
+            val pi = packageManager.getPackageInfo(packageName, 0)
+            Math.abs(pi.lastUpdateTime - pi.firstInstallTime) < 10_000L
+        } catch (e: Exception) { false }
+        if (fresh) showWelcome(0)
+    }
+
+    /** [BIENVENIDA-1] Tres pantallas cortas; también se abre desde Más › «👋 Guía de inicio». */
+    private fun showWelcome(page: Int) {
+        val titles = arrayOf("👋 Bienvenido a CASTV", "📺 Mandar a la TV", "✂️ Taller, canales y más")
+        val texts = arrayOf(
+            "Abajo eliges 🎬 Video o 🎵 Audio. Toca un archivo para reproducirlo; mantenlo pulsado para marcar varios (borrar, añadir a una lista, unir…). Arriba están la búsqueda y las pestañas de la biblioteca.",
+            "El botón del teléfono, arriba, cambia la salida entre Teléfono y TV. Elige tu televisor en Más › «Elegir TV». Con la salida en TV, lo que reproduzcas se manda a la pantalla.",
+            "✂️ La pestaña TALLER corta, une, divide, reduce el peso y convierte videos a MP3. 📡 Canales abre tus listas M3U. «Más» tiene los ajustes, el respaldo y tu resumen. Esta guía vuelve a salir en Más › «Guía de inicio».")
+        val last = page == titles.size - 1
+        val b = AlertDialog.Builder(this)
+            .setTitle(titles[page])
+            .setMessage(texts[page])
+            .setPositiveButton(if (last) "Empezar" else "Siguiente") { _, _ -> if (!last) showWelcome(page + 1) }
+        if (!last) b.setNegativeButton("Saltar", null)
+        b.show()
     }
 
     /** Ejecuta la acción de una opción del menú principal por su id. */
@@ -1741,6 +1773,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             22 -> { groupReturn = null; viewMode = ViewMode.FAVS; applyFilters() }   // [TABS-1]
             23 -> { groupReturn = null; viewMode = ViewMode.RESUME; applyFilters() }   // [TABS-1]
             24 -> showDiagReport()   // [DIAG-1]
+            27 -> showWelcome(0)   // [BIENVENIDA-1]
             20 -> {   // [NOVISTOS-1]
                 if (showingMusic) toast("«No vistos» solo sirve en videos")
                 else { onlyUnseen = !onlyUnseen; applyFilters() }
@@ -1823,6 +1856,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     20 -> R.drawable.ic_mn_visibility   // [ICONOS-MAS-1] No vistos
                     21 -> R.drawable.ic_mas_trending   // [TOP-1] [ICONOS-MAS-1]
                     24 -> R.drawable.ic_vp_info   // [ICONOS-MAS-1] Informe de diagnóstico
+                    27 -> R.drawable.ic_vp_info   // [BIENVENIDA-1]
                     26 -> R.drawable.ic_mas_chart   // [RESUMEN-1] [ICONOS-MAS-1]
                     22 -> R.drawable.ic_vp_star   // [TABS-1]
                     23 -> R.drawable.ic_vp_play   // [TABS-1]
