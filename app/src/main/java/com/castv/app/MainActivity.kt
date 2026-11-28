@@ -4358,7 +4358,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     /** Lleva a la biblioteca para elegir el archivo (un toque lo usa); «Unir» pide marcar varios con pulsación larga. */
     private fun workStart(tool: Int) {
-        workTool = if (tool == 3) null else tool
+        if (tool == 3) { workJoinPick(); return }   // [TALLER-2] Unir con lista para marcar
+        workTool = tool
         groupReturn = null
         resetFilters()
         viewMode = ViewMode.ALL
@@ -4368,8 +4369,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             tool == 7 && !showingMusic -> showMusic()
             else -> applyFilters()
         }
-        toast(if (tool == 3) "Mantén pulsado un archivo, marca 2 o más y toca ⋮ › 🔗 Unir"
-              else workToolLabel(tool) + ": toca el archivo (✕ arriba para cancelar)")
+        toast(workToolLabel(tool) + ": toca el archivo (✕ arriba para cancelar)")
     }
 
     /** Se tocó un archivo con una herramienta elegida en el Taller. */
@@ -4449,6 +4449,38 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             }
             .setNegativeButton("Cerrar", null)
             .show()
+    }
+
+    /** [TALLER-2] Unir desde el Taller: lista de la biblioteca actual (videos o audios) para marcar 2 o más; se unen en el orden en que se marcan. */
+    private fun workJoinPick() {
+        val src = allItems.sortedByDescending { it.dateAdded }.take(300)
+        if (src.size < 2) { toast("No hay suficientes archivos para unir"); return }
+        val chosen = ArrayList<MediaItem>()
+        val names = Array<CharSequence>(src.size) { prettyTitle(src[it]) }
+        val dlg = AlertDialog.Builder(this)
+            .setTitle(if (showingMusic) "🔗 Unir audios (.m4a/AAC)" else "🔗 Unir videos")
+            .setMultiChoiceItems(names, null) { _, which, checked ->
+                if (checked) chosen.add(src[which]) else chosen.remove(src[which])
+            }
+            .setPositiveButton("Siguiente", null)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (chosen.size < 2) { toast("Marca 2 o más, en el orden en que quieres unirlos"); return@setOnClickListener }
+            if (chosen.size > VideoJoin.MAX_FILES) { toast("Máximo ${VideoJoin.MAX_FILES} archivos a la vez"); return@setOnClickListener }
+            if (Mp3Converter.running.get() || LinkDownload.running.get()) { toast("Ya hay una conversión o descarga en curso"); return@setOnClickListener }
+            dlg.dismiss()
+            val sel = ArrayList(chosen)
+            val order = sel.mapIndexed { i, m -> "${i + 1}. ${m.name}" }.joinToString("\n")
+            AlertDialog.Builder(this)
+                .setTitle("🔗 Unir " + sel.size + (if (showingMusic) " audios" else " videos"))
+                .setMessage("Se unirán en este orden (el que marcaste):\n\n" + order +
+                    "\n\nSin recodificar: solo funciona si todos son iguales (mismo códec, tamaño y giro).")
+                .setPositiveButton("Unir") { _, _ -> runJoin(sel, !showingMusic) }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
     }
 
     /** [TALLER-2] «Usar con otra herramienta»: el mismo archivo (la 1.ª parte, si hay varias) sin volver a buscarlo. */
