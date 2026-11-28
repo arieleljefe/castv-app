@@ -459,7 +459,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 section(e.section, first = last.isEmpty())
                 last = e.section
             }
-            row(e.title, e.subtitle, e.onClick)
+            row(e.title, e.subtitle, e.onClick, rowIcon(e.section, e.title))   // [AJUSTES-FILAS-1]
         }
     }
 
@@ -560,29 +560,72 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         content.addView(tv)
     }
 
-    private fun row(title: String, subtitle: String?, onClick: (() -> Unit)?) {
+    /** [AJUSTES-FILAS-1] Icono de cada opción dentro de una sección: por palabras del título; si no hay, el de su sección. */
+    private fun rowIcon(section: String, title: String): Int {
+        val t = norm(title)
+        val map = listOf(
+            "tema" to R.drawable.ic_vp_palette, "color" to R.drawable.ic_vp_palette, "fondo oscuro" to R.drawable.ic_vp_palette,
+            "modelo de voz" to R.drawable.ic_vp_subs, "subtitulos con ia" to R.drawable.ic_vp_subs,
+            "eliminar" to R.drawable.ic_delete, "eliminado" to R.drawable.ic_delete, "limpiar" to R.drawable.ic_delete,
+            "restablecer" to R.drawable.ic_vp_build, "pruebas" to R.drawable.ic_vp_build,
+            "datos moviles" to R.drawable.ic_vp_phone, "ip del telefono" to R.drawable.ic_vp_phone,
+            "puerto" to R.drawable.ic_mas_link, "historial de enlaces" to R.drawable.ic_mas_link,
+            "guia" to R.drawable.ic_event, "velocidad" to R.drawable.ic_mas_speed,
+            "ventana flotante" to R.drawable.ic_vp_aspect, "carpetas" to R.drawable.ic_mas_folder,
+            "busquedas" to R.drawable.ic_search, "canales ocultos" to R.drawable.ic_mn_visibility,
+            "continuar" to R.drawable.ic_vp_play, "sin pausa" to R.drawable.ic_vp_play, "fundido" to R.drawable.ic_vp_play,
+            "ecualizador" to R.drawable.ic_mas_eq, "pin" to R.drawable.ic_vp_lock,
+            "tv" to R.drawable.ic_tv, "salida" to R.drawable.ic_tv,
+            "actualizacion" to R.drawable.ic_mn_download, "versiones nuevas" to R.drawable.ic_mn_download,
+            "registro" to R.drawable.ic_vp_info, "version" to R.drawable.ic_vp_info, "acerca" to R.drawable.ic_vp_info,
+            "exportar" to R.drawable.ic_mn_upload, "enviar respaldo" to R.drawable.ic_mn_upload)
+        for ((k, res) in map) if (t.contains(k)) return res
+        return sectionIcon(section)
+    }
+
+    private fun row(title: String, subtitle: String?, onClick: (() -> Unit)?, iconRes: Int = 0) {
         val box = LinearLayout(this)
-        box.orientation = LinearLayout.VERTICAL
-        box.setPadding(dp(20), dp(14), dp(20), dp(14))
+        box.orientation = LinearLayout.HORIZONTAL   // [AJUSTES-FILAS-1] icono a la izquierda, textos a la derecha
+        box.gravity = Gravity.CENTER_VERTICAL
+        box.setPadding(dp(20), dp(12), dp(20), dp(12))
         if (onClick != null) {
             val sel = TypedValue()
             theme.resolveAttribute(android.R.attr.selectableItemBackground, sel, true)
             box.setBackgroundResource(sel.resourceId)
             box.setOnClickListener { onClick() }
         }
+        if (iconRes != 0) {
+            val acc = accent()
+            val circle = GradientDrawable()
+            circle.shape = GradientDrawable.OVAL
+            circle.setColor((acc and 0x00FFFFFF) or 0x2B000000)
+            val icon = android.widget.ImageView(this)
+            icon.setImageResource(iconRes)
+            icon.setColorFilter(acc)
+            icon.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            icon.setPadding(dp(8), dp(8), dp(8), dp(8))
+            icon.background = circle
+            icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            val ilp = LinearLayout.LayoutParams(dp(36), dp(36))
+            ilp.marginEnd = dp(14)
+            box.addView(icon, ilp)
+        }
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
         val t = TextView(this)
         t.text = title
         t.textSize = 16f
         t.setTextColor(txtColor)
-        box.addView(t)
+        col.addView(t)
         if (subtitle != null) {
             val s = TextView(this)
             s.text = subtitle
             s.textSize = 13f
             s.setTextColor(mutedColor)
             s.setPadding(0, dp(2), 0, 0)
-            box.addView(s)
+            col.addView(s)
         }
+        box.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         content.addView(box)
     }
 
