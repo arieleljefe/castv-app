@@ -4453,18 +4453,71 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     /** [TALLER-2] Unir desde el Taller: lista de la biblioteca actual (videos o audios) para marcar 2 o más; se unen en el orden en que se marcan. */
     private fun workJoinPick() {
-        val src = allItems.sortedByDescending { it.dateAdded }.take(300)
-        if (src.size < 2) { toast("No hay suficientes archivos para unir"); return }
+        val all = allItems.sortedByDescending { it.dateAdded }
+        if (all.size < 2) { toast("No hay suficientes archivos para unir"); return }
+        val recent = all.take(300)
         val chosen = ArrayList<MediaItem>()
-        val names = Array<CharSequence>(src.size) { prettyTitle(src[it]) }
-        val dlg = AlertDialog.Builder(this)
+        var shown: List<MediaItem> = recent
+        // [BUSCA-UNIR-1] textos de búsqueda de toda la biblioteca (se preparan al escribir por 1.ª vez)
+        val keys by lazy { all.map { norm(prettyTitle(it) + " " + it.name) } }
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        val search = EditText(ctx).apply {
+            hint = "🔎 Buscar por nombre"
+            setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        }
+        val none = TextView(ctx).apply {
+            text = "Sin resultados"
+            gravity = android.view.Gravity.CENTER
+            visibility = View.GONE
+        }
+        val rows = android.widget.ArrayAdapter<String>(ctx, android.R.layout.simple_list_item_multiple_choice, ArrayList<String>())
+        val list = ListView(ctx).apply {
+            choiceMode = ListView.CHOICE_MODE_MULTIPLE
+            adapter = rows
+        }
+        val fill = {
+            rows.setNotifyOnChange(false)
+            rows.clear()
+            rows.addAll(shown.map { prettyTitle(it) })
+            list.clearChoices()
+            shown.forEachIndexed { i, m -> if (m in chosen) list.setItemChecked(i, true) }
+            rows.notifyDataSetChanged()
+            none.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
+        }
+        fill()
+        val box = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val side = (16 * resources.displayMetrics.density).toInt()
+            setPadding(side, 0, side, 0)
+            addView(search)
+            addView(none)
+            addView(list, android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.45f).toInt(), 1f))
+        }
+        val dlg = builder
             .setTitle(if (showingMusic) "🔗 Unir audios (.m4a/AAC)" else "🔗 Unir videos")
-            .setMultiChoiceItems(names, null) { _, which, checked ->
-                if (checked) chosen.add(src[which]) else chosen.remove(src[which])
-            }
+            .setView(box)
             .setPositiveButton("Siguiente", null)
             .setNegativeButton("Cancelar", null)
             .create()
+        list.setOnItemClickListener { _, _, pos, _ ->
+            val m = shown[pos]
+            if (list.isItemChecked(pos)) { if (m !in chosen) chosen.add(m) } else chosen.remove(m)
+            dlg.getButton(AlertDialog.BUTTON_POSITIVE).text =
+                if (chosen.isEmpty()) "Siguiente" else "Siguiente (${chosen.size})"
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val q = norm(s?.toString()?.trim() ?: "")
+                shown = if (q.isEmpty()) recent else all.filterIndexed { i, _ -> keys[i].contains(q) }
+                fill()
+            }
+        })
         dlg.show()
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (chosen.size < 2) { toast("Marca 2 o más, en el orden en que quieres unirlos"); return@setOnClickListener }
