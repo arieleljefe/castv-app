@@ -4634,7 +4634,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         val builder = AlertDialog.Builder(this)
         val ctx = builder.context
         val search = EditText(ctx).apply {
-            hint = "🔎 Buscar por nombre"
+            hint = "🔎 Buscar · mantén pulsado para ver"
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_DONE
         }
@@ -4673,6 +4673,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             rows.notifyDataSetChanged()   // [UNIR-MINI-1] renumera 1, 2, 3…
             dlg.getButton(AlertDialog.BUTTON_POSITIVE).text =
                 if (chosen.isEmpty()) "Siguiente" else "Siguiente (${chosen.size})"
+        }
+        list.setOnItemLongClickListener { _, _, pos, _ ->   // [UNIR-VER-1] no cambia las marcas
+            workPreview(shown[pos])
+            true
         }
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -4778,6 +4782,74 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .create()
         d.setOnDismissListener { onClose() }
         d.show()
+    }
+
+    /** [UNIR-VER-1] Ver u oír un archivo sin salir de la lista de Unir (reproductor propio; se detiene al cerrar). */
+    private fun workPreview(item: MediaItem) {
+        if (localActive) pauseAll()   // solo lo que suena en el teléfono; el TV no se toca
+        val builder = AlertDialog.Builder(this)
+        val ctx = builder.context
+        fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+        val match = android.widget.LinearLayout.LayoutParams.MATCH_PARENT
+        val wrap = android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        val video = android.widget.VideoView(ctx)
+        val stage = FrameLayout(ctx).apply {
+            addView(video, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT, android.view.Gravity.CENTER))
+        }
+        val time = TextView(ctx).apply { text = "Cargando…"; gravity = android.view.Gravity.CENTER }
+        val bar = SeekBar(ctx).apply { isEnabled = false }
+        val play = Button(ctx).apply { text = "⏸ Pausa"; isEnabled = false }
+        val box = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), 0)
+            addView(stage, android.widget.LinearLayout.LayoutParams(match, dp(if (item.isMusic) 64 else 260)))
+            addView(bar, android.widget.LinearLayout.LayoutParams(match, wrap))
+            addView(time, android.widget.LinearLayout.LayoutParams(match, wrap))
+            addView(play, android.widget.LinearLayout.LayoutParams(match, wrap))
+        }
+        val d = builder.setTitle(prettyTitle(item)).setView(box).setNegativeButton("Cerrar", null).create()
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var ready = false
+        var touching = false
+        val tick = object : Runnable {
+            override fun run() {
+                if (!d.isShowing) return
+                if (ready) {
+                    if (!touching) bar.progress = video.currentPosition
+                    time.text = fmt(video.currentPosition / 1000) + " / " + fmt(maxOf(video.duration, 0) / 1000)
+                    play.text = if (video.isPlaying) "⏸ Pausa" else "▶ Reproducir"
+                }
+                handler.postDelayed(this, 400)
+            }
+        }
+        video.setOnPreparedListener {
+            ready = true
+            bar.max = maxOf(video.duration, 0)
+            bar.isEnabled = true
+            play.isEnabled = true
+            video.start()
+        }
+        video.setOnErrorListener { _, _, _ ->
+            ready = false
+            bar.isEnabled = false
+            play.isEnabled = false
+            time.text = "No se puede reproducir este archivo aquí"
+            true
+        }
+        play.setOnClickListener { if (video.isPlaying) video.pause() else video.start() }
+        bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) { if (fromUser) video.seekTo(p) }
+            override fun onStartTrackingTouch(sb: SeekBar) { touching = true }
+            override fun onStopTrackingTouch(sb: SeekBar) { touching = false }
+        })
+        d.setOnDismissListener {
+            handler.removeCallbacks(tick)
+            video.stopPlayback()
+        }
+        d.show()
+        video.setVideoURI(uriOf(item))
+        handler.post(tick)
     }
 
     /** [UNIR-MINI-1] Filas de «Unir»: miniatura con duración, nombre, carpeta y fecha, y el número de orden al marcar. */
