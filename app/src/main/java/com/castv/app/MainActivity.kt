@@ -4276,7 +4276,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         groupAdapter.grid = false
         val q = norm(query).trim()
         val rows = ArrayList<GroupRow>()
-        rows.add(GroupRow(4, "＋ Nuevo proyecto", "Cortar, dividir, unir, reducir peso, quitar audio, MP3 y tonos", null, ""))
+        rows.add(GroupRow(4, "＋ Nuevo proyecto", if (workProjects.isEmpty()) "Cortar, dividir, unir, reducir peso, quitar audio, MP3 y tonos"
+            else countLabel(workProjects.size, "proyecto", "proyectos") + " · ocupan " + android.text.format.Formatter.formatShortFileSize(this, workProjects.sumOf { it.bytes }), null, ""))   // [TALLER-2]
         for (p in workProjects) {
             val bits = ArrayList<String>()
             bits.add(p.tool)
@@ -4285,6 +4286,7 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             } else if (p.parts[0].durationSec > 0) {
                 bits.add(fmt(p.parts[0].durationSec))
             }
+            if (p.bytes > 0) bits.add(android.text.format.Formatter.formatShortFileSize(this, p.bytes))   // [TALLER-2]
             bits.add(workWhen(p.newest))
             val sub = bits.joinToString("  ·  ")
             if (q.isNotEmpty() && !norm(p.base + " " + sub).contains(q)) continue
@@ -4320,7 +4322,9 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 val all = ArrayList<MediaItem>()
                 all.addAll(MediaScanner.scanVideos(this))
                 all.addAll(MediaScanner.scanMusic(this))
-                Workshop.detect(all, Workshop.hidden(this), Workshop.records(this))
+                val det = Workshop.detect(all, Workshop.hidden(this), Workshop.records(this))
+                for (p in det) p.bytes = Workshop.sizeOf(this, p)   // [TALLER-2]
+                det
             } catch (e: Exception) {
                 emptyList()
             }

@@ -3,6 +3,7 @@ package com.castv.app
 import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -20,7 +21,9 @@ object Workshop {
         val parts: List<MediaItem>,
         val newest: Long,
         val total: Int
-    )
+    ) {
+        var bytes: Long = 0L   // [TALLER-2] peso de todas sus partes (se llena al buscar)
+    }
 
     private val suffixes = listOf(
         " (corte)" to "✂️ Cortado",
@@ -73,6 +76,20 @@ object Workshop {
             for (r in list.take(100)) a.put(JSONObject().put("u", r.uri).put("t", r.tool).put("n", r.name).put("d", r.ms))
             prefs(ctx).edit().putString("records", a.toString()).apply()
         } catch (e: Exception) { }
+    }
+
+    /** [TALLER-2] Peso en bytes de todas las partes de un proyecto (0 si no se puede leer). */
+    fun sizeOf(ctx: Context, p: Project): Long {
+        var sum = 0L
+        for (m in p.parts) {
+            try {
+                val base = if (m.isMusic) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                ctx.contentResolver.query(ContentUris.withAppendedId(base, m.id), arrayOf(MediaStore.MediaColumns.SIZE), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) sum += c.getLong(0)
+                }
+            } catch (e: Exception) { }
+        }
+        return sum
     }
 
     private fun partNo(m: MediaItem): Int =
