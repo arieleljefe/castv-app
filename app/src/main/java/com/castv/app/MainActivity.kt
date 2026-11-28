@@ -4472,17 +4472,10 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             gravity = android.view.Gravity.CENTER
             visibility = View.GONE
         }
-        val rows = android.widget.ArrayAdapter<String>(ctx, android.R.layout.simple_list_item_multiple_choice, ArrayList<String>())
-        val list = ListView(ctx).apply {
-            choiceMode = ListView.CHOICE_MODE_MULTIPLE
-            adapter = rows
-        }
+        val rows = JoinPickAdapter(chosen)   // [UNIR-MINI-1]
+        val list = ListView(ctx).apply { adapter = rows }
         val fill = {
-            rows.setNotifyOnChange(false)
-            rows.clear()
-            rows.addAll(shown.map { prettyTitle(it) })
-            list.clearChoices()
-            shown.forEachIndexed { i, m -> if (m in chosen) list.setItemChecked(i, true) }
+            rows.items = shown
             rows.notifyDataSetChanged()
             none.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         }
@@ -4505,7 +4498,8 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
             .create()
         list.setOnItemClickListener { _, _, pos, _ ->
             val m = shown[pos]
-            if (list.isItemChecked(pos)) { if (m !in chosen) chosen.add(m) } else chosen.remove(m)
+            if (!chosen.remove(m)) chosen.add(m)
+            rows.notifyDataSetChanged()   // [UNIR-MINI-1] renumera 1, 2, 3…
             dlg.getButton(AlertDialog.BUTTON_POSITIVE).text =
                 if (chosen.isEmpty()) "Siguiente" else "Siguiente (${chosen.size})"
         }
@@ -4535,6 +4529,96 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                 .show()
         }
     }
+
+    /** [UNIR-MINI-1] Filas de «Unir»: miniatura con duración, nombre, carpeta y fecha, y el número de orden al marcar. */
+    private inner class JoinPickAdapter(private val chosen: List<MediaItem>) : BaseAdapter() {
+        var items: List<MediaItem> = emptyList()
+
+        override fun getCount() = items.size
+        override fun getItem(position: Int) = items[position]
+        override fun getItemId(position: Int) = items[position].id
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val row = (convertView as? android.widget.LinearLayout) ?: newRow(parent.context)
+            val h = row.tag as JoinRow
+            val item = items[position]
+            h.icon.setImageResource(if (item.isMusic) R.drawable.ic_nav_audio else R.drawable.ic_nav_video)
+            bindThumb(item, h.thumb)
+            h.time.text = if (item.durationSec > 0) fmt(item.durationSec) else ""
+            h.time.visibility = if (item.durationSec > 0) View.VISIBLE else View.GONE
+            h.name.text = prettyTitle(item)
+            val info = ArrayList<String>()
+            if (item.folder != "(raíz)") info.add(item.folder.substringAfterLast('/'))
+            if (item.dateAdded > 0) info.add(shortDate(item.dateAdded))
+            h.info.text = info.joinToString("  ·  ")
+            val n = chosen.indexOf(item) + 1
+            h.mark.text = if (n > 0) n.toString() else ""
+            h.mark.background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                if (n > 0) setColor(accentColor())
+                else setStroke((2 * resources.displayMetrics.density).toInt(), col(R.color.vlc_muted))
+            }
+            row.contentDescription = h.name.text.toString() + if (n > 0) ", marcado, número $n" else ", sin marcar"
+            return row
+        }
+
+        private fun newRow(ctx: Context): android.widget.LinearLayout {
+            fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
+            val match = FrameLayout.LayoutParams.MATCH_PARENT
+            val wrap = FrameLayout.LayoutParams.WRAP_CONTENT
+            val icon = ImageView(ctx)
+            val thumb = ImageView(ctx).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+            val time = TextView(ctx).apply {
+                textSize = 11f
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundColor(0xB0000000.toInt())
+                setPadding(dp(4), 0, dp(4), 0)
+            }
+            val pic = FrameLayout(ctx).apply {
+                setBackgroundResource(R.drawable.bg_thumb)
+                clipToOutline = true
+                addView(icon, FrameLayout.LayoutParams(dp(28), dp(28), android.view.Gravity.CENTER))
+                addView(thumb, FrameLayout.LayoutParams(match, match))
+                addView(time, FrameLayout.LayoutParams(wrap, wrap, android.view.Gravity.BOTTOM or android.view.Gravity.END))
+            }
+            val name = TextView(ctx).apply {
+                textSize = 14f
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            val info = TextView(ctx).apply {
+                textSize = 12f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(col(R.color.vlc_muted))
+            }
+            val texts = android.widget.LinearLayout(ctx).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding(dp(10), 0, dp(8), 0)
+                addView(name)
+                addView(info)
+            }
+            val mark = TextView(ctx).apply {
+                textSize = 13f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(android.graphics.Color.BLACK)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+            return android.widget.LinearLayout(ctx).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(6), 0, dp(6))
+                // los videos van con miniatura ancha; los audios, con carátula cuadrada
+                addView(pic, android.widget.LinearLayout.LayoutParams(dp(if (showingMusic) 60 else 104), dp(60)))
+                addView(texts, android.widget.LinearLayout.LayoutParams(0, wrap, 1f))
+                addView(mark, android.widget.LinearLayout.LayoutParams(dp(28), dp(28)))
+                tag = JoinRow(icon, thumb, time, name, info, mark)
+            }
+        }
+    }
+
+    private class JoinRow(val icon: ImageView, val thumb: ImageView, val time: TextView,
+                          val name: TextView, val info: TextView, val mark: TextView)
 
     /** [TALLER-2] «Usar con otra herramienta»: el mismo archivo (la 1.ª parte, si hay varias) sin volver a buscarlo. */
     private fun workReuse(p: Workshop.Project) {
