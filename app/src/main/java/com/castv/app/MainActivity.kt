@@ -3978,16 +3978,84 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
     private var lastToast: Toast? = null   // [AVISO-COLA-1] el último aviso, para quitarlo al salir de esta pantalla
 
+    // [AVISO-MINI-1] Aviso propio: una pastilla oscura con borde del color de acento que sale SIEMPRE justo encima del
+    // mini reproductor (el Toast de Android se montaba sobre él). Se quita sola, o al tocarla.
+    private var noteView: TextView? = null
+    private val noteHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val noteHide = Runnable { hideNote() }
+
     private fun toast(msg: String) {
-        val t = Toast.makeText(this, msg, Toast.LENGTH_SHORT)
-        lastToast = t
-        t.show()
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            runOnUiThread { toast(msg) }
+            return
+        }
+        val host: ViewGroup? = findViewById(android.R.id.content)
+        val mini: View? = if (::nowThumbBox.isInitialized && ::navMore.isInitialized) (nowThumbBox.parent?.parent as? View) else null
+        if (host == null || mini == null || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            // sin pantalla lista (arranque) o con la app detrás de otra: el aviso normal de Android, como antes
+            val t = Toast.makeText(this, msg, Toast.LENGTH_SHORT)
+            lastToast = t
+            t.show()
+            return
+        }
+        showNote(msg, host, mini)
+    }
+
+    private fun showNote(msg: String, host: ViewGroup, mini: View) {
+        hideNote(false)
+        val d = resources.displayMetrics.density
+        val tv = TextView(this)
+        tv.text = msg
+        tv.setTextColor(0xFFF2F5F9.toInt())
+        tv.textSize = 14f
+        tv.maxLines = 3
+        tv.ellipsize = android.text.TextUtils.TruncateAt.END
+        tv.gravity = android.view.Gravity.CENTER
+        tv.setPadding((18 * d).toInt(), (11 * d).toInt(), (18 * d).toInt(), (11 * d).toInt())
+        val bg = android.graphics.drawable.GradientDrawable()
+        bg.setColor(0xF2151A21.toInt())
+        bg.cornerRadius = 24 * d
+        bg.setStroke(maxOf(1, (1.2f * d).toInt()), accentColor())
+        tv.background = bg
+        tv.elevation = 12 * d
+        tv.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        tv.setOnClickListener { hideNote() }
+        if (host.width > 0) tv.maxWidth = host.width - (32 * d).toInt()
+        // justo encima del mini reproductor (o de la barra de abajo si el mini no se ve)
+        val ref: View = if (mini.isShown && mini.height > 0) mini else navMore
+        val hp = IntArray(2)
+        val rp = IntArray(2)
+        host.getLocationOnScreen(hp)
+        ref.getLocationOnScreen(rp)
+        val lp = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL)
+        lp.bottomMargin = if (host.height > 0) maxOf(0, host.height - (rp[1] - hp[1])) + (10 * d).toInt() else (150 * d).toInt()
+        tv.alpha = 0f
+        tv.translationY = 12 * d
+        host.addView(tv, lp)
+        tv.animate().alpha(1f).translationY(0f).setDuration(180).start()
+        noteView = tv
+        noteHandler.postDelayed(noteHide, (1800L + msg.length * 45L).coerceIn(2200L, 5000L))
+    }
+
+    private fun hideNote(animate: Boolean = true) {
+        noteHandler.removeCallbacks(noteHide)
+        val v = noteView ?: return
+        noteView = null
+        if (!animate) {
+            (v.parent as? ViewGroup)?.removeView(v)
+            return
+        }
+        v.animate().alpha(0f).translationY(8 * resources.displayMetrics.density).setDuration(160)
+            .withEndAction { (v.parent as? ViewGroup)?.removeView(v) }.start()
     }
 
     /** [AVISO-COLA-1] Un aviso (ej. «La cola está vacía…») no se queda encima de otra pantalla (Ajustes, reproductor de video…). */
     override fun onPause() {
         lastToast?.cancel()
         lastToast = null
+        hideNote(false)   // [AVISO-MINI-1]
         super.onPause()
     }
 
