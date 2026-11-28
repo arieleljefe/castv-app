@@ -1,4 +1,4 @@
-# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v587
+# CASTV: HISTORIAL (solo lo ✅ confirmado por Ariel) · una línea por ítem · v589
 
 Formato: `ID · fecha · qué · archivos principales`. Se consulta solo si algo falla o hay que revertir (`git log --oneline` + `git revert HASH`).
 Los commits exactos están en git; el detalle largo de cada parche vive en el changelog v261 antiguo (guardado como referencia).
@@ -247,3 +247,4 @@ Los commits exactos están en git; el detalle largo de cada parche vive en el ch
 - BUSCA-OTRA-1 · 28 nov · «🔎 Buscar en otro sitio…» cuando la búsqueda no da resultados (Canales o la otra biblioteca) · `MainActivity.kt`
 - TRAER-1 · 28 nov · al cambiar la salida de TV a Teléfono pregunta «¿Seguir escuchando/viendo aquí?» y sigue desde el mismo segundo · `MainActivity.kt`
 - TAG-3.40 · 28 nov · etiqueta `v3.40` publicada e instalada (la app muestra 3.40); incluye el lote visual 3
+- MEJORAS-VENT-1 · 28 nov · «Nuevo proyecto» con textos cortos; «Lo más escuchado» con título limpio, copias `_1` sumadas y conteo en la misma línea; diálogo Álbum ordenado por pistas con buscador y sin «??»; espacio al final de Pistas para el 🔀 · `MainActivity.kt`
