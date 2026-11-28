@@ -57,7 +57,7 @@ class AboutActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
+        root.setBackgroundColor(Themes.color(this, R.attr.castvRootBg))   // [TEMAS-2]
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom)

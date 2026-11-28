@@ -208,7 +208,7 @@ class M3uActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
+        root.setBackgroundColor(Themes.color(this, R.attr.castvRootBg))   // [TEMAS-2]
         root.setPadding(dp(12), dp(16), dp(12), 0)
 
         // [PULIDO-3e] Encabezado: ← Canales (igual que Ajustes)

@@ -114,7 +114,7 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(Themes.color(this, R.attr.castvBg))   // [TEMAS-2]
+        root.setBackgroundColor(Themes.color(this, R.attr.castvRootBg))   // [TEMAS-2] [FONDO-IMG-1]
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom)
@@ -237,6 +237,10 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         l.add(Entry("Interfaz", "Fondo",   // [TEMAS-2]
             Themes.bgNames[Themes.savedBg(this)] + Themes.bgNote(this),
             { pickBg() }))
+
+        l.add(Entry("Interfaz", "Imagen de fondo",   // [FONDO-IMG-1]
+            if (BgImage.has(this)) "Sí: tu imagen, oscurecida ${BgImage.dim(this)} %" else "No: sin imagen",
+            { pickBgImage() }))
 
         l.add(Entry("Interfaz", "Forma", Themes.shapeNames[Themes.savedShape(this)], { pickShape() }))   // [TEMAS-3a]
         l.add(Entry("Interfaz", "Letra", Themes.fontNames[Themes.savedFont(this)], { pickFont() }))   // [TEMAS-3a]
@@ -671,6 +675,56 @@ class SettingsActivity : CastvActivity() {   // [TEXTO-TAM-1]
         Themes.pickBg(this) {
             recreate()   // esta pantalla se redibuja con el fondo; MainActivity lo hace al volver
         }
+    }
+
+    // [FONDO-IMG-1] imagen de fondo propia
+    private val pickBgImg = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            toast("Preparando la imagen…")
+            val app = applicationContext
+            Thread {
+                val ok = BgImage.save(app, uri)
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        if (ok) recreate() else toast("No pude usar esa imagen")
+                    }
+                }
+            }.start()
+        }
+    }
+
+    private fun pickBgImage() {   // [FONDO-IMG-1]
+        val has = BgImage.has(this)
+        val items = ArrayList<String>()
+        items.add("Elegir imagen…")
+        if (has) {
+            items.add("Oscurecer: ${BgImage.dim(this)} %")
+            items.add("Quitar la imagen")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Imagen de fondo")
+            .setItems(items.toTypedArray()) { _, which ->
+                when (which) {
+                    0 -> pickBgImg.launch(arrayOf("image/*"))
+                    1 -> pickBgDim()
+                    else -> { BgImage.clear(this); recreate() }
+                }
+            }
+            .show()
+    }
+
+    private fun pickBgDim() {   // [FONDO-IMG-1]
+        val vals = intArrayOf(30, 50, 70)
+        val names = arrayOf("Poco · 30 %", "Medio · 50 %", "Mucho · 70 %")
+        val cur = vals.indexOf(BgImage.dim(this))
+        AlertDialog.Builder(this)
+            .setTitle("Oscurecer la imagen")
+            .setSingleChoiceItems(names, cur) { d, which ->
+                BgImage.setDim(this, vals[which])
+                d.dismiss()
+                recreate()
+            }
+            .show()
     }
 
     private fun pickShape() {   // [TEMAS-3a]

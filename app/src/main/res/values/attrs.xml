@@ -9,6 +9,8 @@
     <attr name="castvSurface2" format="color"/>
     <attr name="castvNav" format="color"/>
     <attr name="castvStroke" format="color"/>
+    <!-- [FONDO-IMG-1] fondo de las pantallas: = castvBg, o transparente cuando hay imagen de fondo -->
+    <attr name="castvRootBg" format="color"/>
     <!-- [TEMAS-3a] radios de las esquinas (la «forma» del tema) -->
     <attr name="castvRadiusThumb" format="dimension"/>
     <attr name="castvRadiusChip" format="dimension"/>

@@ -93,7 +93,7 @@ object Themes {
     }
 
     /** Un solo número con forma y letra, para que MainActivity sepa si cambiaron en Ajustes. */
-    fun styleKey(a: Context): Int = savedShape(a) * 10 + savedFont(a)
+    fun styleKey(a: Context): Int = BgImage.stamp(a) * 100 + savedShape(a) * 10 + savedFont(a)   // [FONDO-IMG-1] la imagen también cuenta
 
     /** [TEMAS-3b] ¿Este fondo se pinta con el modo actual? (Papel en claro; los demás en oscuro; 0 = el de siempre.) */
     fun bgApplies(c: Context, b: Int): Boolean =
@@ -138,6 +138,8 @@ object Themes {
         if (sh != 0) a.theme.applyStyle(shapeOverlays[sh], true)
         val fo = savedFont(a)
         if (fo != 0) a.theme.applyStyle(fontOverlays[fo], true)
+        val bgImg = if (paintWindow) BgImage.drawable(a) else null   // [FONDO-IMG-1]
+        if (bgImg != null) a.theme.applyStyle(R.style.BgImageOverlay, true)
         val b = savedBg(a)
         if (bgApplies(a, b)) {   // [TEMAS-2] Medianoche = sin cambios; en modo claro no se usa
             a.theme.applyStyle(bgOverlays[b], true)
@@ -147,6 +149,7 @@ object Themes {
                 a.window.navigationBarColor = color(a, R.attr.castvSurface)
             }
         }
+        if (bgImg != null) a.window.setBackgroundDrawable(bgImg)   // [FONDO-IMG-1]
     }
 
     // ------------------------------------------------------------------ [TEMAS-3b] Temas

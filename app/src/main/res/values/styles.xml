@@ -13,6 +13,8 @@
         <item name="castvSurface2">@color/vlc_surface2</item>
         <item name="castvNav">@color/vlc_nav</item>
         <item name="castvStroke">@color/vlc_stroke</item>
+        <!-- [FONDO-IMG-1] -->
+        <item name="castvRootBg">?attr/castvBg</item>
         <!-- [TEMAS-3a] formas por defecto (las de siempre); ShapeOverlay* las cambian -->
         <item name="castvRadiusThumb">10dp</item>
         <item name="castvRadiusChip">18dp</item>
@@ -190,6 +192,10 @@
         <item name="castvSurface2">@color/bgs_kawaii_surface2</item>
         <item name="castvNav">@color/bgs_kawaii_nav</item>
         <item name="castvStroke">@color/bgs_kawaii_stroke</item>
+    </style>
+    <!-- [FONDO-IMG-1] con imagen de fondo, las pantallas dejan ver la ventana -->
+    <style name="BgImageOverlay">
+        <item name="castvRootBg">@android:color/transparent</item>
     </style>
     <style name="FontOverlayCasual">
         <item name="android:fontFamily">casual</item>
