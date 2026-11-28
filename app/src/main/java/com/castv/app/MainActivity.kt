@@ -1684,8 +1684,11 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
                     15 -> R.drawable.ic_mas_link
                     25 -> R.drawable.ic_vp_mp3   // [VIDEO-MP3-1b]
                     18 -> R.drawable.ic_mas_folder
-                    21 -> R.drawable.ic_mas_list   // [TOP-1]
-                    26 -> R.drawable.ic_mas_list   // [RESUMEN-1]
+                    19 -> R.drawable.ic_mas_incognito   // [ICONOS-MAS-1]
+                    20 -> R.drawable.ic_mn_visibility   // [ICONOS-MAS-1] No vistos
+                    21 -> R.drawable.ic_mas_trending   // [TOP-1] [ICONOS-MAS-1]
+                    24 -> R.drawable.ic_vp_info   // [ICONOS-MAS-1] Informe de diagnóstico
+                    26 -> R.drawable.ic_mas_chart   // [RESUMEN-1] [ICONOS-MAS-1]
                     22 -> R.drawable.ic_vp_star   // [TABS-1]
                     23 -> R.drawable.ic_vp_play   // [TABS-1]
                     else -> R.drawable.ic_nav_more
@@ -4405,7 +4408,12 @@ class MainActivity : CastvActivity() {   // [TEXTO-TAM-1]
         } else {
             tvEmpty.visibility = View.GONE
         }
-        if (!footerAttached) {
+        if (workProjects.isEmpty()) {   // [PIE-1] sin proyectos manda el mensaje; el pie de redes queda en Acerca de
+            if (footerAttached) {
+                listFiles.removeFooterView(footerView)
+                footerAttached = false
+            }
+        } else if (!footerAttached) {
             listFiles.addFooterView(footerView, null, false)
             footerAttached = true
         }
